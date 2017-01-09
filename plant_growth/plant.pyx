@@ -216,7 +216,7 @@ cdef class Plant:
         self.water *= constants.WATER_PER_CELL
         self.energy = min(self.water, self.light)
 
-    cpdef double seed_spread(self):
+    cpdef double seed_spread(self) except -1:
         cdef double n = 0
         cdef size_t i = 0
         cdef Cell *cell
@@ -226,6 +226,26 @@ cdef class Plant:
             if cell.flower and cell.vert.p[1] > 0:
                 n += cell.vert.p[1] * cell.vert.p[1]
         return n
+
+    # cpdef double seed_spread(self) except -1:
+    #     cdef double n = 0
+    #     cdef size_t i = 0
+    #     # cdef Cell *cell
+    #     cdef Node *fnode = self.mesh.faces
+
+    #     cdef Face * face# = self.mesh.faces
+    #     cdef (Vert *) v1, v2, v3
+    #     cdef double height
+
+    #     while fnode != NULL:
+    #         face = <Face *>fnode.data
+    #         self.mesh.face_verts(face, &v1, &v2, &v3)
+    #         if (<Cell *>v1.data).flower and (<Cell *>v2.data).flower and (<Cell *>v3.data).flower:
+    #             height = (v1.p[1] + v2.p[1] + v3.p[1])/3
+    #             if height > 0:
+    #                 n += height * height
+    #         fnode = fnode.next
+    #     return n
 
     # cpdef int num_active_flowers(self):
     #     cdef int n = 0

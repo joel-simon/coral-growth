@@ -35,7 +35,7 @@ cdef class Plant:
     cdef void grow(self) except *
 
     cdef void calculate_energy(self)
-    cpdef double seed_spread(self)
+    cpdef double seed_spread(self)  except -1
 
     # cpdef int num_flowers(self)
     # cpdef int num_active_flowers(self)

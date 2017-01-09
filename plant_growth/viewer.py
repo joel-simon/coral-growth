@@ -45,13 +45,10 @@ class Viewer(object):
         glShadeModel(GL_SMOOTH)
 
         # glCullFace(GL_BACK)
-        glDisable( GL_CULL_FACE )
+        # glDisable( GL_CULL_FACE )
 
         # glPolygonMode ( GL_FRONT_AND_BACK, GL_LINE )
 
-        # Transparancy?
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glEnable(GL_BLEND)
 
 
         self.clock = pygame.time.Clock()
@@ -62,6 +59,10 @@ class Viewer(object):
         gluPerspective(90.0, width/float(height), 1, 100.0)
         glEnable(GL_DEPTH_TEST)
         glMatrixMode(GL_MODELVIEW)
+
+        # Transparancy?
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glEnable(GL_BLEND)
 
         glTranslated(-15, -15, -15)
         make_plane(5)
@@ -250,16 +251,21 @@ from colorsys import hsv_to_rgb
 class AnimationViewer(Viewer):
     def __init__(self, files, view_size):
         super(AnimationViewer, self).__init__(view_size)
+        print('Loading Animation')
 
         self.frame = 0
-        self.frame_lists = []
+        self.n_frames = len(files)
+        # self.frame_lists = []
         self.animation_playing = False
 
-        print('Loading Animation')
+        self.view = 0
+
+        self.n_views = 3
+        self.view_lists = [[] for _ in range(self.n_views)]
 
         colors = [hsv_to_rgb((i/16.0), 1.0, 1.0) for i in range(16)]
 
-        for i, file in enumerate(files):
+        for fi, file in enumerate(files):
             mesh = Mesh.from_obj(file).export()
 
             mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
@@ -278,30 +284,48 @@ class AnimationViewer(Viewer):
                     d[2] = int(d[2])
                     d[3] = float(d[3])
                     cell_data.append(d)
-                    # print(d[3])
-
-                    mesh['vert_colors'][ci] = hsv_to_rgb((100+190*d[3])/360, .70, .6 + .4*d[0])
-                    # mesh['vert_colors'][ci] = colors[d[2]]
-
-                    # if d[3]:
-                    #     mesh['vert_colors'][ci] = hsv_to_rgb(290.0/360, .70, .6 + .4*d[0])
-                    # else:
-                    #     mesh['vert_colors'][ci] = hsv_to_rgb(100.0/360, .70, .3 + .7*d[0])
-
                     ci += 1
 
-             # = colors
-            self.start_draw()
+            for v in range(self.n_views):
+                gl_list = glGenLists(1)
+                glNewList(gl_list, GL_COMPILE)
 
-            print(i, 'n_verts=', len(mesh['vertices']))
+                for i, data in enumerate(cell_data):
+                    if v == 0: # PLANT and Flower
+                        color = hsv_to_rgb((100+190*data[3])/360, .70, .6 + .4*data[0])
+                    elif v == 1:
+                        color = (data[0], data[0], data[0])
+                    elif v == 2:
+                        color = colors[data[2]]
 
-            self.build_compiled_gllist(mesh)
+                    mesh['vert_colors'][i] = color
 
-            self.frame_lists.append(self.gl_list)
-            glEndList()
-            self.gl_list = None
+                self.build_compiled_gllist(mesh)
+                self.view_lists[v].append([gl_list])
+                glEndList()
+                # mesh['vert_colors'][ci] = colors[d[2]]
 
-        self.gl_lists = [self.frame_lists[self.frame]]
+            # if d[3]:
+            #     mesh['vert_colors'][ci] = hsv_to_rgb(290.0/360, .70, .6 + .4*d[0])
+            # else:
+            #     mesh['vert_colors'][ci] = hsv_to_rgb(100.0/360, .70, .3 + .7*d[0])
+
+
+            # self.start_draw()
+
+            print(fi, 'n_verts=', len(mesh['vertices']))
+
+            # self.gl_list = glGenLists(1)
+            # glNewList(self.gl_list, GL_COMPILE)
+
+
+
+            # self.frame_lists.append(self.gl_list)
+            # glEndList()
+            # self.gl_list = None
+
+        # self.gl_lists = [self.frame_lists[self.frame]]
+        self.gl_lists = self.view_lists[self.view][self.frame]
         print('Finished Loading Animation')
 
     def handle_input(self, e):
@@ -309,28 +333,37 @@ class AnimationViewer(Viewer):
 
         if e.type == KEYDOWN:
             if e.key == K_RIGHT:
-                if self.frame < len(self.frame_lists) - 1:
+                if self.frame < self.n_frames - 1:
                     self.frame += 1
-                    self.gl_lists = [self.frame_lists[self.frame]]
+                    self.gl_lists = self.view_lists[self.view][self.frame]
 
             elif e.key == K_LEFT:
                 if self.frame > 0:
                     self.frame -= 1
-                    self.gl_lists = [self.frame_lists[self.frame]]
+                    self.gl_lists = self.view_lists[self.view][self.frame]
 
             elif e.key == K_r:
                 self.frame = 0
-                self.gl_lists = [self.frame_lists[self.frame]]
+                self.gl_lists = self.view_lists[self.view][self.frame]
 
             elif e.key == K_SPACE:
                 self.animation_playing = not self.animation_playing
+
+            elif e.key == K_1:
+                self.view = 0
+            elif e.key == K_2:
+                self.view = 1
+            elif e.key == K_3:
+                self.view = 2
+            self.gl_lists = self.view_lists[self.view][self.frame]
+
 
     def step(self, i):
         if self.animation_playing:
             self.rx += 1
             self.zpos += .25
 
-        if self.animation_playing and self.frame < len(self.frame_lists) - 1:
+        if self.animation_playing and self.frame < self.n_frames - 1:
             self.frame += 1
-            self.gl_lists = [self.frame_lists[self.frame]]
+            self.gl_lists = self.view_lists[self.view][self.frame]
 

@@ -6,7 +6,27 @@ G_OBJ_PLANE = 1
 G_OBJ_SPHERE = 2
 G_OBJ_CUBE = 3
 
+
 def make_plane(n):
+    glNewList(G_OBJ_PLANE, GL_COMPILE)
+    glColor3f(153./255, 90./255, 0)
+    glBegin(GL_QUADS)
+
+    x = 100
+    glVertex4f(-x, 0, -n, .1)
+    glVertex4f(-x, 0, x, .1)
+    glVertex4f(x, 0, x, .1)
+    glVertex4f(x, 0, -x, .1)
+    # glVertex4f(-1,0,  -1, 0)
+    # glVertex4f(-1,0,  1, 0)
+    # glVertex4f(1,0,  1, 0)
+    # glVertex4f(1,0,  -1, 0)
+    glEnd()
+    glEndList()
+
+
+
+def make_plane2(n):
     glNewList(G_OBJ_PLANE, GL_COMPILE)
     glBegin(GL_LINES)
     glColor3f(0, 0, 0)

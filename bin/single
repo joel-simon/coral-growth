@@ -35,18 +35,19 @@ pop = NEAT.Population(
     int(time.time()) # Random number generator seed.
 )
 
-def run(out_dir):
+def run(out_dir, run_id):
     last_fitness = 0.0
     t = time.time()
 
     for generation in range(constants.NUM_GENERATIONS):
+        print(run_id)
         print('Starting generation', generation)
+
         genome_list = NEAT.GetGenomeList(pop)
 
         for genome in genome_list:
             plant = evaluate_genome(genome)
-            # fitness = plant.light
-            fitness = plant.seed_spread()#plant.flowers
+            fitness = plant.seed_spread() + plant.volume/100
             genome.SetFitness(fitness)
             print('.', end='', flush=True)
 
@@ -94,5 +95,7 @@ if __name__ == '__main__':
     dir_path = os.path.join(root, dir_name)
     os.makedirs(dir_path)
     shutil.copy(os.path.abspath('..')+'/plant_growth/constants.py', os.path.join(dir_path, 'constants.py'))
-    run(dir_path)
+    shutil.copy(os.path.abspath('..')+'/plant_growth/neat_params.py', os.path.join(dir_path, 'neat_params.py'))
+
+    run(dir_path, run_id)
     # call('./render_all '+out_dir, shell=True)

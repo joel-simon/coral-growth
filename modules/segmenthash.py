@@ -64,7 +64,8 @@ class SegmentHash(object):
 
     def _broad_phase(self, p0, p1):
         for i, j in self._segment_supercover(p0, p1):
-            yield self.data[i, j]
+            if i > 0 and i < self.num_x and j > 0 and j < self.num_y:
+                yield self.data[i, j]
 
     def in_bounds(self, p):
         if p.x < 0 or p.x >= self.width:

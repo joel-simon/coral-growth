@@ -48,7 +48,7 @@ world.add_plant(seed_polygon, net)
 #     seed_polygon.append(Vector(x, y))
 # world.add_plant(seed_polygon, None)
 
-for s in range(100):
+for s in range(300):
     world.simulation_step()
     plot(view, world)
     if s % 10 == 0:

@@ -25,7 +25,6 @@ class World(object):
         self.height = height
         self.max_link_length = max_link_length
         self.light = light
-        self.polygrid = PolygonGrid(width, height)
         self.sh = SegmentHash(width, height, int(max_link_length//2))
         self.plants = []
         self.steps = 0
@@ -79,13 +78,16 @@ class World(object):
             cell.frozen = True
             return
 
-        if self.polygrid.in_polygon(new_p):
-            cell.frozen = True
-            return
+        for id in self.sh.segment_intersect(cell.prev.P, new_p):
+            if id != cell.id:
+                return
+
+        for id in self.sh.segment_intersect(new_p, cell.next.P):
+            if id != cell.next.id:
+                return
 
         growth_area = [ cell.prev.P, new_p, cell.next.P ]
         plant.volume += geometry.polygon_area(growth_area)
-        self.polygrid.add_polygon(growth_area)
 
         self.sh.segment_move(cell.id, p0=cell.P, p1=cell.prev.P)
         self.sh.segment_move(cell.next.id, p0=cell.P, p1=cell.next.P)
@@ -112,19 +114,18 @@ class World(object):
                 self.sh.segment_move(cell.id, cell.P, new_cell.P)
                 self.sh.segment_add(new_cell.id, new_cell.P, new_cell.prev.P)
 
-
     def simulation_step(self):
         self.__calculate_light()
 
         for plant in self.plants:
             for cell in plant.cells:
-                if cell.frozen: continue
+                # if cell.frozen: continue
                 if not cell.light: continue
 
                 N = cell.calculate_normal()
 
                 # A = cell.calulate_angle()
-                step = 4#4.5 + random.random()*4
+                step = random.random()*5
                 new_P = cell.P + N * step
                 self.move_cell(plant, cell, new_P)
 

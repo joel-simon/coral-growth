@@ -27,7 +27,7 @@ class Vector(object):
         return Vector(self.x, self.y)
 
     def __str__(self):
-        return "[%f, %f]" % (self.x, self.y)
+        return "V2D(%f, %f)" % (self.x, self.y)
 
     def __add__(self, other):
         return Vector(self.x + other.x, self.y+other.y)

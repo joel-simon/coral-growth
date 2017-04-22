@@ -1,13 +1,12 @@
 from __future__ import division, print_function
 import random
-import pyvisgraph as vg
 from linkedlist import DoubleList
 from cell import Cell
-from polygon_grid import PolygonGrid
-# import meshpy.triangle as triangle
 import geometry
+import math
 from modules.segmenthash import SegmentHash
 from recordclass import recordclass
+from vector import Vector
 
 Plant = recordclass('Plant', ['network', 'cells', 'water', 'energy', 'volume'])
 
@@ -20,12 +19,14 @@ def round_trip_connect(start, end):
 
 class World(object):
     """docstring for World"""
-    def __init__(self, width, height, max_link_length, light):
+    def __init__(self, width, height, max_link_length, light, soil_height):
         self.width = width
         self.height = height
         self.max_link_length = max_link_length
         self.light = light
-        self.sh = SegmentHash(width, height, int(max_link_length//2))
+        self.soil_height = soil_height
+
+        self.sh = SegmentHash(width, height, int(max_link_length))
         self.plants = []
         self.steps = 0
 
@@ -57,21 +58,28 @@ class World(object):
             # print(cell.P)
             self.sh.segment_add(cell.id, cell.P, cell.prev.P)
 
-    def __single_collision(self, cell):
-        for id in self.sh.segment_intersect(self.light, cell.P):
-            if id != cell.id and id != cell.next.id:
+    def __single_collision(self, P, id_exclude):
+        for id in self.sh.segment_intersect(self.light, P):
+            if id != id_exclude:
                 return True
         return False
 
     def __calculate_light(self):
         for plant in self.plants:
             for cell in plant.cells:
-                # if not cell.frozen:
-                # print(cell.id, list(self.sh.segment_intersect(self.light, cell.P)))
-                if self.__single_collision(cell):
+                cell.light = 0
+        for plant in self.plants:
+            for cell in plant.cells:
+                P = (cell.P + cell.prev.P)/2
+                if self.__single_collision(P, cell.id):
                     cell.light = 0
                 else:
-                    cell.light = 1
+                    vector_light = Vector(P.y - self.light.y, P.x - self.light.x)
+                    vector_segment = Vector(P.y - cell.prev.P.y, P.x - cell.prev.P.x)
+                    angle = vector_light.angle(vector_segment)
+                    light = 1 - (abs(math.pi/2.-angle)) / (math.pi/2.)
+                    cell.light += light/2
+                    cell.prev.light += light/2
 
     def move_cell(self, plant, cell, new_p):
         if not self.__in_bounds(new_p):
@@ -80,10 +88,12 @@ class World(object):
 
         for id in self.sh.segment_intersect(cell.prev.P, new_p):
             if id != cell.id:
+                cell.frozen = True
                 return
 
         for id in self.sh.segment_intersect(new_p, cell.next.P):
             if id != cell.next.id:
+                cell.frozen = True
                 return
 
         growth_area = [ cell.prev.P, new_p, cell.next.P ]
@@ -107,7 +117,7 @@ class World(object):
                     inserts.append(cell)
 
             for cell in inserts:
-                new_cell = self.__make_cell((cell.P+cell.prev.P)/2)
+                new_cell = self.__make_cell((cell.P+cell.prev.P)/2.0)
 
                 plant.cells.insert_before(cell, new_cell)
 
@@ -120,12 +130,10 @@ class World(object):
         for plant in self.plants:
             for cell in plant.cells:
                 # if cell.frozen: continue
-                if not cell.light: continue
-
+                if cell.light == 0: continue
                 N = cell.calculate_normal()
-
                 # A = cell.calulate_angle()
-                step = random.random()*5
+                step = 2 * cell.light+1*random.random()
                 new_P = cell.P + N * step
                 self.move_cell(plant, cell, new_P)
 

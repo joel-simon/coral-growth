@@ -83,18 +83,23 @@ class SegmentHash(object):
         for bucket in self._broad_phase(p0, p1):
             bucket.append(id)
 
-    def segment_intersect(self, p0, p1):
+    def segment_intersect(self, p0, p1, brute_force=False):
         assert(self.in_bounds(p0))
         assert(self.in_bounds(p1))
-
-        seen = set()
-        for bucket in self._broad_phase(p0, p1):
-            for id in bucket:
-                if id not in seen:
-                    seen.add(id)
-                    p2, p3 = self.segments[id]
-                    if intersect(p0, p1, p2, p3):
-                        yield id
+        # brute force for testing
+        if brute_force:
+            for id, (p2, p3) in self.segments.items():
+                if intersect(p0, p1, p2, p3):
+                    yield id
+        else:
+            seen = set()
+            for bucket in self._broad_phase(p0, p1):
+                for id in bucket:
+                    if id not in seen:
+                        seen.add(id)
+                        p2, p3 = self.segments[id]
+                        if intersect(p0, p1, p2, p3):
+                            yield id
 
     def segment_remove(self, id):
         assert(id in self.segments)

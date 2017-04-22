@@ -1,4 +1,6 @@
 import math
+pi2 = math.pi *2
+
 class Vector(object):
     __slots__ = ['x', 'y']
     def __init__(self, x, y):
@@ -21,7 +23,16 @@ class Vector(object):
         return Vector(other.y - self.y , -(other.x - self.x))
 
     def angle(self, other):
-        return math.acos((self*other) / (self.norm() * other.norm()))
+        inner = (self*other) / (self.norm() * other.norm())
+        return math.acos(min(1, max(-1, inner)))
+
+    def angle_clockwise(self, other):
+        inner_angle = self.angle(other)
+        determinant = self.x*other.y - self.y*other.x
+        if determinant < 0:
+            return inner_angle
+        else:
+            return pi2 - inner_angle
 
     def copy(self):
         return Vector(self.x, self.y)

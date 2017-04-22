@@ -11,7 +11,11 @@ class Cell(Node):
         self.P = P
         self.next_P = P.copy()
         self.frozen = False
+
         self.light = 0
+        self.water = 0
+        self.curvature = 0
+
         super(Cell, self).__init__()
 
     def calculate_normal(self):

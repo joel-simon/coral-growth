@@ -5,10 +5,11 @@ from cell import Cell
 import geometry
 import math
 from modules.segmenthash import SegmentHash
+from polygon_grid import PolygonGrid
 from recordclass import recordclass
 from vector import Vector
-
-Plant = recordclass('Plant', ['network', 'cells', 'water', 'energy', 'volume'])
+import numpy as np
+Plant = recordclass('Plant', ['network', 'cells', 'water', 'light', 'volume'])
 
 def round_trip_connect(start, end):
     result = []
@@ -26,6 +27,10 @@ class World(object):
         self.light = light
         self.soil_height = soil_height
 
+        #
+        self.m_delta = 2.0
+        #
+        self.pg = PolygonGrid(width, height)
         self.sh = SegmentHash(width, height, int(max_link_length))
         self.plants = []
         self.steps = 0
@@ -46,16 +51,16 @@ class World(object):
 
     def add_plant(self, seed_polygon, network):
         area = geometry.polygon_area(seed_polygon)
+        self.pg.add_polygon(seed_polygon)
         cells = DoubleList()
 
         for p in seed_polygon:
             cells.append(self.__make_cell(p))
 
-        plant = Plant(network, cells, water=0, energy=0, volume=area)
+        plant = Plant(network, cells, water=0, light=0, volume=area)
         self.plants.append(plant)
 
         for cell in plant.cells:
-            # print(cell.P)
             self.sh.segment_add(cell.id, cell.P, cell.prev.P)
 
     def __single_collision(self, P, id_exclude):
@@ -66,10 +71,13 @@ class World(object):
 
     def __calculate_light(self):
         for plant in self.plants:
+            plant.light = 0
             for cell in plant.cells:
                 cell.light = 0
         for plant in self.plants:
             for cell in plant.cells:
+                if cell.P.y < self.soil_height:
+                    continue
                 P = (cell.P + cell.prev.P)/2
                 if self.__single_collision(P, cell.id):
                     cell.light = 0
@@ -80,24 +88,50 @@ class World(object):
                     light = 1 - (abs(math.pi/2.-angle)) / (math.pi/2.)
                     cell.light += light/2
                     cell.prev.light += light/2
+                    plant.light += light
 
-    def move_cell(self, plant, cell, new_p):
+    def __calculate_water(self):
+        for plant in self.plants:
+            plant.water = 0
+            for cell in plant.cells:
+                if cell.P.y < self.soil_height:
+                    cell.water = 1
+                    plant.water += 1
+                else:
+                    cell.water = 0
+
+    def __calculate_curvatures(self):
+        for plant in self.plants:
+            for cell in plant.cells:
+                v1 = cell.next.P - cell.P
+                v2 = cell.prev.P - cell.P
+                cell.curvature = v1.angle_clockwise(v2)
+
+    def move_cell(self, plant, cell, dist):
+        N = cell.calculate_normal()
+        new_p = cell.P + N * dist*2
+
         if not self.__in_bounds(new_p):
             cell.frozen = True
-            return
+            return False
+
+        if self.pg.in_polygon(new_p):
+            return False
 
         for id in self.sh.segment_intersect(cell.prev.P, new_p):
             if id != cell.id:
-                cell.frozen = True
-                return
+                # cell.frozen = True
+                return False
 
         for id in self.sh.segment_intersect(new_p, cell.next.P):
             if id != cell.next.id:
-                cell.frozen = True
-                return
+                # cell.frozen = True
+                return False
 
+        new_p = cell.P + N * dist
         growth_area = [ cell.prev.P, new_p, cell.next.P ]
         plant.volume += geometry.polygon_area(growth_area)
+        self.pg.add_polygon(growth_area)
 
         self.sh.segment_move(cell.id, p0=cell.P, p1=cell.prev.P)
         self.sh.segment_move(cell.next.id, p0=cell.P, p1=cell.next.P)
@@ -126,16 +160,23 @@ class World(object):
 
     def simulation_step(self):
         self.__calculate_light()
+        self.__calculate_water()
+        self.__calculate_curvatures()
+
+        inputs = np.zeros((3))
 
         for plant in self.plants:
             for cell in plant.cells:
-                # if cell.frozen: continue
-                if cell.light == 0: continue
-                N = cell.calculate_normal()
-                # A = cell.calulate_angle()
-                step = 2 * cell.light+1*random.random()
-                new_P = cell.P + N * step
-                self.move_cell(plant, cell, new_P)
+                inputs[0] = cell.light
+                inputs[1] = cell.water
+                inputs[2] = cell.curvature / math.pi # map [0-1]
+
+                # To replace with netowrk output.
+                # out = [cell.light]
+                out = [random.random()]
+
+                dist = self.m_delta * out[0]
+                self.move_cell(plant, cell, dist)
 
         self.__update_positions()
         self.__split_links()

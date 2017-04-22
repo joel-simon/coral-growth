@@ -3,8 +3,9 @@
     using gfx draw when available
 """
 import sys
-import pygame
 import math
+import pygame
+import pygame.gfxdraw
 pygame.init()
 # pygame.font.init()
 pygame.mixer.init()
@@ -43,8 +44,8 @@ class Draw(object):
 class PygameDraw(Draw):
     """docstring for PygameDraw"""
     def draw_polygon(self, points, color, t=0):
-        # points = [(int(x*self.scale), int(y*self.scale)) for x,y in points]
-        points = map(self.map_point, points)
+
+        points = list(map(self.map_point, points))
         pygame.draw.polygon(self.surface, color, points, t)
 
     def draw_circle(self, position, radius, color, width=1):
@@ -58,15 +59,19 @@ class PygameDraw(Draw):
         a = self.map_point(positionA)
         b = self.map_point(positionB)
         width = int(width*self.scale)
-        pygame.draw.line(self.surface, color, a, b, width)
+        # pygame.draw.line(self.surface, color, a, b, width)
+        pygame.gfxdraw.line(self.surface, a[0], a[1], b[0], b[1], color)
 
     def draw_lines(self, points, color, width=1):
-        points = [(int(x), int(y)) for x,y in points]
+        points = [self.map_point(x,y) for x, y in points]
         pygame.draw.lines(self.surface, color, False, points, width)
 
     def draw_rect(self, rect, color, width=1):
-        rect = tuple(v*self.scale for v in rect)
+        x, y = self.map_point((rect[0], rect[1]))
+        w, h = int(self.scale*rect[2]), int(self.scale*rect[3])
+        rect = (x, y, w, -h)
         pygame.draw.rect(self.surface, color, rect, width)
+        # pygame.gfxdraw.rectangle(self.surface, rect, color)
 
     def draw_text(self, position, string, font=8, color=BLACK, center=False):
         font = int(self.scale * font)

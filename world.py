@@ -96,7 +96,7 @@ class World(object):
             for cell in plant.cells:
                 if cell.P.y < self.soil_height:
                     cell.water = 1
-                    plant.water += 1
+                    plant.water += 1./self.max_link_length
                 else:
                     cell.water = 0
 
@@ -166,16 +166,24 @@ class World(object):
         inputs = np.zeros((3))
 
         for plant in self.plants:
+            network = plant.network
+
+            # print(plant.water, plant.light)
+
             for cell in plant.cells:
                 inputs[0] = cell.light
                 inputs[1] = cell.water
-                inputs[2] = cell.curvature / math.pi # map [0-1]
+                inputs[2] = (cell.curvature/(math.pi)) - 1
 
-                # To replace with netowrk output.
-                # out = [cell.light]
-                out = [random.random()]
+                # if cell.curvature > math.pi:
+                #     inputs[2] = - (cell.curvature-math.pi) / math.pi
+                # else:
+                #     inputs[2] = cell.curvature / math.pi
 
-                dist = self.m_delta * out[0]
+                network.Flush()
+                network.Input(inputs)
+                network.ActivateFast()
+                dist = self.m_delta * network.Output()[0]
                 self.move_cell(plant, cell, dist)
 
         self.__update_positions()

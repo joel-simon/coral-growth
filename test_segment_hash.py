@@ -51,11 +51,11 @@ while True:
 
     for (i,j), v in np.ndenumerate(sh.data):
         if len(v):
-            view.draw_rect((i*sh.d, height-j*sh.d, sh.d, -sh.d), (100,100,0), width=0)
-        view.draw_rect((i*sh.d, height-(j*sh.d), sh.d, -sh.d), (0,0,0), width=1)
+            view.draw_rect((i*sh.d, j*sh.d, sh.d, sh.d), (100,100,0), width=0)
+        view.draw_rect((i*sh.d, (j*sh.d), sh.d, sh.d), (0,0,0), width=1)
 
     for x, y in sh._segment_supercover(center, mouse):
-        view.draw_rect((x*sh.d, height-(y*sh.d), sh.d, -sh.d), (0,200,0), width=0)
+        view.draw_rect((x*sh.d, (y*sh.d), sh.d, sh.d), (0,200,0), width=0)
 
     view.draw_line(center, mouse, (0,0,0), width=2)
 

@@ -43,6 +43,11 @@ class Draw(object):
 
 class PygameDraw(Draw):
     """docstring for PygameDraw"""
+
+    def draw_pixel(self, point, color):
+        x, y = self.map_point(point)
+        pygame.gfxdraw.pixel(self.surface, x, y, color)
+
     def draw_polygon(self, points, color, t=0):
 
         points = list(map(self.map_point, points))
@@ -59,8 +64,10 @@ class PygameDraw(Draw):
         a = self.map_point(positionA)
         b = self.map_point(positionB)
         width = int(width*self.scale)
-        # pygame.draw.line(self.surface, color, a, b, width)
-        pygame.gfxdraw.line(self.surface, a[0], a[1], b[0], b[1], color)
+        if width > 1:
+            pygame.draw.line(self.surface, color, a, b, width)
+        else:
+            pygame.gfxdraw.line(self.surface, a[0], a[1], b[0], b[1], color)
 
     def draw_lines(self, points, color, width=1):
         points = [self.map_point(x,y) for x, y in points]

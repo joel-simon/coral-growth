@@ -15,8 +15,8 @@ width = 750
 height = 750
 soil_height = 200
 
-num_segments = 16
-radius = 50
+num_segments = 12
+radius = 25
 
 link_rest = 2*math.pi*radius / num_segments
 max_link_length = 1.3 * link_rest
@@ -30,14 +30,15 @@ world = World(width, height, max_link_length, light, soil_height)
 
 
 #(id, num_in, hidden out)
-genome = NEAT.Genome(0, 3, 0, 1, False, NEAT.ActivationFunction.UNSIGNED_SIGMOID,
+genome = NEAT.Genome(0, 5, 0, 1, False, NEAT.ActivationFunction.UNSIGNED_SIGMOID,
                     NEAT.ActivationFunction.UNSIGNED_SIGMOID, 0, params)
 
 pop = NEAT.Population(genome, params, True, 1.0, 0)
-pop.RNG.Seed(int(time.clock()*100))
+# print(int(time.clock()*200))
+pop.RNG.Seed(int(time.clock()*200))
 genome_list = NEAT.GetGenomeList(pop)
 
-genome = genome_list[0]
+genome = genome_list[8]
 
 net = NEAT.NeuralNetwork()
 genome.BuildPhenotype(net)
@@ -45,10 +46,11 @@ genome.BuildPhenotype(net)
 seed_polygon = []
 for i in range(num_segments):
     a = 2 * i * math.pi / num_segments
-    x = width/2 + math.cos(a) * radius + (random.random()-.5)
-    y = soil_height + math.sin(a) * radius + (random.random()-.5)
+    x = width/2 + math.cos(a) * radius# + (random.random()-.5)
+    y = soil_height + math.sin(a) * radius# + (random.random()-.5)
     seed_polygon.append(Vector(x, y))
-world.add_plant(seed_polygon, net)
+
+world.add_plant(seed_polygon, net, .002)
 
 
 # seed_polygon = []
@@ -59,8 +61,10 @@ world.add_plant(seed_polygon, net)
 #     seed_polygon.append(Vector(x, y))
 # world.add_plant(seed_polygon, None)
 
-for s in range(100):
-    plot(view, world)
+for s in range(500):
+    world.calculate()
+    if s % 2 == 0:
+        plot(view, world)
     world.simulation_step()
     if s % 10 == 0:
         print(s)

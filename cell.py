@@ -9,8 +9,10 @@ class Cell(Node):
     def __init__(self, id, P):
         self.id = id
         self.P = P
-        self.next_P = P.copy()
+        self.new_p = P.copy()
         self.frozen = False
+        # self.N = None
+        # self.grow_d = 0
 
         self.light = 0
         self.water = 0

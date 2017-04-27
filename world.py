@@ -5,11 +5,14 @@ from cell import Cell
 import geometry
 import math
 from modules.segmenthash import SegmentHash
-from polygon_grid import PolygonGrid
+from image_grid import PolygonGrid
 from recordclass import recordclass
 from vector import Vector
 import numpy as np
-Plant = recordclass('Plant', ['network', 'cells', 'water', 'light', 'volume'])
+
+Plant = recordclass('Plant', [
+    'network', 'cells', 'water', 'light', 'volume', 'efficiency'
+])
 
 def round_trip_connect(start, end):
     result = []
@@ -49,7 +52,7 @@ class World(object):
         self.__next_cell_id += 1
         return cell
 
-    def add_plant(self, seed_polygon, network):
+    def add_plant(self, seed_polygon, network, efficiency):
         area = geometry.polygon_area(seed_polygon)
         self.pg.add_polygon(seed_polygon)
         cells = DoubleList()
@@ -57,7 +60,8 @@ class World(object):
         for p in seed_polygon:
             cells.append(self.__make_cell(p))
 
-        plant = Plant(network, cells, water=0, light=0, volume=area)
+        plant = Plant(network, cells, 0, 0, area, efficiency)
+
         self.plants.append(plant)
 
         for cell in plant.cells:
@@ -74,21 +78,27 @@ class World(object):
             plant.light = 0
             for cell in plant.cells:
                 cell.light = 0
+
         for plant in self.plants:
             for cell in plant.cells:
+                # Underground cells do not get sunlight.
                 if cell.P.y < self.soil_height:
                     continue
-                P = (cell.P + cell.prev.P)/2
+
+                P = cell.P#(cell.P + cell.prev.P)/2
+
                 if self.__single_collision(P, cell.id):
                     cell.light = 0
+
                 else:
                     vector_light = Vector(P.y - self.light.y, P.x - self.light.x)
                     vector_segment = Vector(P.y - cell.prev.P.y, P.x - cell.prev.P.x)
                     angle = vector_light.angle(vector_segment)
                     light = 1 - (abs(math.pi/2.-angle)) / (math.pi/2.)
-                    cell.light += light/2
-                    cell.prev.light += light/2
+                    cell.light += light
+                    # cell.prev.light += light/2
                     plant.light += light
+                    # print(light/2)
 
     def __calculate_water(self):
         for plant in self.plants:
@@ -96,7 +106,7 @@ class World(object):
             for cell in plant.cells:
                 if cell.P.y < self.soil_height:
                     cell.water = 1
-                    plant.water += 1./self.max_link_length
+                    plant.water += 10./self.max_link_length
                 else:
                     cell.water = 0
 
@@ -107,41 +117,31 @@ class World(object):
                 v2 = cell.prev.P - cell.P
                 cell.curvature = v1.angle_clockwise(v2)
 
-    def move_cell(self, plant, cell, dist):
-        N = cell.calculate_normal()
-        new_p = cell.P + N * dist*2
-
+    # def move_cell(self, plant, cell, dist):
+    #     """
+    #     If this is not a valid move, return 0 (False)
+    #     Otherwise, new cell.new_P and return the area of the increase
+    #     """
+    def __valid_move(self, cell, new_p):
         if not self.__in_bounds(new_p):
-            cell.frozen = True
             return False
+
+        # if self.pg.line_intersection(new_p, cell.prev.P):
+        #     return False
+
+        # if self.pg.line_intersection(new_p, cell.next.P):
+        #     return False
 
         if self.pg.in_polygon(new_p):
             return False
 
-        for id in self.sh.segment_intersect(cell.prev.P, new_p):
-            if id != cell.id:
-                # cell.frozen = True
-                return False
-
-        for id in self.sh.segment_intersect(new_p, cell.next.P):
-            if id != cell.next.id:
-                # cell.frozen = True
-                return False
-
-        new_p = cell.P + N * dist
-        growth_area = [ cell.prev.P, new_p, cell.next.P ]
-        plant.volume += geometry.polygon_area(growth_area)
-        self.pg.add_polygon(growth_area)
-
-        self.sh.segment_move(cell.id, p0=cell.P, p1=cell.prev.P)
-        self.sh.segment_move(cell.next.id, p0=cell.P, p1=cell.next.P)
-
-        cell.next_P = new_p
+        return True
 
     def __update_positions(self):
         for plant in self.plants:
             for cell in plant.cells:
-                cell.P = cell.next_P
+                cell.P = cell.new_p
+                self.sh.segment_move(cell.id, cell.prev.P, cell.P)
 
     def __split_links(self):
         for plant in self.plants:
@@ -158,22 +158,38 @@ class World(object):
                 self.sh.segment_move(cell.id, cell.P, new_cell.P)
                 self.sh.segment_add(new_cell.id, new_cell.P, new_cell.prev.P)
 
-    def simulation_step(self):
+    def calculate(self):
         self.__calculate_light()
         self.__calculate_water()
         self.__calculate_curvatures()
 
-        inputs = np.zeros((3))
+    def fake_output(self, cell):
+        if cell.water:
+            return [cell.curvature*3]
+        else:
+            return [cell.curvature]
+            # return []
+
+    def simulation_step(self):
+        inputs = np.zeros((5))
 
         for plant in self.plants:
-            network = plant.network
 
-            # print(plant.water, plant.light)
+            energy = 10 * min(plant.water, plant.light)
+            consumption = plant.volume * plant.efficiency / energy
+            print(plant.water / plant.light)
+            if consumption > 1.0:
+                continue
+
+            network = plant.network
 
             for cell in plant.cells:
                 inputs[0] = cell.light
                 inputs[1] = cell.water
                 inputs[2] = (cell.curvature/(math.pi)) - 1
+                inputs[3] = consumption
+                inputs[4] = plant.water / plant.light
+
 
                 # if cell.curvature > math.pi:
                 #     inputs[2] = - (cell.curvature-math.pi) / math.pi
@@ -183,8 +199,22 @@ class World(object):
                 network.Flush()
                 network.Input(inputs)
                 network.ActivateFast()
-                dist = self.m_delta * network.Output()[0]
-                self.move_cell(plant, cell, dist)
+                output = network.Output()
+                # output = [random.random()*5]
+                # output = self.fake_output(cell)
 
-        self.__update_positions()
-        self.__split_links()
+                # Handle Outputs.
+                N = cell.calculate_normal()
+                P2 = cell.P + N * output[0]
+
+                if self.__valid_move(cell, P2):
+                    cell.new_p = P2
+
+            self.__update_positions()
+
+            polygon = [c.P for c in plant.cells]
+            plant.volume = geometry.polygon_area(polygon)
+            for plant in self.plants:
+                self.pg.add_polygon(polygon)
+
+            self.__split_links()

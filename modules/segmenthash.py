@@ -13,8 +13,6 @@ class SegmentHash(object):
         self.num_x = int(width/self.d)
         self.num_y = int(height/self.d)
 
-        print('Initialized polygrid with', self.num_x, self.num_y, self.d)
-
         # Each data bucket stores a vector of IDs
         self.data = np.empty((self.num_x, self.num_y), dtype=object)
         for x in range(self.num_x):

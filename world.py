@@ -11,7 +11,7 @@ from vector import Vector
 import numpy as np
 
 Plant = recordclass('Plant', [
-    'network', 'cells', 'water', 'light', 'volume', 'efficiency'
+    'network', 'cells', 'water', 'light', 'volume', 'efficiency', 'alive'
 ])
 
 def round_trip_connect(start, end):
@@ -60,7 +60,7 @@ class World(object):
         for p in seed_polygon:
             cells.append(self.__make_cell(p))
 
-        plant = Plant(network, cells, 0, 0, area, efficiency)
+        plant = Plant(network, cells, 0, 0, area, efficiency, True)
 
         self.plants.append(plant)
 
@@ -174,11 +174,14 @@ class World(object):
         inputs = np.zeros((5))
 
         for plant in self.plants:
+            if not plant.alive:
+                continue
 
             energy = 10 * min(plant.water, plant.light)
             consumption = plant.volume * plant.efficiency / energy
-            print(plant.water / plant.light)
+            # print(plant.water / plant.light)
             if consumption > 1.0:
+                plant.alive = False
                 continue
 
             network = plant.network

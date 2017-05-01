@@ -6,28 +6,30 @@ import sys
 import math
 import pygame
 import pygame.gfxdraw
+
 pygame.init()
 # pygame.font.init()
 pygame.mixer.init()
 BLACK = (0,0,0)
 
-class Draw(object):
+class PygameDraw(object):
     """docstring for Draw"""
-    def __init__(self, w, h, scale=1, save_path=None):
+    def __init__(self, w, h, scale=1, flip_y=True):
         self.fonts = dict()
         self.w = w
         self.h = h
         self.scale = scale
+        self.flip_y = flip_y
+
         self.surface = pygame.display.set_mode((w, h))
         self.images = dict()
 
-        self.save_path = save_path
-        if self.save_path:
-            self.frame = 0
-
     def map_point(self, p):
         x, y = p
-        return (int(x*self.scale), int(self.h - y*self.scale))
+        if self.flip_y:
+            return (int(x*self.scale), int(self.h - y*self.scale))
+        else:
+            return (int(x*self.scale), int(y*self.scale))
 
     def start_draw(self):
         self.surface.fill((255, 255, 255))
@@ -35,26 +37,24 @@ class Draw(object):
     def end_draw(self):
         pygame.display.flip()
 
+    def save(self, path):
+        pygame.image.save(self.surface, path)
+
     def hold(self):
         while True:
             for event in pygame.event.get():
               if event.type == pygame.QUIT:
                 sys.exit()
 
-class PygameDraw(Draw):
-    """docstring for PygameDraw"""
-
     def draw_pixel(self, point, color):
         x, y = self.map_point(point)
         pygame.gfxdraw.pixel(self.surface, x, y, color)
 
     def draw_polygon(self, points, color, t=0):
-
-        points = list(map(self.map_point, points))
+        points = [self.map_point(p) for p in points]
         pygame.draw.polygon(self.surface, color, points, t)
 
     def draw_circle(self, position, radius, color, width=1):
-        # pos = (int(position[0]*self.scale), int(position[1]*self.scale))
         position = self.map_point(position)
         r  = int(radius*self.scale)
         width = int(width*self.scale)
@@ -70,7 +70,7 @@ class PygameDraw(Draw):
             pygame.gfxdraw.line(self.surface, a[0], a[1], b[0], b[1], color)
 
     def draw_lines(self, points, color, width=1):
-        points = [self.map_point(x,y) for x, y in points]
+        points = [self.map_point(p) for p in points]
         pygame.draw.lines(self.surface, color, False, points, width)
 
     def draw_rect(self, rect, color, width=1):

@@ -1,4 +1,4 @@
-from vec2D import Vec2D
+from plant_growth.vec2D import Vec2D
 
 from recordclass import recordclass
 

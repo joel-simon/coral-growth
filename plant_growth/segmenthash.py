@@ -1,7 +1,7 @@
 from __future__ import division, print_function
 import math
 import numpy as np
-from geometry import Point, intersect
+from plant_growth.geometry import Point, intersect
 
 class SegmentHash(object):
     """docstring for SegmentHash"""

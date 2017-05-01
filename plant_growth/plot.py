@@ -2,7 +2,8 @@ import math
 from colorsys import hsv_to_rgb
 import numpy as np
 import pygame
-from vec2D import Vec2D
+
+from plant_growth.vec2D import Vec2D
 
 def plot(view, world, draw_segmentgrid=False):
     sh = world.sh

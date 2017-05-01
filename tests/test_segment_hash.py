@@ -1,12 +1,17 @@
-from modules.segmenthash import SegmentHash
-from collections import namedtuple
-import math, sys
+import sys
+import math
 import random
-from geometry import Point
-from drawer import PygameDraw
-from plot import plot
+from collections import namedtuple
+
+from plant_growth.segmenthash import SegmentHash
+
+from plant_growth.geometry import Point
+from plant_growth.pygameDraw import PygameDraw
+from plant_growth.plot import plot
+
 import pygame
 import numpy as np
+
 segment = namedtuple('segment', ['id', 'p1', 'p2'])
 
 width = 500

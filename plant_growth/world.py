@@ -1,18 +1,13 @@
 from __future__ import division, print_function
 import random
-
-from cell import Cell
-import geometry
 import math
-
-from modules.segmenthash import SegmentHash
-from modules.linkedlist import DoubleList
-
-from image_grid import PolygonGrid
-from recordclass import recordclass
-from vec2D import Vec2D
-from constants import NUM_INPUTS, NUM_OUTPUTS, MAX_CELLS
 import numpy as np
+
+from plant_growth.cell import Cell
+from plant_growth.vec2D import Vec2D
+from plant_growth import image_grid, linkedlist, segmenthash, geometry, constants
+
+from recordclass import recordclass
 
 Plant = recordclass('Plant', [
     'network', 'cells', 'water', 'light', 'volume', 'efficiency', 'alive'
@@ -27,8 +22,8 @@ class World(object):
         self.light = light
         self.soil_height = soil_height
 
-        self.pg = PolygonGrid(width, height)
-        self.sh = SegmentHash(width, height, int(max_link_length)*3)
+        self.pg = image_grid.PolygonGrid(width, height)
+        self.sh = segmenthash.SegmentHash(width, height, int(max_link_length)*3)
         self.plants = []
 
         self.__next_cell_id = 0
@@ -49,7 +44,7 @@ class World(object):
     def add_plant(self, seed_polygon, network, efficiency):
         area = geometry.polygon_area(seed_polygon)
         self.pg.add_polygon(seed_polygon)
-        cells = DoubleList()
+        cells = linkedlist.DoubleList()
 
         for p in seed_polygon:
             cells.append(self.__make_cell(p))
@@ -146,7 +141,7 @@ class World(object):
     def __split_links(self):
         for plant in self.plants:
 
-            if len(plant.cells) >= MAX_CELLS: # Cant insert any new cells.
+            if len(plant.cells) >= constants.MAX_CELLS: # Cant insert any new cells.
                 continue
 
             inserts = []
@@ -179,7 +174,7 @@ class World(object):
         """
         Map cell status to nerual input in [-1, 1] range.
         """
-        inputs = np.zeros((NUM_INPUTS+1))
+        inputs = np.zeros((constants.NUM_INPUTS+1))
         inputs[0] = (cell.light*2) - 1
         inputs[1] = (cell.water*2) - 1
         inputs[2] = (cell.curvature/(math.pi)) - 1
@@ -196,8 +191,6 @@ class World(object):
         plant.network.Input(inputs)
         plant.network.ActivateFast()
         output = plant.network.Output()
-
-        assert(len(output) == NUM_OUTPUTS)
 
         growth = output[0] * self.max_growth
         death = output[1] > 0.5

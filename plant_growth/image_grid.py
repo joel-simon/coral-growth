@@ -1,7 +1,5 @@
 from __future__ import division
-from geometry import intersect
 import numpy as np
-
 from PIL import Image, ImageDraw
 
 class PolygonGrid(object):
@@ -17,17 +15,6 @@ class PolygonGrid(object):
 
     def in_polygon(self, point):
         return self.img.getpixel((point.x, point.y))
-
-    def line_intersection(self, point1, point2):
-        d = point2 - point1
-        n = 4
-        for i in range(n):
-            p = point1 + i/float(n) * d
-            if self.img.getpixel((p.x, p.y)):
-                return True
-
-        return False
-
 
 if __name__ == '__main__':
     grid = PolygonGrid(100, 100)

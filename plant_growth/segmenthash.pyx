@@ -23,24 +23,21 @@ cdef class SegmentHash:
 
         self.segments = dict() # Map ID -> (p1, p2)
 
-    cdef iterator _segment_supercover(self, int x0, int x1, int y0, int y1):
-        """
-        Yield all grid positions.
-        """
+    cpdef object collisions(self, int x0, int x1, int y0, int y1):
         # Number of squares to cross.
-        dx = int(p1.x/self.d) - int(p0.x / self.d)
-        dy = int(p1.y/self.d) - int(p0.y / self.d)
-        nx = abs(dx)
-        ny = abs(dy)
+        int dx = int(p1.x/self.d) - int(p0.x / self.d)
+        int dy = int(p1.y/self.d) - int(p0.y / self.d)
+        int nx = abs(dx)
+        int ny = abs(dy)
 
-        sign_x = 1 if dx > 0 else -1
-        sign_y = 1 if dy > 0 else -1
+        int sign_x = 1 if dx > 0 else -1
+        int sign_y = 1 if dy > 0 else -1
 
-        px = int(p0.x/self.d)
-        py = int(p0.y/self.d)
+        int px = int(p0.x/self.d)
+        int py = int(p0.y/self.d)
 
-        ix = 0
-        iy = 0
+        int ix = 0
+        int iy = 0
 
         yield px, py
 

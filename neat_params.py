@@ -1,15 +1,15 @@
 import MultiNEAT as NEAT
 
 params = NEAT.Parameters()
-params.PopulationSize = 50
+params.PopulationSize = 30
 params.DynamicCompatibility = True
 params.WeightDiffCoeff = 4.0
 params.CompatTreshold = 2.0
-params.YoungAgeTreshold = 15
-params.SpeciesMaxStagnation = 15
-params.OldAgeTreshold = 35
-params.MinSpecies = 5
-params.MaxSpecies = 10
+params.YoungAgeTreshold = 2
+params.SpeciesMaxStagnation = 8
+params.OldAgeTreshold = 6
+params.MinSpecies = 1
+params.MaxSpecies = 2
 params.RouletteWheelSelection = False
 params.RecurrentProb = 0.0
 params.OverallMutationRate = 0.8
@@ -36,6 +36,6 @@ params.ActivationFunction_SignedStep_Prob = 0.0
 
 params.CrossoverRate = 0.75  # mutate only 0.25
 params.MultipointCrossoverRate = 0.4
-params.SurvivalRate = 0.2
+params.SurvivalRate = 0.3
 
 params.AllowLoops = False

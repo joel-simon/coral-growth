@@ -1,7 +1,7 @@
 import math
 pi2 = math.pi *2
 
-class Vector(object):
+class Vec2D(object):
     __slots__ = ['x', 'y']
     def __init__(self, x, y):
         self.x = x
@@ -10,8 +10,8 @@ class Vector(object):
     def normed(self):
         norm = self.norm()
         if norm == 0:
-            return Vector(0, 0)
-        return Vector(self.x/norm, self.y/norm)
+            return Vec2D(0, 0)
+        return Vec2D(self.x/norm, self.y/norm)
 
     def norm(self):
         return math.sqrt(self.x**2 + self.y**2)
@@ -20,7 +20,7 @@ class Vector(object):
         return self.x*other.x + self.y*other.y
 
     def cross(self, other):
-        return Vector(other.y - self.y , -(other.x - self.x))
+        return Vec2D(other.y - self.y , -(other.x - self.x))
 
     def angle(self, other):
         inner = (self*other) / (self.norm() * other.norm())
@@ -35,35 +35,35 @@ class Vector(object):
             return pi2 - inner_angle
 
     def copy(self):
-        return Vector(self.x, self.y)
+        return Vec2D(self.x, self.y)
 
     def __str__(self):
         return "V2D(%f, %f)" % (self.x, self.y)
 
     def __add__(self, other):
-        return Vector(self.x + other.x, self.y+other.y)
+        return Vec2D(self.x + other.x, self.y+other.y)
 
     def __sub__(self, other):
-        return Vector(self.x - other.x, self.y - other.y)
+        return Vec2D(self.x - other.x, self.y - other.y)
 
     def __mul__(self, other):
-        # Dot product. if other is vector.
+        # Dot product. if other is Vec2D.
         if type(other) == type(self):
             return self.inner(other)
         else:
-            return Vector(self.x * other, self.y * other)
+            return Vec2D(self.x * other, self.y * other)
 
     def __rmul__(self, other):
         """ Called if 4*self for instance """
         return self.__mul__(other)
 
     def __truediv__(self, other):
-        return Vector(self.x / other, self.y / other)
+        return Vec2D(self.x / other, self.y / other)
 
     def __iter__(self):
         yield self.x
         yield self.y
 
     # def __rdiv__(self, other):
-    #     return Vector(self.x / other, self.y / other)
+    #     return Vec2D(self.x / other, self.y / other)
 

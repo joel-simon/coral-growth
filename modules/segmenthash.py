@@ -13,7 +13,9 @@ class SegmentHash(object):
         self.num_x = int(width/self.d)
         self.num_y = int(height/self.d)
 
-        # Each data bucket stores a vector of IDs
+        # print(self.num_x, self.num_y)
+
+        # Each data bucket stores a Vec2D of IDs
         self.data = np.empty((self.num_x, self.num_y), dtype=object)
         for x in range(self.num_x):
             for y in range(self.num_y):
@@ -73,8 +75,8 @@ class SegmentHash(object):
         return True
 
     def segment_add(self, id, p0, p1):
-        assert(self.in_bounds(p0))
-        assert(self.in_bounds(p1))
+        # assert(self.in_bounds(p0))
+        # assert(self.in_bounds(p1))
         assert(id not in self.segments)
 
         self.segments[id] = (p0, p1)
@@ -82,8 +84,9 @@ class SegmentHash(object):
             bucket.append(id)
 
     def segment_intersect(self, p0, p1, brute_force=False):
-        assert(self.in_bounds(p0))
-        assert(self.in_bounds(p1))
+        # assert(self.in_bounds(p0))
+        # assert(self.in_bounds(p1))
+
         # brute force for testing
         if brute_force:
             for id, (p2, p3) in self.segments.items():

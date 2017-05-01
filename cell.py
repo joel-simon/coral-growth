@@ -1,9 +1,6 @@
-from vector import Vector
+from vec2D import Vec2D
+from modules.linkedlist import Node
 
-class Node(object):
-    def __init__(self):
-        self.prev = None
-        self.next = None
 
 class Cell(Node):
     def __init__(self, id, P):
@@ -11,8 +8,9 @@ class Cell(Node):
         self.P = P
         self.new_p = P.copy()
         self.frozen = False
+        self.alive = True
         # self.N = None
-        # self.grow_d = 0
+        # self.grow_d = 0w
 
         self.light = 0
         self.water = 0

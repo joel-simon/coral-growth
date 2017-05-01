@@ -1,3 +1,7 @@
+class Node(object):
+    def __init__(self):
+        self.prev = None
+        self.next = None
 
 class DoubleList(object):
     def __init__(self):
@@ -42,19 +46,30 @@ class DoubleList(object):
 
         self._n += 1
 
-    # def remove(self, node):
-        # node.prev.next = node.next
-        # node.next.prev = node.prev
-        # node.next = None
-        # node.prev = None
-        # self._n -= 1
+    def remove(self, node):
+        node.prev.next = node.next
+        node.next.prev = node.prev
+
+        if self.head == self.tail:
+            assert(node == self.head)
+            self.head = None
+            self.tail = None
+        elif node == self.head:
+            self.head = node.next
+        elif node == self.tail:
+            self.tail = node.prev
+
+        node.next = None
+        node.prev = None
+
+        self._n -= 1
 
     def __len__(self):
         return self._n
 
     def __iter__(self):
         if self.head == None:
-            yield
+            pass
         elif self.head == self.tail:
             yield self.head
         else:
@@ -67,11 +82,17 @@ class DoubleList(object):
 
 if __name__ == '__main__':
     ll = DoubleList()
-    print(list(map(str, ll)))
-    for i in range(10):
-        if i == 1:
-            print(list(map(str, ll)))
-        c = Cell(i)
-        ll.append(c)
+    # print(list(map(str, ll)))
 
-    print(list(map(str, ll)))
+
+    for i in range(10):
+        c = Node()
+        ll.append(c)
+    c_list = list(ll)
+    # print(list(map(str, ll)))
+
+    for c in c_list:
+        ll.remove(c)
+        print(list(ll))
+        print()
+    print(list(ll))

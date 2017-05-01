@@ -2,6 +2,7 @@ import math
 from colorsys import hsv_to_rgb
 import numpy as np
 import pygame
+from vec2D import Vec2D
 
 def plot(view, world, draw_segmentgrid=False):
     sh = world.sh
@@ -19,32 +20,31 @@ def plot(view, world, draw_segmentgrid=False):
     # new_surf = pygame.pixelcopy.make_surface(pixl_arr)
     # view.surface.blit(new_surf, (0, 0))
 
-
     # Draw Plant Mass
     for plant in world.plants:
-        view.draw_polygon([c.P for c in plant.cells], (255, 255, 255))
+        # print([c.P for c in plant.cells])
+        view.draw_polygon([c.P for c in plant.cells], (20, 200, 20))
+
+    # Draw light rays
+    for plant in world.plants:
+        for cell in plant.cells:
+            if cell.light > 0 and cell.prev.light > 0:
+                derp = cell.P + Vec2D(math.cos(world.light), math.sin(world.light)) * 1000
+                view.draw_line(derp, cell.P, (255, 255, 102, 200))
+
 
     # Draw Plant Cells
-    lines = []
     for plant in world.plants:
         for cell in plant.cells:
             water = (cell.water + cell.prev.water) / 2
             light = (cell.light + cell.prev.light) / 2
+            # else:
+            # color = hsv_to_rgb(.59, 1, water)
+            # width = 1
+            # rgb = tuple(int(x*255) for x in color)
 
-            if light > water and light > 0:
-                color = hsv_to_rgb(.8, 1, light)
-                # (cell.P+cell.prev.P)/2
-                lines.append((world.light, cell.P, color))
+            view.draw_line(cell.P, cell.prev.P, (0,0,0), width=1)
 
-            else:
-                color = hsv_to_rgb(.59, 1, water)
-
-            rgb = tuple(int(x*255) for x in color)
-
-            view.draw_line(cell.P, cell.prev.P, rgb, width=3)
-
-    for d in lines:
-        view.draw_line(*d)
 
     if draw_segmentgrid:
         for (i,j), v in np.ndenumerate(world.sh.data):
@@ -77,11 +77,13 @@ def plot(view, world, draw_segmentgrid=False):
 
     for i, plant in enumerate(world.plants):
         x = (i * 400) + 25
-        view.draw_text((x, height), "Plant "+str(i), font=16)
-        view.draw_text((x, height-20), "Light "+str(plant.light), font=16)
-        view.draw_text((x, height-40), "Water "+str(plant.water), font=16)
-        view.draw_text((x, height-60), "Volume "+str(plant.volume), font=16)
-
-
-    view.draw_circle(world.light, 10, (255, 255, 0), width=0)
+        view.draw_text((x, height), "Plant id: "+str(i), font=16)
+        view.draw_text((x, height-20), "Light: "+str(plant.light), font=16)
+        view.draw_text((x, height-40), "Water: "+str(plant.water), font=16)
+        view.draw_text((x, height-60), "Volume: "+str(plant.volume), font=16)
+        energy = min(plant.water, plant.light)
+        view.draw_text((x, height-80), "Energy: "+str(energy), font=16)
+        view.draw_text((x, height-100), "consumption: "+str(plant.volume * plant.efficiency / energy), font=16)
+        view.draw_text((x, height-120), "Num cells: "+str(len(plant.cells)), font=16)
+    # view.draw_circle(world.light, 10, (255, 255, 0), width=0)
     view.end_draw()

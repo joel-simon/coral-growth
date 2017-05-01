@@ -15,7 +15,7 @@ cdef class SegmentHash:
 
         print('Initialized polygrid with', self.num_x, self.num_y, self.d)
 
-        # Each data bucket stores a vector of IDs
+        # Each data bucket stores a Vec2D of IDs
         self.data = np.empty((self.num_x, self.num_y), dtype=object)
         for x in range(self.num_x):
             for y in range(self.num_y):

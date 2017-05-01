@@ -5,7 +5,7 @@ from geometry import Point, intersect
 
 cdef class SegmentHash:
     """docstring for SegmentHash"""
-    def __init__(self, width, height, d):
+    def __init__(self, width, height, d, segments):
         self.width = width
         self.height = height
         self.d = int(d)
@@ -24,6 +24,7 @@ cdef class SegmentHash:
         self.segments = dict() # Map ID -> (p1, p2)
 
     cpdef object collisions(self, int x0, int x1, int y0, int y1):
+        object result = []
         # Number of squares to cross.
         int dx = int(p1.x/self.d) - int(p0.x / self.d)
         int dy = int(p1.y/self.d) - int(p0.y / self.d)
@@ -57,6 +58,7 @@ cdef class SegmentHash:
                 py += sign_y
                 iy += 1
 
+
             yield (px, py)
 
     def _broad_phase(self, p0, p1):
@@ -80,33 +82,22 @@ cdef class SegmentHash:
         for bucket in self._broad_phase(p0, p1):
             bucket.append(id)
 
-    def segment_intersect(self, p0, p1, brute_force=False):
+    def segment_intersect(self, p0, p1):
         assert(self.in_bounds(p0))
         assert(self.in_bounds(p1))
         # brute force for testing
-        if brute_force:
-            for id, (p2, p3) in self.segments.items():
-                if intersect(p0, p1, p2, p3):
-                    yield id
-        else:
-            seen = set()
-            for bucket in self._broad_phase(p0, p1):
-                for id in bucket:
-                    if id not in seen:
-                        seen.add(id)
-                        p2, p3 = self.segments[id]
-                        if intersect(p0, p1, p2, p3):
-                            yield id
 
-    def segment_remove(self, id):
-        assert(id in self.segments)
-        p0, p1 = self.segments[id]
-        del self.segments[id]
-        for bucket in self._broad_phase(p0, p1):
-            bucket.remove(id)
+        for id, (p2, p3) in self.segments.items():
+            if intersect(p0, p1, p2, p3):
+                yield id
 
-    def segment_move(self, id, p0, p1):
-        assert(id in self.segments)
-        self.segment_remove(id)
-        self.segment_add(id, p0, p1)
+        # else:
+        #     seen = set()
+        #     for bucket in self._broad_phase(p0, p1):
+        #         for id in bucket:
+        #             if id not in seen:
+        #                 seen.add(id)
+        #                 p2, p3 = self.segments[id]
+        #                 if intersect(p0, p1, p2, p3):
+        #                     yield id
 

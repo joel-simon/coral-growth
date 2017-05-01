@@ -1,6 +1,8 @@
 __pycache__
 *.pyc
 *.prof
-out
+out*
 best_*
 movies/
+*.c
+*.so

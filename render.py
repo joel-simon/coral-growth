@@ -10,17 +10,13 @@ from tempfile import TemporaryDirectory
 
 view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 frame = 0
-# out_dir = 'temp/'
-# if not os.path.exists(out_dir):
-#     os.makedirs(out_dir)
 
 if __name__ == '__main__':
     assert(len(sys.argv) == 2)
 
-
-
     with TemporaryDirectory() as temp_dir:
-        # print(temp_dir)
+        print('Created temp directory.')
+
         def display_func(world):
             global frame
             path = os.path.join(temp_dir, '{:04d}.jpg'.format(frame))
@@ -28,8 +24,10 @@ if __name__ == '__main__':
             view.save(path)
             frame += 1
 
-        path = sys.argv[1]
-        genome = NEAT.Genome(path)
+        file_path = sys.argv[1]
+        assert(os.path.exists(file_path))
+        genome = NEAT.Genome(file_path)
+        print('Loaded', file_path)
         print('Generating images...')
         evaluate(genome, display=display_func)
         print('Finished generating images.')

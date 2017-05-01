@@ -11,7 +11,7 @@ class PolygonGrid(object):
 
     def add_polygon(self, polygon):
         points = [(p.x, p.y) for p in polygon]
-        ImageDraw.Draw(self.img).polygon(points, outline=0, fill=1)
+        ImageDraw.Draw(self.img).polygon(points, outline=1, fill=1)
 
     def in_polygon(self, point):
         return self.img.getpixel((point.x, point.y))

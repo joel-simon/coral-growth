@@ -14,5 +14,5 @@ if __name__ == '__main__':
     assert(len(sys.argv) == 2)
     path = sys.argv[1]
     genome = NEAT.Genome(path)
-    evaluate(genome, display=display_func)
-    view.hold()
+    evaluate(genome, display=None)
+    # view.hold()

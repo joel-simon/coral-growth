@@ -1,9 +1,10 @@
+# cython: cdivision=True
+from __future__ import division
 from libc.math cimport acos, M_PI, sqrt, fmin, fmax
 
 cdef float pi2 = M_PI*2
 
 cdef class Vec2D:
-    cdef public float x, y
     def __init__(self, float x, float y):
         self.x = x
         self.y = y
@@ -36,33 +37,34 @@ cdef class Vec2D:
         else:
             return pi2 - inner_angle
 
-    cpdef Vec2D copy(self):
+    cpdef Vec2D copy(Vec2D self):
         return Vec2D(self.x, self.y)
 
-    def __str__(self):
+    def __str__(Vec2D self):
         return "V2D(%f, %f)" % (self.x, self.y)
 
-    def __add__(self, other):
+    def __add__(Vec2D self, Vec2D other):
         return Vec2D(self.x + other.x, self.y+other.y)
 
-    def __sub__(self, other):
+    def __sub__(Vec2D self, Vec2D other):
         return Vec2D(self.x - other.x, self.y - other.y)
 
-    def __mul__(self, other):
+    def __mul__(Vec2D self, other):
         # Dot product. if other is Vec2D.
         if type(other) == type(self):
             return self.inner(other)
         else:
             return Vec2D(self.x * other, self.y * other)
 
-    def __rmul__(self, other):
+    def __rmul__(Vec2D self, other):
         """ Called if 4*self for instance """
         return self.__mul__(other)
 
-    def __truediv__(self, float other):
+    def __truediv__(Vec2D self, float other):
         return Vec2D(self.x / other, self.y / other)
 
-    def __iter__(self):
+    def __iter__(Vec2D self):
+        # Useful for x, y = V
         yield self.x
         yield self.y
 

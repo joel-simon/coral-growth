@@ -5,7 +5,7 @@ import numpy as np
 
 from plant_growth.cell import Cell
 from plant_growth.vec2D import Vec2D
-from plant_growth import image_grid, linkedlist, segmenthash, geometry, constants
+from plant_growth import image_grid, linkedlist, segmenthashx, geometry, constants
 
 from recordclass import recordclass
 
@@ -23,8 +23,10 @@ class World(object):
         self.soil_height = soil_height
 
         self.pg = image_grid.PolygonGrid(width, height)
-        self.sh = segmenthash.SegmentHash(width, height, int(max_link_length)*3)
+        self.sh = segmenthashx.SegmentHash(width, height, int(max_link_length)*3)
         self.plants = []
+
+        self.cell_inputs = np.zeros((constants.NUM_INPUTS+1))
 
         self.__next_cell_id = 0
         self.max_growth = 3
@@ -53,8 +55,8 @@ class World(object):
 
         self.plants.append(plant)
 
-        for cell in plant.cells:
-            self.sh.segment_add(cell.id, cell.P, cell.prev.P)
+        # for cell in plant.cells:
+        #     self.sh.segment_add(cell.id, cell.P, cell.prev.P)
 
     def __single_light_collision(self, P, id_exclude):
         light = P + Vec2D(math.cos(self.light), math.sin(self.light)) * 1000
@@ -136,7 +138,7 @@ class World(object):
         for plant in self.plants:
             for cell in plant.cells:
                 cell.P = cell.new_p
-                self.sh.segment_move(cell.id, cell.prev.P, cell.P)
+                # self.sh.segment_move(cell.id, cell.prev.P, cell.P)
 
     def __split_links(self):
         for plant in self.plants:
@@ -155,10 +157,13 @@ class World(object):
 
                 plant.cells.insert_before(cell, new_cell)
 
-                self.sh.segment_move(cell.id, cell.P, new_cell.P)
-                self.sh.segment_add(new_cell.id, new_cell.P, new_cell.prev.P)
+                # self.sh.segment_move(cell.id, cell.P, new_cell.P)
+                # self.sh.segment_add(new_cell.id, new_cell.P, new_cell.prev.P)
 
     def calculate(self):
+        self.sh.clear()
+        for cell in self.plants[0].cells:
+            self.sh.add_segment(cell.id, cell.P, cell.prev.P)
         self.__calculate_light()
         self.__calculate_water()
         self.__calculate_curvatures()
@@ -174,21 +179,20 @@ class World(object):
         """
         Map cell status to nerual input in [-1, 1] range.
         """
-        inputs = np.zeros((constants.NUM_INPUTS+1))
-        inputs[0] = (cell.light*2) - 1
-        inputs[1] = (cell.water*2) - 1
-        inputs[2] = (cell.curvature/(math.pi)) - 1
-        inputs[3] = (consumption*2) - 1
-        # inputs[4] = plant.water / plant.light
-        inputs[4] = 1 #The last input is always used as bias.
+        self.cell_inputs[0] = (cell.light*2) - 1
+        self.cell_inputs[1] = (cell.water*2) - 1
+        self.cell_inputs[2] = (cell.curvature/(math.pi)) - 1
+        self.cell_inputs[3] = (consumption*2) - 1
+        # self.cell_inputs[4] = plant.water / plant.light
+        self.cell_inputs[4] = 1 #The last input is always used as bias.
 
         # if cell.curvature > math.pi:
-        #     inputs[2] = - (cell.curvature-math.pi) / math.pi
+        #     self.cell_inputs[2] = - (cell.curvature-math.pi) / math.pi
         # else:
-        #     inputs[2] = cell.curvature / math.pi
+        #     self.cell_inputs[2] = cell.curvature / math.pi
 
         plant.network.Flush()
-        plant.network.Input(inputs)
+        plant.network.Input(self.cell_inputs)
         plant.network.ActivateFast()
         output = plant.network.Output()
 

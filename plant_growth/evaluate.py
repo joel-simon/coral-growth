@@ -7,11 +7,11 @@ from plant_growth.world import World
 
 import MultiNEAT as NEAT
 
-def evaluate(genome, display=None):
+def evaluate(genome, display=None, break_early=True):
     net = NEAT.NeuralNetwork()
     genome.BuildPhenotype(net)
     world = World(constants.WORLD_WIDTH, constants.WORLD_HEIGHT,
-                    constants.MAX_EDGE_LENGTH, constants.LIGHT_ANGLE,
+                    constants.LIGHT_ANGLE,
                     constants.SOIL_HEIGHT)
 
     random.seed(0)
@@ -26,26 +26,23 @@ def evaluate(genome, display=None):
     world.add_plant(seed_polygon, net, constants.PLANT_EFFICIENCY)
 
     for s in range(constants.SIMULATION_STEPS):
-        world.calculate()
+        world.simulation_step()
 
         if display:
             display(world)
 
-        world.simulation_step()
+        if break_early:
+            if not world.plants[0].alive:
+                break
 
-        if not world.plants[0].alive:
-            break
-
-        if s==50 and world.plants[0].volume < 2000:
-            break
-
-    fitness = world.plants[0].volume
+            if s==50 and world.plants[0].volume < 2000:
+                break
 
     if display:
         print('Evaluate finished.')
-        print('\tFitness =', fitness)
+        # print('\tFitness =', fitness)
         print('\tSteps =', s+1)
         print('\tNum cells =', len(world.plants[0].cells))
         print()
 
-    return fitness
+    return world.plants[0]

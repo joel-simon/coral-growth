@@ -19,9 +19,14 @@ extensions = [
       sources = ['./plant_growth/vec2D.pyx'],
       extra_compile_args = _extra
       ),
+    # Extension(
+    #   'plant_growth/segmenthashx',
+    #   sources = ['./plant_growth/segmenthashx.pyx'],
+    #   extra_compile_args = _extra
+    #   ),
     Extension(
-      'plant_growth/segmenthashx',
-      sources = ['./plant_growth/segmenthashx.pyx'],
+      'plant_growth/geometry',
+      sources = ['./plant_growth/geometry.pyx'],
       extra_compile_args = _extra
       ),
     ]

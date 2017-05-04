@@ -3,6 +3,6 @@ __pycache__
 *.prof
 out*
 best_*
-movies/
+buid/*
 *.c
 *.so

@@ -12,26 +12,29 @@ def plot(view, world, draw_segmentgrid=False):
 
     view.start_draw()
     view.draw_rect((0, 0, width, height), (0, 102, 255), width=0)
-    view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51), width=0)
+    view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 200), width=0)
 
 
-    pixl_arr = np.array(world.pg.img)
-    # pixl_arr = np.swapaxes(np.array(world.pg.img), 0, 1)
+    # pixl_arr = np.array(world.pg.img)
+    # pixl_arr = np.swapaxes(np.array(world.plants[0].grid), 0, 1)
     # pixl_arr = np.fliplr(pixl_arr)
+    # print(pixl_arr)
     # new_surf = pygame.pixelcopy.make_surface(pixl_arr)
     # view.surface.blit(new_surf, (0, 0))
+    # view.end_draw()
+    # return
 
     # Draw Plant Mass
     for plant in world.plants:
         # print([c.P for c in plant.cells])
-        view.draw_polygon([c.P for c in plant.cells], (20, 200, 20))
+        view.draw_polygon(plant.polygon, (20, 200, 20))
 
     # Draw light rays
     for plant in world.plants:
         for cell in plant.cells:
             if cell.light > 0 and cell.prev.light > 0:
                 derp = cell.P + Vec2D(math.cos(world.light), math.sin(world.light)) * 1000
-                view.draw_line(derp, cell.P, (255, 255, 102, 200))
+                view.draw_line(derp, cell.P, (255, 255, 102, 255))
 
 
     # Draw Plant Cells
@@ -82,9 +85,8 @@ def plot(view, world, draw_segmentgrid=False):
         view.draw_text((x, height-20), "Light: "+str(plant.light), font=16)
         view.draw_text((x, height-40), "Water: "+str(plant.water), font=16)
         view.draw_text((x, height-60), "Volume: "+str(plant.volume), font=16)
-        energy = min(plant.water, plant.light)
-        view.draw_text((x, height-80), "Energy: "+str(energy), font=16)
-        view.draw_text((x, height-100), "consumption: "+str(plant.volume * plant.efficiency / energy), font=16)
+        view.draw_text((x, height-80), "Energy: "+str(plant.energy), font=16)
+        view.draw_text((x, height-100), "consumption: "+str(plant.consumption), font=16)
         view.draw_text((x, height-120), "Num cells: "+str(len(plant.cells)), font=16)
     # view.draw_circle(world.light, 10, (255, 255, 0), width=0)
     view.end_draw()

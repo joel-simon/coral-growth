@@ -14,11 +14,5 @@ class Cell(linkedlist.Node):
 
         super(Cell, self).__init__()
 
-    def calculate_normal(self):
-        Sa = self.prev.P - self.P
-        Sb = self.next.P - self.P
-        # self.N = Sa.cross(Sb).normed()
-        return Sa.cross(Sb).normed()
-
     def __str__(self):
         return "Cell:"+str(self.P)

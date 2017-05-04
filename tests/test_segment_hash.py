@@ -21,6 +21,7 @@ view = PygameDraw(width, height)
 segment_length = 20.0
 num_segments = 100
 
+sh = SegmentHash(width, height, 20, num_segments)
 
 segments = []
 for id in range(num_segments):
@@ -30,19 +31,8 @@ for id in range(num_segments):
     p1.x += p0.x
     p1.y += p0.y
 
-    # sh.segment_add(id, p0, p1)
-    # segments.append(segment(id, p0, p1))
+    sh.add_segment(id, p0.x, p0.y, p1.x, p1.y)
     segments.append((p0, p1))
-
-sh = SegmentHash(width, height, 20)
-sh.set_segments(segments)
-
-# n = 200
-# for i in range(n):
-#     p1 = Point(random.random() * width, random.random() * height)
-#     a = list(sh.segment_intersect(Point(0,0), p1))
-
-
 
 while True:
     for event in pygame.event.get():
@@ -60,19 +50,19 @@ while True:
             view.draw_rect((i*sh.d, j*sh.d, sh.d, sh.d), (100,100,0), width=0)
         view.draw_rect((i*sh.d, (j*sh.d), sh.d, sh.d), (0,0,0), width=1)
 
-    n = sh._segment_supercover(center, mouse)
-    for i in range(n):
-        x = sh.buff[i, 0]
-        y = sh.buff[i, 1]
-    # for x, y in sh._segment_supercover(center, mouse):
-        view.draw_rect((x*sh.d, (y*sh.d), sh.d, sh.d), (0,200,0), width=0)
+    # n = sh._segment_supercover(center, mouse)
+    # for i in range(n):
+    #     x = sh.buff[i, 0]
+    #     y = sh.buff[i, 1]
+    # # for x, y in sh._segment_supercover(center, mouse):
+    #     view.draw_rect((x*sh.d, (y*sh.d), sh.d, sh.d), (0,200,0), width=0)
 
     view.draw_line(center, mouse, (0,0,0), width=2)
 
     for segment in segments:
        view.draw_line(segment[0], segment[1], (0,0,0), width=4)
 
-    for id in sh.segment_intersect(center, mouse):
+    for id in sh.segment_intersect(center.x, center.y, mouse.x, mouse.y):
         view.draw_line(segments[id][0], segments[id][1], (200,0,0), width=4)
 
     view.end_draw()

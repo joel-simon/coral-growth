@@ -5,31 +5,43 @@ import numpy as np
 
 from plant_growth.cell import Cell
 from plant_growth.vec2D import Vec2D
-from plant_growth import image_grid, linkedlist, segmenthashx, geometry, constants
+from plant_growth.plant import Plant
+from plant_growth import linkedlist, segmenthashx, geometry, constants
 
-from recordclass import recordclass
+# from recordclass import recordclass
 
-Plant = recordclass('Plant', [
-    'network', 'cells', 'water', 'light', 'volume', 'efficiency', 'alive'
-])
+# def lerp(start, end, t):
+#     return start + t * (end-start)
+
+# def diagonal_distance(p0, p1):
+#     dx, dy = p1.x - p0.x, p1.y - p0.y
+#     return max(abs(dx), abs(dy))
+
+# def round_point(p):
+#     return Vec2D(int(p.x), int(p.y))
+
+# def line(p0, p1):
+#     points = []
+#     N = diagonal_distance(p0, p1)
+#     for step in range(N):
+#         t = 0 if N == 0 else (step / N)
+#         yield round_point(lerp(p0, p1, t))
 
 class World(object):
     """docstring for World"""
-    def __init__(self, width, height, max_link_length, light, soil_height):
+    def __init__(self, width, height, light, soil_height):
         self.width = width
         self.height = height
-        self.max_link_length = max_link_length
         self.light = light
         self.soil_height = soil_height
 
-        self.pg = image_grid.PolygonGrid(width, height)
-        self.sh = segmenthashx.SegmentHash(width, height, int(max_link_length)*3)
+        self.sh = segmenthashx.SegmentHash(width, height, int(constants.MAX_EDGE_LENGTH)*2, 10000)
+
         self.plants = []
 
         self.cell_inputs = np.zeros((constants.NUM_INPUTS+1))
 
         self.__next_cell_id = 0
-        self.max_growth = 3
 
     def __in_bounds(self, p):
         if p.x >= self.width or p.x < 0:
@@ -38,226 +50,116 @@ class World(object):
             return False
         return True
 
-    def __make_cell(self, p):
+    def make_cell(self, p):
+        """
+        Called by a Plant when it needs a new cell.
+        """
         cell = Cell(self.__next_cell_id, p)
         self.__next_cell_id += 1
         return cell
 
-    def add_plant(self, seed_polygon, network, efficiency):
-        area = geometry.polygon_area(seed_polygon)
-        self.pg.add_polygon(seed_polygon)
-        cells = linkedlist.DoubleList()
-
-        for p in seed_polygon:
-            cells.append(self.__make_cell(p))
-
-        plant = Plant(network, cells, 0, 0, area, efficiency, True)
-
+    def add_plant(self, polygon, network, efficiency):
+        plant = Plant(self, network, polygon, efficiency)
         self.plants.append(plant)
+        self.update_plant_attributes()
 
-        # for cell in plant.cells:
-        #     self.sh.segment_add(cell.id, cell.P, cell.prev.P)
-
-    def __single_light_collision(self, P, id_exclude):
+    def single_light_collision(self, P, id_exclude):
         light = P + Vec2D(math.cos(self.light), math.sin(self.light)) * 1000
-        for id in self.sh.segment_intersect(light, P):
+        for id in self.sh.segment_intersect(light.x, light.y, P.x, P.y):
             if id != id_exclude:
                 return True
         return False
 
-    def __calculate_light(self):
-        for plant in self.plants:
-            plant.light = 0
-            for cell in plant.cells:
-                cell.light = 0
-
+    def update_plant_attributes(self):
+        self.sh.clear()
         for plant in self.plants:
             for cell in plant.cells:
+                self.sh.add_segment(cell.id, cell.P.x, cell.P.y, cell.prev.P.x, cell.prev.P.y)
 
-                # Underground cells do not get sunlight.
-                if cell.P.y < self.soil_height:
-                    continue
-
-                # We cast a ray to the center of every segment.
-                P = (cell.P + cell.prev.P)/2
-
-                if not self.__single_light_collision(P, cell.id):
-                    Vec2D_light = Vec2D(math.cos(self.light), math.sin(self.light))
-                    Vec2D_segment = Vec2D(P.y - cell.prev.P.y, P.x - cell.prev.P.x)
-                    angle = Vec2D_light.angle(Vec2D_segment)
-                    light = 1 - (abs(math.pi/2.-angle)) / (math.pi/2.)
-
-                    cell.light += light/2
-                    cell.prev.light += light/2
-                    plant.light += light*.75
-
-    def __calculate_water(self):
         for plant in self.plants:
-            plant.water = 0
-            for cell in plant.cells:
-                if cell.P.y < self.soil_height:
-                    cell.water = 1
-                    plant.water += 3./self.max_link_length
-                else:
-                    cell.water = 0
+            plant.update_attributes()
 
-    def __calculate_curvatures(self):
-        for plant in self.plants:
-            for cell in plant.cells:
-                v1 = cell.next.P - cell.P
-                v2 = cell.prev.P - cell.P
-                cell.curvature = v1.angle_clockwise(v2)
-
-    def __valid_move(self, cell, N, D):
-        new_p = cell.P + N*D
+    def __valid_move(self, plant, cell, new_p):
         if not self.__in_bounds(new_p):
             return False
 
-        if D > 0:
-            if self.pg.in_polygon(new_p):
-                return False
+        v1 = cell.next.P - new_p
+        v2 = cell.prev.P - new_p
+        curvature = v1.angle_clockwise(v2)
 
-            if self.pg.in_polygon((new_p+cell.prev.P)/2):
-                return False
+        if curvature > constants.MAX_ANGLE:
+            return False
 
-            if self.pg.in_polygon((new_p+cell.next.P)/2):
-                return False
-        else:
-            if not self.pg.in_polygon(new_p):
-                return False
+        if plant.grid[new_p.x, new_p.y]:
+            return False
 
-            if not self.pg.in_polygon((new_p+cell.prev.P)/2):
-                return False
+        x, y = (new_p+cell.prev.P)/2
+        if plant.grid[x, y]:
+            return False
 
-            if not self.pg.in_polygon((new_p+cell.next.P)/2):
-                return False
+        x, y = (new_p+cell.next.P)/2
+        if plant.grid[x, y]:
+            return False
 
         return True
 
-    def __update_positions(self):
-        for plant in self.plants:
-            for cell in plant.cells:
-                cell.P = cell.new_p
-                # self.sh.segment_move(cell.id, cell.prev.P, cell.P)
-
-    def __split_links(self):
-        for plant in self.plants:
-
-            if len(plant.cells) >= constants.MAX_CELLS: # Cant insert any new cells.
-                continue
-
-            inserts = []
-
-            for cell in plant.cells:
-                if (cell.P - cell.prev.P).norm() > self.max_link_length:
-                    inserts.append(cell)
-
-            for cell in inserts:
-                new_cell = self.__make_cell((cell.P+cell.prev.P)/2.0)
-
-                plant.cells.insert_before(cell, new_cell)
-
-                # self.sh.segment_move(cell.id, cell.P, new_cell.P)
-                # self.sh.segment_add(new_cell.id, new_cell.P, new_cell.prev.P)
-
-    def calculate(self):
-        self.sh.clear()
-        for cell in self.plants[0].cells:
-            self.sh.add_segment(cell.id, cell.P, cell.prev.P)
-        self.__calculate_light()
-        self.__calculate_water()
-        self.__calculate_curvatures()
-
-    def fake_output(self, cell):
-        if cell.water:
-            return [cell.curvature*3]
-        else:
-            return [cell.curvature]
-            # return []
-
-    def __cell_update(self, plant, cell, consumption):
+    def cell_calculate_output(self, cell, plant):
         """
-        Map cell status to nerual input in [-1, 1] range.
+        Map cell stats to nerual input in [-1, 1] range.
         """
         self.cell_inputs[0] = (cell.light*2) - 1
         self.cell_inputs[1] = (cell.water*2) - 1
         self.cell_inputs[2] = (cell.curvature/(math.pi)) - 1
-        self.cell_inputs[3] = (consumption*2) - 1
+        self.cell_inputs[3] = (plant.consumption*2) - 1
         # self.cell_inputs[4] = plant.water / plant.light
-        self.cell_inputs[4] = 1 #The last input is always used as bias.
-
-        # if cell.curvature > math.pi:
-        #     self.cell_inputs[2] = - (cell.curvature-math.pi) / math.pi
-        # else:
-        #     self.cell_inputs[2] = cell.curvature / math.pi
+        self.cell_inputs[4] = 1 # The last input is always used as bias.
 
         plant.network.Flush()
         plant.network.Input(self.cell_inputs)
         plant.network.ActivateFast()
         output = plant.network.Output()
+        return output
 
-        growth = output[0] * self.max_growth
-        death = output[1] > 0.5
-
-        if death:
-            cell.alive = False
-        #     return
-        # if output[0] > output[1]:
-        #     growth = output[0]
-        # else:
-        #     growth = - output[1]
-
-        # growth = random.gauss(output[0], output[1]/2)
-        # output = [random.random()*5]
-        # output = self.fake_output(cell)
-
-        # Handle Outputs.
-        N = cell.calculate_normal()
-        # D = N * growth
-
-        if self.__valid_move(cell, N, growth):
-            cell.new_p = cell.P + N*growth
-
-    def simulation_step(self):
-
+    def calculate_plant_changes(self):
         for plant in self.plants:
             if not plant.alive:
                 continue
 
-            # print(plant.alive, len(plant.cells), plant.water, plant.light)
-            energy = min(plant.water, plant.light)
-            consumption = plant.volume * plant.efficiency / max(1, energy)
-
-            if consumption >= 1.0:
-                plant.alive = False
-                continue
-
             # Calculate cell movements and removals.
             for cell in plant.cells:
-                self.__cell_update(plant, cell, consumption)
+                output = self.cell_calculate_output(cell, plant)
+                growth = output[0] * constants.CELL_MAX_GROWTH
+                # death = output[1] > 0.5
 
-            # for plant in self.plants:
-            #     if len(to_kill) == len(plant.cells):
-            #         plant.alive = False
-            #         continue
-            #     for cell in to_kill:
-            #         plant.cells.remove(cell)
+                # if death:
+                #     cell.alive = False
 
+                # Crate normal Vector.
+                Sa = cell.prev.P - cell.P
+                Sb = cell.next.P - cell.P
+                N = Sa.cross(Sb).normed()
+                new_p1 = cell.P + N * growth
+                new_p2 = cell.P + N * growth * 2
 
-            for cell in list(plant.cells):
-                if cell.alive == False:
-                    plant.cells.remove(cell)
+                if self.__valid_move(plant, cell, new_p1):
+                    cell.new_p = new_p1
+                else:
+                    cell.new_p = cell.P.copy()
 
-            if len(plant.cells) <= 2:
-                plant.alive = False
-                # continue
-
-        self.__update_positions()
-
+    def apply_plant_changes(self):
         for plant in self.plants:
-            if plant.alive:
-                polygon = [c.P for c in plant.cells]
-                plant.volume = geometry.polygon_area(polygon)
-                self.pg.add_polygon(polygon)
+            # for cell in plant.cells:
+            #     if cell.alive == False:
+            #         plant.cells.remove(cell)
+            if len(plant.cells) < constants.MAX_CELLS: # Cant insert any new cells.
+                for cell in plant.cells:
+                    cell.P = cell.new_p
 
-        self.__split_links()
+                plant.split_links()
+
+    def simulation_step(self):
+        self.calculate_plant_changes()
+        self.apply_plant_changes()
+        self.update_plant_attributes()
+
+

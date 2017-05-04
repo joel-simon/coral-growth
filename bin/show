@@ -1,4 +1,7 @@
-import sys
+#!/usr/bin/env python3
+import sys, os
+sys.path.append(os.path.abspath('.'))
+
 from plant_growth import constants
 from plant_growth.pygameDraw import PygameDraw
 from plant_growth.plot import plot
@@ -12,7 +15,8 @@ def display_func(world):
 
 if __name__ == '__main__':
     assert(len(sys.argv) == 2)
-    path = sys.argv[1]
-    genome = NEAT.Genome(path)
-    evaluate(genome, display=None)
-    # view.hold()
+    file_path = sys.argv[1]
+    assert(os.path.exists(file_path))
+    genome = NEAT.Genome(file_path)
+    evaluate(genome, display=display_func)
+    view.hold()

@@ -1,72 +1,92 @@
-# cython: cdivision=True
-# cython: profile=False
-
-from vec2D cimport Vec2D
-from libc.math cimport acos, M_PI, sqrt, fmin, fmax, floor, fabs, abs
+#cython: cdivision=True
+#cython: profile=False
+#cython: wraparound=False
+#cython: boundscheck=False
+#cython: nonecheck=False
 
 import math
 import numpy as np
 from cython.view cimport array as cvarray
 
-cdef float ccw(float ax, float ay, float bx, float By, float cx, float cy ):
-    return (cy-ay) * (bx-ax) > (By-ay) * (cx-ax)
+cdef int intersect(float p0_x, float p0_y, float p1_x, float p1_y,
+                    float p2_x, float p2_y, float p3_x, float p3_y):
+    cdef float s1_x, s1_y, s2_x, s2_y, s, t
+    s1_x = p1_x - p0_x
+    s1_y = p1_y - p0_y
+    s2_x = p3_x - p2_x
+    s2_y = p3_y - p2_y
+    s = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) / (-s2_x * s1_y + s1_x * s2_y)
+    t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / (-s2_x * s1_y + s1_x * s2_y)
 
-# Return true if line segments AB and CD intersect
-# This does not handle colinear cases well.
-cdef int intersect(float ax, float ay, float bx, float By, float cx, float cy,
-                    float dx, float dy):
-    return ccw(ax, ay, cx, cy, dx, dy) != ccw(bx, By, cx, cy, dx, dy) and ccw(ax, ay, bx, By, cx, cy) != ccw(ax, ay, bx, By, dx, dy)
+    if (s >= 0 and s <= 1 and t >= 0 and t <= 1):
+        return True
+        # // Collision detected
+        # if (i_x != NULL)
+        #     *i_x = p0_x + (t * s1_x);
+        # if (i_y != NULL)
+        #     *i_y = p0_y + (t * s1_y);
+        # return 1;
 
+    return False
 
 cdef class SegmentHash:
     """docstring for SegmentHash"""
-    cdef public int width, height, d, num_x, num_y
-    cdef public object segments
+    cdef public int width, height, d, num_x, num_y, max_segments, __num_segments
+    cdef object idx_to_id
     cdef public list[:, :] data
+    cdef public float[:, :] segments # A [n_segments, 4] shaped array
     cdef public int[:, :] buff # Store i, j index values into data
 
-    def __init__(self, width, height, d):
+    def __init__(self, width, height, d, max_segments):
         self.width = width
         self.height = height
         self.d = int(d)
-        self.segments = None # list of vec2d tuples
+        self.max_segments = max_segments
 
         self.num_x = int(width/self.d)
         self.num_y = int(height/self.d)
-        # print('Initialized polygrid with', self.num_x, self.num_y, self.d)
 
         cdef int max_result = self.num_x + self.num_y
+
         self.buff = np.zeros((max_result, 2), dtype=np.dtype("i"))
+        self.data = np.empty((self.num_x, self.num_y), dtype=list)
+
+        self.segments = np.zeros(( max_segments, 4 ), dtype=np.dtype("f"))
 
         self.clear()
 
-    def clear(self):
-        self.segments = dict()
+    cpdef clear(self):
+        cdef int i, j
+        self.idx_to_id = dict()
+        self.__num_segments = 0
+
         # Each data bucket stores a list of IDs
-        self.data = np.empty((self.num_x, self.num_y), dtype=list)
         for j in range(self.num_x):
             for k in range(self.num_y):
                 self.data[j, k] = []
 
-    def add_segment(self, id, p0, p1):
-        self.segments[id] = (p0, p1)
-        cdef int i, j, k
+    cpdef add_segment(self, id, float x0, float y0, float x1, float y1):
+        cdef int i, j, k, idx
 
-        n = self._segment_supercover(p0, p1)
-        for i in range(n):
-            j = self.buff[i, 0]
-            k = self.buff[i, 1]
-            self.data[j, k].append(id)
+        idx = self.__num_segments
+        assert(idx < self.max_segments)
+        self.__num_segments += 1
 
-    # float x0, float x1, float y0, float y1
-    def _segment_supercover(self, p0, p1):
+        self.idx_to_id[idx] = id
+        self.segments[idx, 0] = x0
+        self.segments[idx, 1] = y0
+        self.segments[idx, 2] = x1
+        self.segments[idx, 3] = y1
+
+        # n = self.__segment_supercover(x0, y0, x1, y1)
+        # for i in range(n):
+        #     j = self.buff[i, 0]
+        #     k = self.buff[i, 1]
+        #     self.data[j, k].append(idx)
+
+    cdef __segment_supercover(self, float x0, float y0, float x1, float y1):
         """ An iterator over the squares that the segment intersects
         """
-        cdef float x0 = p0.x
-        cdef float y0 = p0.y
-        cdef float x1 = p1.x
-        cdef float y1 = p1.y
-        # object result = []
         # Number of squares to cross.
         cdef df = <float>self.d
         cdef int dx = <int>((x1//df) - (x0 // df))
@@ -108,42 +128,36 @@ cdef class SegmentHash:
 
         return n+1
 
-    # cdef int in_bounds(self, int x, int y):
-    #     if x < 0 or x >= self.width:
-    #         return False
-    #     if y < 0 or y >= self.height:
-    #         return False
-    #     return True
+    def segment_intersect(self, float x0, float y0, float x1, float y1):
+        cdef int i, j, k, n, idx
+        cdef float x2, y2, x3, y3
 
-    def segment_intersect(self, p0, p1):
-        # assert(self.in_bounds(p0))
-        # assert(self.in_bounds(p1))
-        cdef int i, j, k, n
-        x0, y0 = p0
-        x1, y1 = p1
+        for idx in range(self.__num_segments):
+            x2 = self.segments[idx, 0]
+            y2 = self.segments[idx, 1]
+            x3 = self.segments[idx, 2]
+            y3 = self.segments[idx, 3]
+            if intersect(x0, y0, x1, y1, x2, y2, x3, y3):
+                yield self.idx_to_id[idx]
 
-        # brute force for testing
-        # for id, (p2, p3) in enumerate(self.segments):
-        #     x2, y2 = p2
-        #     x3, y3 = p3
-        #     if intersect(x0, y0, x1, y1, x2, y2, x3, y3):
-        #         yield id
+        # seen = set()
+        # n = self.__segment_supercover(x0, y0, x1, y1)
 
-        # else:
-        seen = set()
-        n = self._segment_supercover(p0, p1)
-        for i in range(n):
-            j = self.buff[i, 0]
-            k = self.buff[i, 1]
-            if j < 0 or j >= self.num_x:
-                continue
-            if k < 0 or k >= self.num_y:
-                continue
-            for id in self.data[j, k]:
-                if id not in seen:
-                    seen.add(id)
-                    p2, p3 = self.segments[id]
-                    x2, y2 = p2
-                    x3, y3 = p3
-                    if intersect(x0, y0, x1, y1, x2, y2, x3, y3):
-                        yield id
+        # for i in range(n):
+        #     j = self.buff[i, 0]
+        #     k = self.buff[i, 1]
+
+        #     if j < 0 or j >= self.num_x:
+        #         continue
+        #     if k < 0 or k >= self.num_y:
+        #         continue
+
+        #     for idx in self.data[j, k]:
+        #         if idx not in seen:
+        #             seen.add(idx)
+        #             x2 = self.segments[idx, 0]
+        #             y2 = self.segments[idx, 1]
+        #             x3 = self.segments[idx, 2]
+        #             y3 = self.segments[idx, 3]
+        #             if intersect(x0, y0, x1, y1, x2, y2, x3, y3):
+        #                 yield self.idx_to_id[idx]

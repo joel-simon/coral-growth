@@ -61,3 +61,7 @@ def shoelace(point_list):
 
 def polygon_area(point_list):
     return abs(shoelace(point_list)) / 2
+
+def tri_area(v1, v2, v3):
+    # shoelace for case n=3
+    return .5*abs(v1.x*v2.y - v3.x*v2.y + v3.x*v1.y - v1.x*v3.y + v2.x*v3.y - v2.x*v1.y)

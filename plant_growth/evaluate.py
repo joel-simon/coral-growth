@@ -15,15 +15,15 @@ def evaluate(genome, display=None, break_early=True):
                     constants.SOIL_HEIGHT)
 
     random.seed(0)
-    seed_polygon = []
+    # seed_polygon = []
 
-    for i in range(constants.SEED_SEGMENTS):
-        a = 2 * i * math.pi / constants.SEED_SEGMENTS
-        x = constants.WORLD_WIDTH/2 + math.cos(a) * constants.SEED_RADIUS
-        y = constants.SOIL_HEIGHT + math.sin(a) * constants.SEED_RADIUS
-        seed_polygon.append(Vec2D(x, y))
-
-    world.add_plant(seed_polygon, net, constants.PLANT_EFFICIENCY)
+    # for i in range(constants.SEED_SEGMENTS):
+    #     a = 2 * i * math.pi / constants.SEED_SEGMENTS
+    x = constants.WORLD_WIDTH/2# + math.cos(a) * constants.SEED_RADIUS
+    y = constants.SOIL_HEIGHT# + math.sin(a) * constants.SEED_RADIUS
+    #     seed_polygon.append(Vec2D(x, y))
+    r = constants.SEED_RADIUS
+    world.add_plant(x, y, r, net, constants.PLANT_EFFICIENCY)
 
     for s in range(constants.SIMULATION_STEPS):
         world.simulation_step()
@@ -42,7 +42,7 @@ def evaluate(genome, display=None, break_early=True):
         print('Evaluate finished.')
         # print('\tFitness =', fitness)
         print('\tSteps =', s+1)
-        print('\tNum cells =', len(world.plants[0].cells))
+        # print('\tNum out_verts =', len(world.plants[0].out_verts))
         print()
 
     return world.plants[0]

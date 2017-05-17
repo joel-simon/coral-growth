@@ -58,13 +58,17 @@ class PygameDraw(object):
         position = self.map_point(position)
         r  = int(radius*self.scale)
         width = int(width*self.scale)
-        pygame.draw.circle(self.surface, color, position, r, width)
+        if width == 0:
+            x, y = position
+            pygame.gfxdraw.filled_circle(self.surface, x, y, r, color)
+        else:
+            pygame.draw.circle(self.surface, color, position, r, width)
 
     def draw_line(self, positionA, positionB, color, width=1):
         a = self.map_point(positionA)
         b = self.map_point(positionB)
-        width = int(width*self.scale)
         if width > 1:
+            width = int(width*self.scale)
             pygame.draw.line(self.surface, color, a, b, width)
         else:
             pygame.gfxdraw.line(self.surface, a[0], a[1], b[0], b[1], color)
@@ -77,8 +81,18 @@ class PygameDraw(object):
         x, y = self.map_point((rect[0], rect[1]))
         w, h = int(self.scale*rect[2]), int(self.scale*rect[3])
         rect = (x, y, w, -h)
-        pygame.draw.rect(self.surface, color, rect, width)
-        # pygame.gfxdraw.rectangle(self.surface, rect, color)
+
+        if width == 0:
+            points = [(x, y), (x+w, y), (x+w, y-h), (x, y-h)]
+            pygame.gfxdraw.filled_polygon(self.surface, points, color)
+
+        elif width == 1:
+            pygame.gfxdraw.rectangle(self.surface, rect, color)
+
+        else:
+            pygame.draw.rect(self.surface, color, rect, width)
+
+
 
     def draw_text(self, position, string, font=8, color=BLACK, center=False):
         font = int(self.scale * font)

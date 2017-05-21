@@ -1,8 +1,8 @@
-__pycache__
+gm rf __pycache__
 *.pyc
 *.prof
 out*
 best_*
-buid/*
+buid/
 *.c
 *.so

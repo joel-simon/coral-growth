@@ -1,7 +1,7 @@
 import MultiNEAT as NEAT
 
 params = NEAT.Parameters()
-params.PopulationSize = 200
+params.PopulationSize = 100
 params.DynamicCompatibility = True
 params.WeightDiffCoeff = 4.0
 params.CompatTreshold = 2.0
@@ -38,4 +38,4 @@ params.CrossoverRate = 0.75  # mutate only 0.25
 params.MultipointCrossoverRate = 0.4
 params.SurvivalRate = 0.3
 
-params.AllowLoops = False
+# params.AllowLoops = False

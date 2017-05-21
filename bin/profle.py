@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
 from __future__ import division, print_function
 import math, random, os, time, sys
 sys.path.append(os.path.abspath('..'))
 
 from plant_growth import constants, neat_params
-from plant_growth.pygameDraw import PygameDraw
-from plant_growth.plot import plot
 from plant_growth.evaluate import evaluate
 
 import MultiNEAT as NEAT
 
-# view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
+neat_params.params.PopulationSize = 50
 
 genome = NEAT.Genome(
     0, # ID
@@ -29,12 +26,20 @@ pop = NEAT.Population(
     neat_params.params,
     True, # Randomize weights.
     1.0, # Random Range.
-    14 # Random number generator seed.
+    int(time.time()) # Random number generator seed.
 )
 
-def display_func(world):
-    plot(view, world)
+for generation in range(5):
+    print('Starting generation', generation)
 
-genome = NEAT.GetGenomeList(pop)[2]
-evaluate(genome, display=None, break_early=False)
-# view.hold()
+    genome_list = NEAT.GetGenomeList(pop)
+    for genome in genome_list:
+        plant = evaluate(genome)
+        fitness = plant.total_flowering
+        genome.SetFitness(fitness)
+
+    fitnesses = [g.Fitness for g in genome_list]
+    mean = sum(fitnesses) / float(len(fitnesses))
+    maxf = max(fitnesses)
+    print('Max fitness:', maxf, 'Mean fitness:', mean)
+    pop.Epoch()

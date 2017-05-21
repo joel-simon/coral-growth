@@ -40,9 +40,8 @@ def evaluate(genome, display=None, break_early=True):
 
     if display:
         print('Evaluate finished.')
-        # print('\tFitness =', fitness)
         print('\tSteps =', s+1)
-        # print('\tNum out_verts =', len(world.plants[0].out_verts))
+        print('\tn_cells =', world.plants[0].n_cells)
         print()
 
     return world.plants[0]

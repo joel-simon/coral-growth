@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 
 try:
-  from setuptools import setup
-  from setuptools.extension import Extension
+    from setuptools import setup
+    from setuptools.extension import Extension
 except Exception:
-  from distutils.core import setup
-  from distutils.extension import Extension
+    from distutils.core import setup
+    from distutils.extension import Extension
 
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
@@ -15,31 +15,30 @@ _extra = ['-ffast-math']
 
 extensions = [
     Extension(
-      'plant_growth/vec2D',
-      sources = ['./plant_growth/vec2D.pyx'],
-      extra_compile_args = _extra
-      ),
+        'plant_growth/vec2D',
+        sources = ['./plant_growth/vec2D.pyx'],
+        extra_compile_args = _extra,
+        define_macros=[('CYTHON_TRACE', '1')]
+    ),
     Extension(
-      'plant_growth/segmenthashx',
-      sources = ['./plant_growth/segmenthashx.pyx'],
-      extra_compile_args = _extra
-      ),
+        'plant_growth/geometry',
+        sources = ['./plant_growth/geometry.pyx'],
+        extra_compile_args = _extra,
+        define_macros=[('CYTHON_TRACE', '1')]
+    ),
     Extension(
-      'plant_growth/geometry',
-      sources = ['./plant_growth/geometry.pyx'],
-      extra_compile_args = _extra
-      ),
-      # Extension(
-      # 'plant_growth/mesh',
-      # sources = ['./plant_growth/mesh.pyx'],
-      # extra_compile_args = _extra
-      # ),
-      # Extension(
-      # 'plant_growth/plant',
-      # sources = ['./plant_growth/plant.pyx'],
-      # extra_compile_args = _extra
-      # ),
-    ]
+        'plant_growth/plant',
+        sources = ['./plant_growth/plant.pyx'],
+        extra_compile_args = _extra,
+        define_macros=[('CYTHON_TRACE', '1')]
+    ),
+    Extension(
+        'plant_growth/world',
+        sources = ['./plant_growth/world.pyx'],
+        extra_compile_args = _extra,
+        define_macros=[('CYTHON_TRACE', '1')]
+    ),
+]
 
 setup(
     name = "plant-growth",
@@ -49,5 +48,5 @@ setup(
     license = 'MIT',
     cmdclass={'build_ext' : build_ext},
     include_dirs = [numpy.get_include()],
-    ext_modules = cythonize(extensions,include_path = [numpy.get_include()])
+    ext_modules = cythonize(extensions, include_path = [numpy.get_include()], compiler_directives={'linetrace': True})
 )

@@ -17,12 +17,12 @@ if __name__ == '__main__':
     assert(len(sys.argv) == 2)
     dirname = sys.argv[1]
     assert os.path.isdir(dirname)
-    
+
     view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
     frame = 0
 
-    networks_re = re.compile('best_(\d*)$') 
-    
+    networks_re = re.compile('best_(\d*)$')
+
     networks = []
 
     for name in os.listdir(dirname):
@@ -33,10 +33,10 @@ if __name__ == '__main__':
 
     # Sort in-place in increasing order
     networks.sort()
-    
+
     with TemporaryDirectory() as  temp_dir:
         print('Created temp directory.')
-        
+
         for gen, file_path in networks:
             # Display_func is only passed world object so pass rest with closure.
             def display_func(world):
@@ -58,7 +58,7 @@ if __name__ == '__main__':
             print('Loaded', file_path)
             print('Generating images...')
             evaluate(genome, display=display_func)
-            copy_frames()
+            copy_frames(40)
 
         print('Finished generating images.')
         print('Generating movie...')

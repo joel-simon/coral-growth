@@ -2,12 +2,17 @@
 from __future__ import division, print_function
 import math, random, os, time, sys
 sys.path.append(os.path.abspath('..'))
+
+import time
+import random
+import string
 from datetime import datetime
 
 from plant_growth import constants, neat_params
 from plant_growth.pygameDraw import PygameDraw
 from plant_growth.plot import plot
 from plant_growth.evaluate import evaluate
+from subprocess import call
 
 import MultiNEAT as NEAT
 
@@ -35,14 +40,15 @@ pop = NEAT.Population(
 
 def display_func(world):
     plot(view, world)
-import random
-import string
+
+
 uid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
 out_dir = "out_{:%B_%d_%Y_%H-%M}".format(datetime.now())+uid
 if not os.path.exists(out_dir):
     os.makedirs(out_dir)
 
 last_fitness = 0.0
+t = time.time()
 for generation in range(constants.NUM_GENERATIONS):
     print('Starting generation', generation)
 
@@ -50,14 +56,17 @@ for generation in range(constants.NUM_GENERATIONS):
     for genome in genome_list:
         plant = evaluate(genome)
         fitness = plant.total_flowering
-        # fitness = plant.volume
-        # fitness = plant.num_flowers
         genome.SetFitness(fitness)
 
     fitnesses = [g.Fitness for g in genome_list]
     mean = sum(fitnesses) / float(len(fitnesses))
     maxf = max(fitnesses)
+
+    runtime = time.time() - t
+    t = time.time()
+    print('Generation ran in %f, %f per plant' % (runtime, runtime/len(genome_list)))
     print('Max fitness:', maxf, 'Mean fitness:', mean)
+
 
     if maxf != last_fitness:
         best = pop.GetBestGenome()
@@ -68,3 +77,5 @@ for generation in range(constants.NUM_GENERATIONS):
 
     pop.Epoch()
     print()
+
+call('./render_all '+out_dir, shell=True)

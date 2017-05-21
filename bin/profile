@@ -3,24 +3,20 @@ import sys, os
 sys.path.append(os.path.abspath('..'))
 
 from plant_growth import constants
-from plant_growth.pygameDraw import PygameDraw
-from plant_growth.plot import plot
 from plant_growth.evaluate import evaluate
 import MultiNEAT as NEAT
 import time
 
-view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
-
 def display_func(world):
-    plot(view, world)
+    pass
 
 if __name__ == '__main__':
-
     assert(len(sys.argv) == 2)
     file_path = sys.argv[1]
     assert(os.path.exists(file_path))
     genome = NEAT.Genome(file_path)
     t1 = time.time()
-    evaluate(genome, display=display_func)
-    print('done in ', time.time() - t1)
-    view.hold()
+    n = 5
+    for _ in range(n):
+        evaluate(genome, display=display_func)
+    print('average time ', (time.time() - t1)/n)

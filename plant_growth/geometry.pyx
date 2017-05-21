@@ -1,14 +1,21 @@
 # from plant_growth.vec2D cimport Vec2D
-
+# from __future__ import
 cdef bint intersect(float p0_x, float p0_y, float p1_x, float p1_y,
                     float p2_x, float p2_y, float p3_x, float p3_y):
-    cdef float s1_x, s1_y, s2_x, s2_y, s, t
+    cdef float s1_x, s1_y, s2_x, s2_y, s, t, d
     s1_x = p1_x - p0_x
     s1_y = p1_y - p0_y
     s2_x = p3_x - p2_x
     s2_y = p3_y - p2_y
-    s = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) / (-s2_x * s1_y + s1_x * s2_y)
-    t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / (-s2_x * s1_y + s1_x * s2_y)
+
+    d = -s2_x * s1_y + s1_x * s2_y
+
+    # Parallel (Consider co-linear as not intersecting)
+    if d == 0.0:
+        return False
+
+    s = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) / d
+    t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / d
 
     if (s >= 0 and s <= 1 and t >= 0 and t <= 1):
         return True

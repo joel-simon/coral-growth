@@ -11,27 +11,24 @@ cdef class Vec2D:
         self.x = x
         self.y = y
 
-    cpdef Vec2D normed(Vec2D self):
+    cdef inline Vec2D normed(Vec2D self):
         cdef double norm = self.norm()
         if norm == 0:
             return Vec2D(0, 0)
         else:
             return Vec2D(self.x/norm, self.y/norm)
 
-    cpdef double norm(Vec2D self):
+    cdef inline double norm(Vec2D self):
         return sqrt(self.x*self.x + self.y*self.y)
 
-    cpdef double inner(Vec2D self, Vec2D other):
+    cdef inline double inner(Vec2D self, Vec2D other):
         return self.x*other.x + self.y*other.y
 
-    cpdef Vec2D cross(Vec2D self, Vec2D other):
-        return Vec2D(other.y - self.y , -(other.x - self.x))
-
-    cpdef double angle(Vec2D self, Vec2D other):
+    cdef inline double angle(Vec2D self, Vec2D other):
         cdef double inn = (self.inner(other)) / (self.norm() * other.norm())
         return acos(fmin(1, fmax(-1, inn)))
 
-    cpdef double angle_clockwise(Vec2D self, Vec2D other):
+    cdef inline double angle_clockwise(Vec2D self, Vec2D other):
         cdef double inner_angle = self.angle(other)
         cdef double determinant = self.x*other.y - self.y*other.x
         if determinant < 0:
@@ -39,25 +36,25 @@ cdef class Vec2D:
         else:
             return pi2 - inner_angle
 
-    cpdef Vec2D copy(Vec2D self):
-        return Vec2D(self.x, self.y)
+    # cpdef Vec2D copy(Vec2D self):
+    #     return Vec2D(self.x, self.y)
 
-    cdef Vec2D add(Vec2D self, Vec2D other):
+    cdef inline Vec2D add(Vec2D self, Vec2D other):
         return Vec2D(self.x + other.x, self.y + other.y)
 
-    cdef Vec2D sub(Vec2D self, Vec2D other):
+    cdef inline Vec2D sub(Vec2D self, Vec2D other):
         return Vec2D(self.x - other.x, self.y - other.y)
 
-    cdef Vec2D addf(Vec2D self, double v):
+    cdef inline Vec2D addf(Vec2D self, double v):
         return Vec2D(self.x + v, self.y + v)
 
-    cdef Vec2D subf(Vec2D self, double v):
+    cdef inline Vec2D subf(Vec2D self, double v):
         return Vec2D(self.x - v, self.y - v)
 
-    cdef Vec2D multf(Vec2D self, double v):
+    cdef inline Vec2D multf(Vec2D self, double v):
         return Vec2D(self.x * v, self.y * v)
 
-    cdef Vec2D divf(Vec2D self, double v):
+    cdef inline Vec2D divf(Vec2D self, double v):
         return Vec2D(self.x / v, self.y / v)
 
 

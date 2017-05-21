@@ -1,4 +1,4 @@
-# cython: boundscheck=True
+# cython: boundscheck=False
 # cython: wraparound=False
 # cython: initializedcheck=False
 # cython: nonecheck=False
@@ -6,10 +6,10 @@
 # cython: linetrace=True
 
 import math
-from libc.math cimport M_PI, log, sqrt, fmin, fmax, acos
+from libc.math cimport M_PI, log, sqrt, fmin, fmax, acos, cos, sin, abs
 
-# from plant_growth.vec2D import Vec2D
 from plant_growth.vec2D cimport Vec2D
+from plant_growth.world cimport World
 
 from plant_growth import constants
 from plant_growth cimport geometry
@@ -42,6 +42,9 @@ cdef class Plant:
 
         self.n_cells = 0
         self.cell_p = np.empty(constants.MAX_CELLS, dtype=object)
+        # self.cell_x = np.empty(constants.MAX_CELLS)
+        # self.cell_y = np.empty(constants.MAX_CELLS)
+
         self.cell_norm = np.empty((constants.MAX_CELLS, 2))
         self.cell_water = np.zeros(constants.MAX_CELLS)
         self.cell_light = np.zeros(constants.MAX_CELLS)
@@ -59,14 +62,11 @@ cdef class Plant:
     cpdef void update_attributes(self):
         cdef double e_production, e_consumption
 
-        self._split_links()
-        self._order_cells()
-        self._calculate_norms()
-
         self.polygon = self._make_polygon()
         self.volume = geometry.polygon_area(self.polygon)
 
         # self._calculate_mesh()
+        self._calculate_norms()
         self._calculate_collision_grid()
         self._calculate_light()
         self._calculate_water()
@@ -135,13 +135,16 @@ cdef class Plant:
                 self.cell_p[cid].x += self.cell_norm[cid, 0] * growth
                 self.cell_p[cid].y += self.cell_norm[cid, 1] * growth
 
+        self._split_links()
+        self._order_cells()
+
     cpdef void create_circle(self, double x, double y, double r, int n):
         cdef int i
         cdef double a, xx, yy
         for i in range(n):
             a = 2 * i * math.pi / n
-            xx = x + math.cos(a) * r
-            yy = y + math.sin(a) * r
+            xx = x + cos(a) * r
+            yy = y + sin(a) * r
             self._create_cell(xx, yy)
 
     cdef void _insert_before(self, int node, int new_node):
@@ -310,7 +313,8 @@ cdef class Plant:
             v_cell = self.cell_p[cid]
             v_prev = self.cell_p[id_prev]
 
-            dist = (v_cell - v_prev).norm()
+            dist = v_cell.sub(v_prev).norm()
+
             if dist > constants.MAX_EDGE_LENGTH:
                 inserts.append(cid)
 
@@ -333,6 +337,8 @@ cdef class Plant:
 
     cdef void _calculate_light(self):
         cdef int cid, id_prev
+        cdef double light
+        cdef Vec2D P, v_cell, v_prev, v_light, v_segment
 
         self.light = 0.0
 
@@ -341,7 +347,7 @@ cdef class Plant:
             v_cell = self.cell_p[cid]
             v_prev = self.cell_p[id_prev]
 
-            P = (v_cell + v_prev) / 2.0
+            P = v_cell.add(v_prev).divf(2.0)
 
             if self.cell_flower[cid]:
                 self.cell_light[cid] = 0.0
@@ -352,11 +358,10 @@ cdef class Plant:
 
             # Cast a ray to the center of every segment.
             elif not self.world.single_light_collision(P.x, P.y, cid):
-
-                v_light   = Vec2D(math.cos(self.light), math.sin(self.light))
-                v_segment = Vec2D(P.y - v_prev.y, P.x - v_prev.x)
+                v_light   = Vec2D(cos(self.light), sin(self.light))
+                v_segment = P.sub(v_prev)
                 angle = v_light.angle(v_segment)
-                light = 1 - (abs(angle - math.pi / 2.0)) / (math.pi / 2.0)
+                light = 1 - (abs(angle - M_PI / 2.0)) / (M_PI / 2.0)
 
                 self.cell_light[cid] += light / 2.0
                 self.cell_light[id_prev] += light / 2.0
@@ -381,14 +386,16 @@ cdef class Plant:
 
     cdef void _calculate_curvature(self):
         cdef int cid, id_prev, id_next
-        cdef Vec2D v_cell, v1, v2
+        cdef Vec2D v_cell, v1, v2, v_next, v_prev
 
         for cid in range(self.n_cells):
             id_prev = self.cell_prev[cid]
             id_next = self.cell_next[cid]
             v_cell = self.cell_p[cid]
-            v1 = self.cell_p[id_next] - v_cell
-            v2 = self.cell_p[id_prev] - v_cell
+            v_next = self.cell_p[id_next]
+            v_prev = self.cell_p[id_prev]
+            v1 = v_next.sub(v_cell)
+            v2 = v_prev.sub(v_cell)
             self.cell_curvature[cid] = v1.angle_clockwise(v2)
 
     cdef void _calculate_flowers(self):
@@ -404,4 +411,4 @@ cdef class Plant:
 
             if flower:
                 self.num_flowers += 1
-                self.total_flowering += v_cell.y-constants.SOIL_HEIGHT
+                self.total_flowering += v_cell.y - self.world.soil_height

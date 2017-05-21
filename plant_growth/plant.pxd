@@ -1,13 +1,16 @@
 from plant_growth.vec2D cimport Vec2D
+from plant_growth.world cimport World
 
 cdef class Plant:
-    cdef public object world, network, polygon, mesh
+    cdef public object network, polygon, mesh
     cdef public double efficiency, energy, volume, water, light, total_flowering, consumption
     cdef public bint alive
     cdef public int age, n_cells, cell_head, cell_tail, num_flowers
     cdef public double[:] cell_water, cell_light, cell_curvature
     cdef public int[:] cell_next, cell_prev, cell_flower, ordered_cell
     cdef public object[:] cell_p
+
+    cdef World world
     cdef int[:, :] grid
     cdef double[:,:] cell_norm
     cdef list cell_inputs

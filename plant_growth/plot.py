@@ -23,17 +23,22 @@ def plot_image_grid(view, world):
 
 import random
 r = lambda: random.randint(0,255)
-c = lambda: ('#%02X%02X%02X' % (r(),r(),r()))
-# print
-num_groups = 10
-colors = [c() for _ in range(num_groups)]
+c = lambda: (r(),r(),r())
+
+derp = [c() for _ in range(1000)]
+
+group_width = 20
+
+def myround(x, base=5):
+    return int(base * round(float(x)/base))
+
+colors = dict()
+
+def group(vec):
+    return myround(vec.x - vec.y, group_width)
 
 def plot(view, world, title=None):
-    # sh = world.sh
-
-
     width, height = world.width, world.height
-
     view.start_draw()
     view.draw_rect((0, 0, width, height), (0, 102, 200), width=0)
     view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 200), width=0)
@@ -44,8 +49,8 @@ def plot(view, world, title=None):
             light_prev = plant.cell_light[plant.cell_prev[cid]]
             if light_cell > 0 and light_prev > 0:
                 v_cell = plant.cell_p[cid]
-                derp = v_cell + Vec2D(math.cos(world.light), math.sin(world.light)) * 1000
-                view.draw_line(derp, v_cell, (255, 255, 102, 150))
+                derp2 = v_cell + Vec2D(math.cos(world.light), math.sin(world.light)) * 1000
+                view.draw_line(derp2, v_cell, (255, 255, 102, 150))
 
     for plant in world.plants:
         view.draw_polygon(plant.polygon, (20, 200, 20))
@@ -60,7 +65,16 @@ def plot(view, world, title=None):
         for cid in range(plant.n_cells):
             if plant.cell_flower[cid]:
                 v_cell = plant.cell_p[cid]
-                view.draw_circle(v_cell, 3, (200, 0, 200, 100), width=0)
+
+                # g = group(v_cell)
+                # if g in colors:
+                #     color = colors[g]
+                # else:
+                #     color = derp.pop()
+                #     colors[g] = color
+
+                view.draw_circle(v_cell, 3, (200, 0, 200, 200), width=0)
+            # view.draw_circle(v_cell, 3, color, width=0)
 
     view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 150), width=0)
     # plot_image_grid(view, world)

@@ -4,5 +4,6 @@ gm rf __pycache__
 out*
 best_*
 buid/
+*.o
 *.c
 *.so

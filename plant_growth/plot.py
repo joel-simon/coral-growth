@@ -21,40 +21,86 @@ def plot_image_grid(view, world):
         #     if v:
         #         view.draw_pixel((j,i), (255, 0, 0, 100))
 
-import random
-r = lambda: random.randint(0,255)
-c = lambda: (r(),r(),r())
+# import random
+# r = lambda: random.randint(0,255)
+# c = lambda: (r(),r(),r())
 
-derp = [c() for _ in range(1000)]
+# derp = [c() for _ in range(1000)]
 
-group_width = 20
+# group_width = 20
 
-def myround(x, base=5):
-    return int(base * round(float(x)/base))
+# def myround(x, base=5):
+#     return int(base * round(float(x)/base))
 
-colors = dict()
+# colors = dict()
 
-def group(vec):
-    return myround(vec.x - vec.y, group_width)
+# def group(vec):
+#     return myround(vec.x - vec.y, group_width)
+
+def contiguous_lit_cells(plant):
+    run = []
+    for i in range(plant.n_cells):
+        cid = plant.ordered_cell[i]
+
+        if plant.cell_light[cid] > 0:
+            run.append(cid)
+
+        elif len(run):
+            yield run
+            run = []
 
 def plot(view, world, title=None):
     width, height = world.width, world.height
     view.start_draw()
     view.draw_rect((0, 0, width, height), (0, 102, 200), width=0)
-    view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 200), width=0)
+    view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 150), width=0)
 
-    for plant in world.plants:
-        for cid in range(plant.n_cells):
-            light_cell = plant.cell_light[cid]
-            light_prev = plant.cell_light[plant.cell_prev[cid]]
-            if light_cell > 0 and light_prev > 0:
-                v_cell = plant.cell_p[cid]
-                derp2 = v_cell + Vec2D(math.cos(world.light), math.sin(world.light)) * 1000
-                view.draw_line(derp2, v_cell, (255, 255, 102, 150))
+    # for plant in world.plants:
+    #     for contig_group in contiguous_lit_cells(plant):
+    #         if len(contig_group) > 1:
+    #             x0 = plant.cell_x[contig_group[0]] + math.cos(world.light) * 1000
+    #             y0 = plant.cell_y[contig_group[0]] + math.sin(world.light) * 1000
+
+    #             xn = plant.cell_x[contig_group[-1]] + math.cos(world.light) * 1000
+    #             yn = plant.cell_y[contig_group[-1]] + math.sin(world.light) * 1000
+
+    #             poly = [(x0, y0)]+[(plant.cell_x[i], plant.cell_y[i]) for i in contig_group]+[(xn, yn)]
+    #             view.draw_polygon(poly, (255, 255, 102, 150))
+
+        # print(list(continuous_lit_cells(plant)))
+        # for cid in range(plant.n_cells):
+        #     light_cell = plant.cell_light[cid]
+        #     light_prev = plant.cell_light[plant.cell_prev[cid]]
+        #     if light_cell > 0 and light_prev > 0:
+        #         c_x = plant.cell_x[cid]
+        #         c_y = plant.cell_y[cid]
+        #         d_x = c_x + math.cos(world.light) * 1000
+        #         d_y = c_y + math.sin(world.light) * 1000
+        #         view.draw_line((d_x, d_y), (c_x, c_y), (255, 255, 102, 150))
 
     for plant in world.plants:
         view.draw_polygon(plant.polygon, (20, 200, 20))
-        view.draw_lines(plant.polygon, (20, 20, 20), width=1)
+        # view.draw_lines(plant.polygon, (20, 20, 20), width=1)
+
+                # print(list(continuous_lit_cells(plant)))
+        for cid in range(plant.n_cells):
+            prev_id = plant.cell_prev[cid]
+            cell_light = plant.cell_light[cid]
+            prev_light = plant.cell_light[prev_id]
+            c_x = plant.cell_x[cid]
+            c_y = plant.cell_y[cid]
+            p_x = plant.cell_x[prev_id]
+            p_y = plant.cell_y[prev_id]
+
+            light = min(1, max(0, plant.cell_light[cid]))
+            color = (int(255*light), int(248*light), 0, 255)
+
+            # view.draw_circle(((c_x+p_x)/2, (c_y+p_y)/2), 3, color, width=0)
+            # if plant.cell_water[cid]:
+            # color = (0,0,0)
+            view.draw_line((c_x, c_y), (p_x, p_y), color, width=2)
+            # else:
+            # view.draw_line((c_x, c_y), (p_x, p_y), (20, 20, 20), width=1)
 
         if plant.mesh:
             for face in plant.mesh.elements:
@@ -64,16 +110,10 @@ def plot(view, world, title=None):
 
         for cid in range(plant.n_cells):
             if plant.cell_flower[cid]:
-                v_cell = plant.cell_p[cid]
+                c_x = plant.cell_x[cid]
+                c_y = plant.cell_y[cid]
 
-                # g = group(v_cell)
-                # if g in colors:
-                #     color = colors[g]
-                # else:
-                #     color = derp.pop()
-                #     colors[g] = color
-
-                view.draw_circle(v_cell, 3, (200, 0, 200, 200), width=0)
+                view.draw_circle((c_x, c_y), 3, (200, 0, 200, 200), width=0)
             # view.draw_circle(v_cell, 3, color, width=0)
 
     view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 150), width=0)

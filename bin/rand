@@ -10,7 +10,7 @@ from plant_growth.evaluate import evaluate
 
 import MultiNEAT as NEAT
 
-# view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
+view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 
 genome = NEAT.Genome(
     0, # ID
@@ -36,5 +36,5 @@ def display_func(world):
     plot(view, world)
 
 genome = NEAT.GetGenomeList(pop)[2]
-evaluate(genome, display=None, break_early=False)
+evaluate(genome, display=display_func, break_early=False)
 # view.hold()

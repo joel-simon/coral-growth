@@ -8,20 +8,18 @@ from plant_growth.world import World
 import MultiNEAT as NEAT
 
 def evaluate(genome, display=None, break_early=True):
+    
     net = NEAT.NeuralNetwork()
     genome.BuildPhenotype(net)
+    
     world = World(constants.WORLD_WIDTH, constants.WORLD_HEIGHT,
                     constants.LIGHT_ANGLE,
                     constants.SOIL_HEIGHT)
 
     random.seed(0)
-    # seed_polygon = []
 
-    # for i in range(constants.SEED_SEGMENTS):
-    #     a = 2 * i * math.pi / constants.SEED_SEGMENTS
-    x = constants.WORLD_WIDTH/2# + math.cos(a) * constants.SEED_RADIUS
-    y = constants.SOIL_HEIGHT# + math.sin(a) * constants.SEED_RADIUS
-    #     seed_polygon.append(Vec2D(x, y))
+    x = constants.WORLD_WIDTH / 2.0
+    y = constants.SOIL_HEIGHT
     r = constants.SEED_RADIUS
     world.add_plant(x, y, r, net, constants.PLANT_EFFICIENCY)
 

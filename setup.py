@@ -13,30 +13,35 @@ import numpy
 
 _extra = ['-ffast-math']
 
+_macros = [('CYTHON_TRACE', '1')]
+# _macros = None
+
+compiler_directives = {'linetrace': True, 'profile': True}
+
 extensions = [
     Extension(
         'plant_growth/vec2D',
         sources = ['./plant_growth/vec2D.pyx'],
         extra_compile_args = _extra,
-        define_macros=[('CYTHON_TRACE', '1')]
+        define_macros=_macros
     ),
     Extension(
         'plant_growth/geometry',
         sources = ['./plant_growth/geometry.pyx'],
         extra_compile_args = _extra,
-        define_macros=[('CYTHON_TRACE', '1')]
+        define_macros=_macros
     ),
     Extension(
         'plant_growth/plant',
         sources = ['./plant_growth/plant.pyx'],
         extra_compile_args = _extra,
-        define_macros=[('CYTHON_TRACE', '1')]
+        define_macros=_macros
     ),
     Extension(
         'plant_growth/world',
         sources = ['./plant_growth/world.pyx'],
         extra_compile_args = _extra,
-        define_macros=[('CYTHON_TRACE', '1')]
+        define_macros=_macros
     ),
 ]
 
@@ -48,5 +53,9 @@ setup(
     license = 'MIT',
     cmdclass={'build_ext' : build_ext},
     include_dirs = [numpy.get_include()],
-    ext_modules = cythonize(extensions, include_path = [numpy.get_include()], compiler_directives={'linetrace': True})
+    ext_modules = cythonize(
+        extensions,
+        include_path = [numpy.get_include()],
+        compiler_directives=compiler_directives
+    )
 )

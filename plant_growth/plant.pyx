@@ -3,19 +3,19 @@
 # cython: initializedcheck=False
 # cython: nonecheck=False
 # cython: cdivision=True
-# cython: linetrace=True
 
-import math
-from libc.math cimport M_PI, log, sqrt, fmin, fmax, acos, cos, sin, abs
+from libc.math cimport M_PI, log, sqrt, fmin, fmax, acos, cos, sin, abs, atan2
+
+import numpy as np
+cimport numpy as np
+
+from random import random
 
 from plant_growth.vec2D cimport Vec2D
 from plant_growth.world cimport World
 
 from plant_growth import constants
 from plant_growth cimport geometry
-
-import numpy as np
-cimport numpy as np
 
 from meshpy.triangle import MeshInfo, build, refine
 from PIL import Image, ImageDraw
@@ -39,11 +39,12 @@ cdef class Plant:
         self.total_flowering = 0
         self.consumption = 0
         self.age = 0
-
+        self.max_age = float(constants.SIMULATION_STEPS)
+        
         self.n_cells = 0
-        self.cell_p = np.empty(constants.MAX_CELLS, dtype=object)
-        # self.cell_x = np.empty(constants.MAX_CELLS)
-        # self.cell_y = np.empty(constants.MAX_CELLS)
+
+        self.cell_x = np.empty(constants.MAX_CELLS)
+        self.cell_y = np.empty(constants.MAX_CELLS)
 
         self.cell_norm = np.empty((constants.MAX_CELLS, 2))
         self.cell_water = np.zeros(constants.MAX_CELLS)
@@ -91,23 +92,29 @@ cdef class Plant:
             self.alive = False
 
     cpdef void grow(self):
-        cdef double growth
+        cdef double growth, x_cell, y_cell, x_prev, y_prev, x_next, y_next
         cdef bint flower, death
         cdef double[:] inputs
         cdef int cid, cid_prev, cid_next
-        cdef Vec2D v_cell, v_prev, v_next, Va, Vb, v_new
 
         for cid in range(self.n_cells):
-            cid_prev = self.cell_prev[cid]
-            cid_next = self.cell_next[cid]
+            cid_prev = self.cell_prev[cid] # id of cell before
+            cid_next = self.cell_next[cid] # id of cell after
 
-            v_cell = self.cell_p[cid]
-            v_prev = self.cell_p[cid_prev]
-            v_next = self.cell_p[cid_next]
+            x_cell = self.cell_x[cid]
+            y_cell = self.cell_y[cid]
+            x_prev = self.cell_x[cid_prev]
+            y_prev = self.cell_y[cid_prev]
+            x_next = self.cell_x[cid_next]
+            y_next = self.cell_y[cid_next]
 
+            # Transfer values to cell_input buffer.
             self._cell_input(cid)
+
+            # Compute feed-forward neteork results.
             output = self._output()
 
+            # Three possible output actions.
             growth = output[0] * constants.CELL_MAX_GROWTH
             flower = output[1] > .5
             death  = output[2] > .5
@@ -118,22 +125,20 @@ cdef class Plant:
                 flower = False
 
             if death:
-                self.cell_p[cid].x = (v_prev.x + v_next.x) / 2.0
-                self.cell_p[cid].y = (v_prev.y + v_next.y) / 2.0
+                self.cell_x[cid] = (x_prev + x_next) / 2.0
+                self.cell_y[cid] = (y_prev + y_next) / 2.0
 
             if not self.cell_water[cid] and flower:
                 if self.energy >= constants.FLOWER_COST:
                     self.energy -= constants.FLOWER_COST
                     self.cell_flower[cid] = True
 
-            new_p = Vec2D(
-                v_cell.x + self.cell_norm[cid, 0] * 3 * growth,
-                v_cell.y + self.cell_norm[cid, 1] * 3 * growth
-            )
+            x_test = x_cell + self.cell_norm[cid, 0] * 3 * growth
+            y_test = y_cell + self.cell_norm[cid, 1] * 3 * growth
 
-            if self._valid_growth(new_p, v_prev, v_next):
-                self.cell_p[cid].x += self.cell_norm[cid, 0] * growth
-                self.cell_p[cid].y += self.cell_norm[cid, 1] * growth
+            if self._valid_growth(x_test, y_test, x_prev, y_prev, x_next, y_next):
+                self.cell_x[cid] += self.cell_norm[cid, 0] * growth
+                self.cell_y[cid] += self.cell_norm[cid, 1] * growth
 
         self._split_links()
         self._order_cells()
@@ -142,7 +147,7 @@ cdef class Plant:
         cdef int i
         cdef double a, xx, yy
         for i in range(n):
-            a = 2 * i * math.pi / n
+            a = 2 * i * M_PI / n
             xx = x + cos(a) * r
             yy = y + sin(a) * r
             self._create_cell(xx, yy)
@@ -178,7 +183,8 @@ cdef class Plant:
 
         cid = self.n_cells
         self.n_cells += 1
-        self.cell_p[cid] = Vec2D(x, y)
+        self.cell_x[cid] = x
+        self.cell_y[cid] = y
 
         if before:
             self._insert_before(before, cid)
@@ -196,8 +202,10 @@ cdef class Plant:
         self.cell_inputs[2] = (self.cell_curvature[cid]/(M_PI)) - 1
         self.cell_inputs[3] = (self.consumption*2) - 1
         self.cell_inputs[4] = (self.cell_flower[cid]*2) - 1
-        self.cell_inputs[5] = log(self.water/self.light)
-        self.cell_inputs[6] = 1 # The last input is always used as bias.
+        self.cell_inputs[5] = log(self.water / self.light)
+        self.cell_inputs[6] = (2 * self.age / self.max_age) - 1
+        self.cell_inputs[7] = random()
+        self.cell_inputs[8] = 1 # The last input is always used as bias.
 
     cdef void _order_cells(self):
         cdef int cid, i
@@ -213,38 +221,35 @@ cdef class Plant:
         output = self.network.Output()
         return output
 
-    cdef bint _valid_growth(self, Vec2D v_cell, Vec2D v_prev, Vec2D v_next):
-        cdef Vec2D Sa, Sb
+    cdef bint _valid_growth(self, double x_test, double y_test, double x_prev, double y_prev, double x_next, double y_next):
         cdef int x, y
+        cdef double x1, y1, x2, y2, angle
 
-        if v_cell.x < 0 or v_cell.y < 0:
+        if x_test < 0 or y_test < 0:
             return False
 
-        if v_cell.x >= self.world.width or v_cell.x >= self.world.height:
+        if x_test >= self.world.width or y_test >= self.world.height:
             return False
 
-        Sa = v_next - v_cell
-        Sb = v_prev - v_cell
-        if Sa.angle_clockwise(Sb) > constants.MAX_ANGLE:
+        x1 = x_next - x_test
+        y1 = y_next - y_test
+        x2 = x_prev - x_test
+        y2 = y_prev - y_test
+        angle = geometry.angle_clockwise(x1, y1, x2, y2)
+
+        if angle > constants.MAX_ANGLE:
             return False
 
-        # x1, y1 = cell.prev.vector
-        # x2, y2 = v_cell
-        # for id in self.world.sh.segment_intersect(x1, y1, x2, y2):
-        #     if id != cell.id:
-        #         return False
-        x = <int>v_cell.x
-        y = <int>v_cell.y
+        if self.grid[<int>x_test, <int>y_test]:
+            return False
+
+        x = <int>((x_test + x_prev) / 2.)
+        y = <int>((y_test + y_prev) / 2.)
         if self.grid[x, y]:
             return False
 
-        x = <int>((v_cell.x + v_prev.x) / 2.)
-        y = <int>((v_cell.y + v_prev.y) / 2.)
-        if self.grid[x, y]:
-            return False
-
-        x = <int>((v_cell.x + v_next.x) / 2.)
-        y = <int>((v_cell.y + v_next.y) / 2.)
+        x = <int>((x_test + x_next) / 2.)
+        y = <int>((y_test + y_next) / 2.)
         if self.grid[x, y]:
             return False
 
@@ -252,13 +257,11 @@ cdef class Plant:
 
     cdef object _make_polygon(self):
         cdef int i, cid
-        cdef Vec2D v
         polygon = []
 
         for i in range(self.n_cells):
             cid = self.ordered_cell[i]
-            v = self.cell_p[cid]
-            polygon.append((v.x, v.y))
+            polygon.append((self.cell_x[cid], self.cell_y[cid]))
 
         return polygon
 
@@ -276,11 +279,11 @@ cdef class Plant:
             cid_prev = self.cell_prev[cid]
             cid_next = self.cell_next[cid]
 
-            x1 = self.cell_p[cid_prev].x - self.cell_p[cid].x
-            y1 = self.cell_p[cid_prev].y - self.cell_p[cid].y
+            x1 = self.cell_x[cid_prev] - self.cell_x[cid]
+            y1 = self.cell_y[cid_prev] - self.cell_y[cid]
 
-            x2 = self.cell_p[cid_next].x - self.cell_p[cid].x
-            y2 = self.cell_p[cid_next].y - self.cell_p[cid].y
+            x2 = self.cell_x[cid_next] - self.cell_x[cid]
+            y2 = self.cell_y[cid_next] - self.cell_y[cid]
 
             norm_x = y2 - y1
             norm_y = -(x2 - x1)
@@ -299,8 +302,7 @@ cdef class Plant:
 
     cdef void _split_links(self):
         cdef int cid, id_prev
-        cdef double dist, x, y
-        cdef Vec2D v_cell, v_prev
+        cdef double dist, x, y, dx, dy
 
         inserts = []
 
@@ -310,23 +312,22 @@ cdef class Plant:
         for cid in range(self.n_cells):
             id_prev = self.cell_prev[cid]
 
-            v_cell = self.cell_p[cid]
-            v_prev = self.cell_p[id_prev]
-
-            dist = v_cell.sub(v_prev).norm()
+            dx = self.cell_x[cid] - self.cell_x[id_prev]
+            dy = self.cell_y[cid] - self.cell_y[id_prev]
+            dist = sqrt(dx*dx + dy*dy)
+            # dist = v_cell.sub(v_prev).norm()
 
             if dist > constants.MAX_EDGE_LENGTH:
                 inserts.append(cid)
 
         for cid in inserts:
             id_prev = self.cell_prev[cid]
-            v_cell = self.cell_p[cid]
-            v_prev = self.cell_p[id_prev]
 
             if self.n_cells >= constants.MAX_CELLS:
                 break
 
-            x, y = (v_cell + v_prev) / 2.0
+            x = (self.cell_x[cid] + self.cell_x[id_prev]) / 2.0
+            y = (self.cell_y[cid] + self.cell_y[id_prev]) / 2.0
             self._create_cell(x, y, before=cid)
 
     cdef void _calculate_collision_grid(self):
@@ -337,48 +338,62 @@ cdef class Plant:
 
     cdef void _calculate_light(self):
         cdef int cid, id_prev
-        cdef double light
-        cdef Vec2D P, v_cell, v_prev, v_light, v_segment
+        cdef double light, x_cell, y_cell, x_prev, y_prev
+        cdef Vec2D P, v_light, v_segment
+        cdef double derp = constants.MAX_EDGE_LENGTH*constants.LIGHT_EFFICIENCY
+        cdef double angle
+
+        cdef double ax = cos(self.world.light - (M_PI / 2))
+        cdef double ay = sin(self.world.light - (M_PI / 2))
 
         self.light = 0.0
 
         for cid in range(self.n_cells):
+            self.cell_light[cid] = 0
+
+        for cid in range(self.n_cells):
             id_prev = self.cell_prev[cid]
-            v_cell = self.cell_p[cid]
-            v_prev = self.cell_p[id_prev]
+            x_cell = self.cell_x[cid]
+            y_cell = self.cell_y[cid]
+            x_prev = self.cell_x[id_prev]
+            y_prev = self.cell_y[id_prev]
 
-            P = v_cell.add(v_prev).divf(2.0)
+            x_center = (x_cell + x_prev) / 2.0
+            y_center = (y_cell + y_prev) / 2.0
 
-            if self.cell_flower[cid]:
-                self.cell_light[cid] = 0.0
 
-            # Underground out_verts do not get sunlight.
-            elif v_cell.y <= constants.SOIL_HEIGHT:
+            # Underground cells do not recieve sunlight.
+            if y_cell <= constants.SOIL_HEIGHT:
                 self.cell_light[cid] = 0.0
 
             # Cast a ray to the center of every segment.
-            elif not self.world.single_light_collision(P.x, P.y, cid):
-                v_light   = Vec2D(cos(self.light), sin(self.light))
-                v_segment = P.sub(v_prev)
-                angle = v_light.angle(v_segment)
-                light = 1 - (abs(angle - M_PI / 2.0)) / (M_PI / 2.0)
+            elif not self.world.single_light_collision(self, x_center, y_center, cid):
+                
+                # angle from 0 to 2pi
+                angle = geometry.angle_clockwise(x_prev - x_cell, y_prev - y_cell, ax, ay)
+                
+                # map angle to [0, 1]
+                light = abs(angle-M_PI) / M_PI
+
+                # TODO - figure out why this is needed.
+                light = (light -.5) * 2
+
+                # self.cell_light[cid] = light
 
                 self.cell_light[cid] += light / 2.0
                 self.cell_light[id_prev] += light / 2.0
-                self.light += light*constants.MAX_EDGE_LENGTH*constants.LIGHT_EFFICIENCY
-            else:
-                self.cell_light[cid] = 0
+                
+                # Flowers do not contribute light.
+                if not self.cell_flower[cid]:
+                    self.light += light * derp
 
     cdef void _calculate_water(self):
         cdef int cid
-        cdef Vec2D v_cell
-
+        # cdef Vec2D v_cell
         self.water = 0
+
         for cid in range(self.n_cells):
-
-            v_cell = self.cell_p[cid]
-
-            if v_cell.y < constants.SOIL_HEIGHT:
+            if self.cell_y[cid] < constants.SOIL_HEIGHT:
                 self.cell_water[cid] = 1
                 self.water += constants.MAX_EDGE_LENGTH*constants.WATER_EFFICIENCY
             else:
@@ -386,29 +401,30 @@ cdef class Plant:
 
     cdef void _calculate_curvature(self):
         cdef int cid, id_prev, id_next
-        cdef Vec2D v_cell, v1, v2, v_next, v_prev
+        cdef double x1, y1, x2, y2, angle
 
         for cid in range(self.n_cells):
             id_prev = self.cell_prev[cid]
             id_next = self.cell_next[cid]
-            v_cell = self.cell_p[cid]
-            v_next = self.cell_p[id_next]
-            v_prev = self.cell_p[id_prev]
-            v1 = v_next.sub(v_cell)
-            v2 = v_prev.sub(v_cell)
-            self.cell_curvature[cid] = v1.angle_clockwise(v2)
+
+            x1 = self.cell_x[id_next] - self.cell_x[cid]
+            y1 = self.cell_y[id_next] - self.cell_y[cid]
+            x2 = self.cell_x[id_prev] - self.cell_x[cid]
+            y2 = self.cell_y[id_prev] - self.cell_y[cid]
+
+            angle = geometry.angle_clockwise(x1, y1, x2, y2)
 
     cdef void _calculate_flowers(self):
         cdef int cid
         cdef bint flower
-        cdef Vec2D v_cell
+        cdef double y_cell
 
         self.num_flowers = 0
 
         for cid in range(self.n_cells):
-            v_cell = self.cell_p[cid]
             flower = self.cell_flower[cid]
+            y_cell = self.cell_y[cid]
 
             if flower:
                 self.num_flowers += 1
-                self.total_flowering += v_cell.y - self.world.soil_height
+                self.total_flowering += y_cell - self.world.soil_height

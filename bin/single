@@ -16,8 +16,6 @@ from subprocess import call
 
 import MultiNEAT as NEAT
 
-view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
-
 genome = NEAT.Genome(
     0, # ID
     constants.NUM_INPUTS,
@@ -38,44 +36,51 @@ pop = NEAT.Population(
     int(time.time()) # Random number generator seed.
 )
 
-def display_func(world):
-    plot(view, world)
 
+def run(out_dir):
+    view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 
-uid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
-out_dir = "out_{:%B_%d_%Y_%H-%M}".format(datetime.now())+uid
-if not os.path.exists(out_dir):
+    def display_func(world):
+        plot(view, world)
+
+    last_fitness = 0.0
+    t = time.time()
+
+    for generation in range(constants.NUM_GENERATIONS):
+        print('Starting generation', generation)
+
+        genome_list = NEAT.GetGenomeList(pop)
+        for genome in genome_list:
+            plant = evaluate(genome)
+            fitness = plant.total_flowering
+            genome.SetFitness(fitness)
+
+        fitnesses = [g.Fitness for g in genome_list]
+        mean = sum(fitnesses) / float(len(fitnesses))
+        maxf = max(fitnesses)
+
+        runtime = time.time() - t
+        t = time.time()
+        print('Generation ran in %f, %f per plant' % (runtime, runtime/len(genome_list)))
+        print('Max fitness:', maxf, 'Mean fitness:', mean)
+
+        if maxf != last_fitness:
+            best = pop.GetBestGenome()
+            best.Save(out_dir+'/best_%i' % generation)
+            evaluate(best, display=display_func)
+            view.save(out_dir+'/best_%i.png' % generation)
+            last_fitness = maxf
+
+        pop.Epoch()
+        print()
+
+    print('Run Complete.')
+
+if __name__ == '__main__':
+    uid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
+    out_dir = "out_{:%B_%d_%Y_%H-%M}".format(datetime.now())+uid
+
     os.makedirs(out_dir)
 
-last_fitness = 0.0
-t = time.time()
-for generation in range(constants.NUM_GENERATIONS):
-    print('Starting generation', generation)
-
-    genome_list = NEAT.GetGenomeList(pop)
-    for genome in genome_list:
-        plant = evaluate(genome)
-        fitness = plant.total_flowering
-        genome.SetFitness(fitness)
-
-    fitnesses = [g.Fitness for g in genome_list]
-    mean = sum(fitnesses) / float(len(fitnesses))
-    maxf = max(fitnesses)
-
-    runtime = time.time() - t
-    t = time.time()
-    print('Generation ran in %f, %f per plant' % (runtime, runtime/len(genome_list)))
-    print('Max fitness:', maxf, 'Mean fitness:', mean)
-
-
-    if maxf != last_fitness:
-        best = pop.GetBestGenome()
-        best.Save(out_dir+'/best_%i' % generation)
-        evaluate(best, display=display_func)
-        view.save(out_dir+'/best_%i.png' % generation)
-        last_fitness = maxf
-
-    pop.Epoch()
-    print()
-
-call('./render_all '+out_dir, shell=True)
+    run(out_dir)
+    # call('./render_all '+out_dir, shell=True)

@@ -3,12 +3,11 @@ from plant_growth.world cimport World
 
 cdef class Plant:
     cdef public object network, polygon, mesh
-    cdef public double efficiency, energy, volume, water, light, total_flowering, consumption
+    cdef public double efficiency, energy, volume, water, light, total_flowering, consumption, max_age
     cdef public bint alive
     cdef public int age, n_cells, cell_head, cell_tail, num_flowers
-    cdef public double[:] cell_water, cell_light, cell_curvature
+    cdef public double[:] cell_x, cell_y, cell_water, cell_light, cell_curvature
     cdef public int[:] cell_next, cell_prev, cell_flower, ordered_cell
-    cdef public object[:] cell_p
 
     cdef World world
     cdef int[:, :] grid
@@ -25,7 +24,8 @@ cdef class Plant:
     cdef void _cell_input(self, int cid)
     cdef void _order_cells(self)
     cdef list _output(self)
-    cdef bint _valid_growth(self, Vec2D v_cell, Vec2D v_prev, Vec2D v_next)
+    cdef bint _valid_growth(self, double x_test, double y_test, double x_prev,
+                                  double y_prev, double x_next, double y_next)
     cdef object _make_polygon(self)
     cdef void _calculate_mesh(self)
     cdef void _calculate_norms(self)

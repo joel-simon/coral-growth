@@ -1,5 +1,13 @@
-# from plant_growth.vec2D cimport Vec2D
-# from __future__ import
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: initializedcheck=False
+# cython: nonecheck=False
+# cython: cdivision=True
+from __future__ import division
+from libc.math cimport acos, M_PI, sqrt, fmin, fmax
+
+cdef double TWOPI = 2.0 * M_PI
+
 cdef bint intersect(float p0_x, float p0_y, float p1_x, float p1_y,
                     float p2_x, float p2_y, float p3_x, float p3_y):
     cdef float s1_x, s1_y, s2_x, s2_y, s, t, d
@@ -42,45 +50,24 @@ cdef double shoelace(list point_list):
 cdef double polygon_area(list point_list):
     return abs(shoelace(point_list)) / 2.0
 
+cdef double angle(double x1, double y1, double x2, double y2):
+    cdef double l1, l2, cosx
+    l1 = sqrt(x1*x1 + y1*y1)
+    l2 = sqrt(x2*x2 + y2*y2)
+    cosx = (x1*x2 + y1*y2) / (l1*l2)
+
+    return acos(cosx)
+
+cdef double angle_clockwise(double x1, double y1, double x2, double y2):
+    cdef double a, det
+    a = angle(x1, y1, x2, y2)
+    det = x1*y2 - y1*x2
+    if det < 0:
+        return a
+    else:
+        return TWOPI - a
+
 # def tri_area(v1, v2, v3):
 #     # shoelace for case n=3
 #     return .5*abs(v1.x*v2.y - v3.x*v2.y + v3.x*v1.y - v1.x*v3.y + v2.x*v3.y - v2.x*v1.y)
 
-
-# def segment_intersect(a, b):
-#     A, B = a
-#     C, D = b
-#     return intersect(A, B, C, D)
-
-# cpdef bint point_in_polygon(poly, Vec2D p):
-#     cdef int nvert = len(poly)
-#     cdef int i, j
-#     cdef bint res = 0
-#     for (i = 0, j = nvert-1; i < nvert; j = i++):
-
-#         if ( ((poly[i].y>p.y) != (poly[j].y>p.y)) and
-#             (p.x < (vertx[j]-vertx[i]) * (p.y-poly[i].y) / (poly[j].y-poly[i].y) + vertx[i]))
-#                 res = not res
-#     return res
-
-# def point_inside_polygon(x, y, poly):
-#     n = len(poly)
-#     inside =False
-
-#     p1x,p1y = poly[0]
-#     for i in range(n+1):
-#         p2x,p2y = poly[i % n]
-#         if y > min(p1y,p2y):
-#             if y <= max(p1y,p2y):
-#                 if x <= max(p1x,p2x):
-#                     if p1y != p2y:
-#                         xinters = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
-#                     if p1x == p2x or x <= xinters:
-#                         inside = not inside
-#         p1x,p1y = p2x,p2y
-
-#     return inside
-
-# def lineIntersection(p1, p2, p3, p4):
-#     s = ((p4.x - p3.x) * (p1.y - p3.y) - (p4.y - p3.y) * (p1.x - p3.x)) / ((p4.y - p3.y) * (p2.x - p1.x) - (p4.x - p3.x) * (p2.y - p1.y))
-#     return Vec2D(p1.x + s * (p2.x - p1.x), p1.y + s * (p2.y - p1.y))

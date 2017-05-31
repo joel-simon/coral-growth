@@ -4,6 +4,7 @@
 # cython: nonecheck=False
 # cython: cdivision=True
 
+from __future__ import print_function
 from libc.math cimport cos, sin, round
 
 import numpy as np
@@ -16,31 +17,48 @@ from plant_growth import constants
 from plant_growth cimport geometry
 
 cdef class World:
-    def __init__(self, int width, int height, double light, int soil_height):
-        self.width = width
-        self.height = height
-        self.light = light
-        self.soil_height = soil_height
-        self.cos_light = cos(self.light)
-        self.sin_light = sin(self.light)
+    def __init__(self, object params):
+        self.width  = params['width']
+        self.height = params['height']
+        self.soil_height = params['soil_height']
+        self.max_plants  = params['max_plants']
+        # self.light_angle = params.light
+        # self.cos_light = cos(self.light_angle)
+        # self.sin_light = sin(self.light_angle)
 
         self.plants = []
 
         # Spatial hashing for lighting.
         # The width must be larger than the max edge size.
-        self.group_width = constants.WORLD_GROUP_WIDTH
-        self.num_buckets = constants.WORLD_NUM_BUCKETS
-        self.bucket_max_n = constants.WORLD_BUCKET_SIZE
-        self.hash_buckets = np.zeros((self.num_buckets, self.bucket_max_n), dtype='i')
-        self.bucket_sizes = np.zeros(self.num_buckets, dtype='i')
+        # self.group_width = constants.WORLD_GROUP_WIDTH
+        # self.num_buckets = constants.WORLD_NUM_BUCKETS
+        # self.bucket_max_n = constants.WORLD_BUCKET_SIZE
+        # self.hash_buckets = np.zeros((self.num_buckets, self.bucket_max_n), dtype='i')
+        # self.bucket_sizes = np.zeros(self.num_buckets, dtype='i')
+
+        # self.__open_plant_ids = list(reversed(range(self.max_plants)))
+        # self.plant_alive = np.zeros(self.max_plants)
+        # self.plant_x = np.zeros((self.max_plants, constants.MAX_CELLS))
+        # self.plant_y = np.zeros((self.max_plants, constants.MAX_CELLS))
 
     cpdef int add_plant(self, double x, double y, double r, network, double efficiency):
+
+        # if len(self.__open_plant_ids) == 0:
+        #     raise ValueError()
+
+        # cdef int plant_id = self.__open_plant_ids.pop()
+        # cdef object x_arr = self.plant_x[plant_id]  
         cdef Plant plant = Plant(self, network, efficiency)
+        # self.plant_alive[plant_id] = 1
         plant.create_circle(x, y, r, constants.SEED_SEGMENTS)
         self.plants.append(plant)
         self.__update()
         plant.update_attributes()
+        
         return 0 # To eventually become plant id.
+
+    # cdef void kill_plant(self, Plant plant):
+    #     self.plant_alive[plant.id] = 0
 
     cpdef void simulation_step(self):
         """ The main function called from outside.
@@ -60,112 +78,46 @@ cdef class World:
             if plant.alive:
                 plant.update_attributes()
 
-    cdef int __get_bucket(self, double x, double y):
-        # First get spatial section.
-        cdef int width = self.group_width
-        cdef int q = int(width * round((x - y)/width))
-
-        # Then, hash q to an existing bucket. (32 bit integer hash func)
-        # http://stackoverflow.com/a/12996028/2175411
-        q = (q ^ (q >> 16)) * 0x45d9f3b
-        q = (q ^ (q >> 16)) * 0x45d9f3b
-        q = q ^ (q >> 16)
-        q = q % self.num_buckets
-
-        return q
 
     cdef void __update(self):
-        """ We place each cell polygon segment into a spatial hash for
-            fast lookup later in single_light_collision method.
+        pass
+
+    cdef void calculate_light(self, Plant plant):
         """
-        cdef int i, j, cid, id_prev
-        cdef double x, y, c_x, c_y, p_x, p_y
-        cdef Plant plant
-        cdef int bucket_id1, bucket_id2, bucket_id3
-
-        for i in range(self.bucket_sizes.shape[0]):
-            self.bucket_sizes[i] = 0
-
-        for plant in self.plants:
-            for cid in range(plant.max_i):
-                if plant.cell_alive[cid]:
-                    id_prev = plant.cell_prev[cid]
-                    c_x = plant.cell_x[cid]
-                    c_y = plant.cell_y[cid]
-
-                    p_x = plant.cell_x[id_prev]
-                    p_y = plant.cell_y[id_prev]
-
-                    x = (c_x + p_x) / 2.0
-                    y = (c_y + p_y) / 2.0
-
-                    bucket_id1 = self.__get_bucket(x, y)
-                    bucket_id2 = self.__get_bucket(c_x, c_y)
-                    bucket_id3 = self.__get_bucket(p_x, p_y)
-
-                    j = self.bucket_sizes[bucket_id1]
-                    self.hash_buckets[bucket_id1, j] = cid
-                    self.bucket_sizes[bucket_id1] += 1
-
-                    if j >= self.bucket_max_n:
-                        self.__double_bucket_size()
-
-                    if bucket_id2 != bucket_id1:
-                        j = self.bucket_sizes[bucket_id2]
-                        self.hash_buckets[bucket_id2, j] = cid
-                        self.bucket_sizes[bucket_id2] += 1
-
-                        if j >= self.bucket_max_n:
-                            self.__double_bucket_size()
-
-                    elif bucket_id3 != bucket_id1:
-                        j = self.bucket_sizes[bucket_id3]
-                        self.hash_buckets[bucket_id3, j] = cid
-                        self.bucket_sizes[bucket_id3] += 1
-
-                        if j >= self.bucket_max_n:
-                            self.__double_bucket_size()
-
-    cdef void __double_bucket_size(self):
-        print('doubling bucket size')
-        # Create new buckets of double size.
-        print(self.hash_buckets.shape)
-        new = np.zeros((self.num_buckets, self.bucket_max_n*2), dtype='i')
-        # Copy over old values.
-        new[:, :self.bucket_max_n] = self.hash_buckets
-        self.hash_buckets = new
-        print(self.hash_buckets.shape)
-        self.bucket_max_n *= 2
-
-    cdef bint single_light_collision(self, Plant plant, double x0, double y0, int id_exclude):
-        """ See if there is a segment that blocks the light to this point.
-            Called by each plant from its update_attributes method.
+        We assume there are no segment intersections.
         """
-        cdef int i, cid, cid_prev, bucket_id
-        cdef double x1, y1, x2, y2, x3, y3
+        cdef int i, cell_left, cell_right, cell_index
+        cdef double x0, y0, x1, y1, x2, y2, slope
+        cdef bint is_above
+        cdef long[:] cells_indexes_ordered
 
-        bucket_id = self.__get_bucket(x0, y0)
+        cells_indexes_ordered = np.asarray(plant.cell_x[:plant.max_i]).argsort()
 
-        x1 = x0 + 1000 * self.cos_light
-        y1 = y0 + 1000 * self.sin_light
+        for i in range(plant.max_i):
+            plant.cell_light[i] = 0
 
-        for i in range(self.bucket_sizes[bucket_id]):
-            cid = self.hash_buckets[bucket_id, i]
+        cell_left = cells_indexes_ordered[0]
+        plant.cell_light[cell_left] = 1
 
-            if cid == id_exclude:
-                continue
+        for i in range(1, plant.max_i):
+            cell_index = cells_indexes_ordered[i]
 
-            cid_prev = plant.cell_prev[cid]
-            x2 = plant.cell_x[cid]
-            y2 = plant.cell_y[cid]
-            x3 = plant.cell_x[cid_prev]
-            y3 = plant.cell_y[cid_prev]
+            x0 = plant.cell_x[cell_index]
+            y0 = plant.cell_y[cell_index]
+                
+            x1, y1 = plant.cell_x[cell_left], plant.cell_y[cell_left]
 
-            # Do a quick test to see if segment is on other side.
-            if x2 + y2 < x0 + y0 and x3 + y3 < x0 + y0:
-                continue
+            if plant.cell_x[plant.cell_next[cell_left]] > plant.cell_x[plant.cell_prev[cell_left]]:
+                cell_right = plant.cell_next[cell_left]
+            else:
+                cell_right = plant.cell_prev[cell_left]
 
-            if geometry.intersect(x0, y0, x1, y1, x2, y2, x3, y3):
-                return True
+            x2, y2 = plant.cell_x[cell_right], plant.cell_y[cell_right]
 
-        return False
+            slope = (y2 - y1) / (x2 - x1)
+            is_above = y0 >= slope*(x0-x1) + y1
+                        
+            if x0 > x2 or is_above:
+                plant.cell_light[cell_index] = 1
+                cell_left = cell_index
+

@@ -11,7 +11,7 @@ cdef class Plant:
 
     cdef World world
     cdef int[:, :] grid
-    cdef double[:,:] cell_norm
+    cdef public double[:,:] cell_norm
     cdef list cell_inputs, open_ids
 
     cpdef void update_attributes(self)

@@ -4,7 +4,7 @@
 # cython: nonecheck=False
 # cython: cdivision=True
 
-from libc.math cimport M_PI, log, sqrt, fmin, fmax, acos, cos, sin, abs, atan2
+from libc.math cimport M_PI, M_PI_2, log, sqrt, fmin, fmax, acos, cos, sin, abs, atan2
 
 import numpy as np
 cimport numpy as np
@@ -376,58 +376,25 @@ cdef class Plant:
         # self.grid = np.asarray(img, dtype=np.uint8).T
 
     cdef void _calculate_light(self):
-        cdef int cid, id_prev
-        cdef double light, x_cell, y_cell, x_prev, y_prev
-        cdef Vec2D P, v_light, v_segment
-        cdef double derp = constants.MAX_EDGE_LENGTH*constants.LIGHT_EFFICIENCY
-        cdef double angle
-
-        cdef double ax = cos(self.world.light - (M_PI / 2))
-        cdef double ay = sin(self.world.light - (M_PI / 2))
-
-        self.light = 0.0
-
-        for cid in range(self.max_i):
-            self.cell_light[cid] = 0
+        cdef int cid
+        cdef double angle, light
+        self.world.calculate_light(self)
 
         for cid in range(self.max_i):
             if not self.cell_alive[cid]:
                 continue
 
-            id_prev = self.cell_prev[cid]
-            x_cell = self.cell_x[cid]
-            y_cell = self.cell_y[cid]
-            x_prev = self.cell_x[id_prev]
-            y_prev = self.cell_y[id_prev]
-
-            x_center = (x_cell + x_prev) / 2.0
-            y_center = (y_cell + y_prev) / 2.0
-
-
-            # Underground cells do not recieve sunlight.
-            if y_cell <= constants.SOIL_HEIGHT:
-                self.cell_light[cid] = 0.0
-
-            # Cast a ray to the center of every segment.
-            elif not self.world.single_light_collision(self, x_center, y_center, cid):
-
-                # angle from 0 to 2pi
-                angle = geometry.angle_clockwise(x_prev - x_cell, y_prev - y_cell, ax, ay)
+            if self.cell_light[cid] != 0:
+                # angle in radians (will be no values > pi or < 0)
+                angle = atan2(self.cell_norm[cid, 1], self.cell_norm[cid, 0])
 
                 # map angle to [0, 1]
-                light = abs(angle-M_PI) / M_PI
-
-                # TODO - figure out why this is needed.
-                light = (light -.5) * 2
-
-                # self.cell_light[cid] = light
-
-                self.cell_light[cid] += light / 2.0
-                self.cell_light[id_prev] += light / 2.0
+                light = 1 - abs(M_PI_2 - angle) / M_PI_2
+                self.cell_light[cid] = light
 
                 # Flowers do not contribute light.
                 if not self.cell_flower[cid]:
-                    self.light += light * derp
+                    self.light += light# * derp
 
     cdef void _calculate_water(self):
         cdef int cid

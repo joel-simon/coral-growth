@@ -12,9 +12,14 @@ def evaluate(genome, display=None, break_early=True):
     net = NEAT.NeuralNetwork()
     genome.BuildPhenotype(net)
     
-    world = World(constants.WORLD_WIDTH, constants.WORLD_HEIGHT,
-                    constants.LIGHT_ANGLE,
-                    constants.SOIL_HEIGHT)
+    world_params = {
+        'width': constants.WORLD_WIDTH,
+        'height': constants.WORLD_HEIGHT,
+        'soil_height': constants.SOIL_HEIGHT,
+        'max_plants': 1,
+    }
+
+    world = World(world_params)
 
     random.seed(0)
 

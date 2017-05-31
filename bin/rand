@@ -37,4 +37,4 @@ def display_func(world):
 
 genome = NEAT.GetGenomeList(pop)[2]
 evaluate(genome, display=display_func, break_early=False)
-# view.hold()
+view.hold()

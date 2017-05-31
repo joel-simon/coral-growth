@@ -23,6 +23,7 @@ def evaluate(genome, display=None, break_early=True):
     r = constants.SEED_RADIUS
     world.add_plant(x, y, r, net, constants.PLANT_EFFICIENCY)
 
+    last_volume = 0
     for s in range(constants.SIMULATION_STEPS):
         world.simulation_step()
 
@@ -31,9 +32,6 @@ def evaluate(genome, display=None, break_early=True):
 
         if break_early:
             if not world.plants[0].alive:
-                break
-
-            if s==50 and world.plants[0].volume < 2000:
                 break
 
     if display:

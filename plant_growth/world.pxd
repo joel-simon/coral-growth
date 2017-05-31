@@ -11,7 +11,7 @@ cdef class World:
     cdef double cos_light, sin_light
     cdef int[:] bucket_sizes
 
-    cdef int[:, :] hash_buckets
+    cdef public int[:, :] hash_buckets
 
     cpdef int add_plant(self, double x, double y, double r, network, double efficiency)
 

@@ -6,7 +6,7 @@ from plant_growth import constants
 from plant_growth.evaluate import evaluate
 
 import MultiNEAT as NEAT
-import line_profiler
+# import line_profiler
 
 def display_func(world):
     pass
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     assert(os.path.exists(file_path))
     genome = NEAT.Genome(file_path)
     t1 = time.time()
-    n = 5
+    n = 1
     for _ in range(n):
         evaluate(genome, display=display_func)
     print('average time ', (time.time() - t1)/n)

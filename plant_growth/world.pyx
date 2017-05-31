@@ -87,54 +87,54 @@ cdef class World:
             self.bucket_sizes[i] = 0
 
         for plant in self.plants:
-            for cid in range(plant.n_cells):
-                id_prev = plant.cell_prev[cid]
-                c_x = plant.cell_x[cid]
-                c_y = plant.cell_y[cid]
+            for cid in range(plant.max_i):
+                if plant.cell_alive[cid]:
+                    id_prev = plant.cell_prev[cid]
+                    c_x = plant.cell_x[cid]
+                    c_y = plant.cell_y[cid]
 
-                p_x = plant.cell_x[id_prev]
-                p_y = plant.cell_y[id_prev]
+                    p_x = plant.cell_x[id_prev]
+                    p_y = plant.cell_y[id_prev]
 
-                x = (c_x + p_x) / 2.0
-                y = (c_y + p_y) / 2.0
+                    x = (c_x + p_x) / 2.0
+                    y = (c_y + p_y) / 2.0
 
-                bucket_id1 = self.__get_bucket(x, y)
-                bucket_id2 = self.__get_bucket(c_x, c_y)
-                bucket_id3 = self.__get_bucket(p_x, p_y)
+                    bucket_id1 = self.__get_bucket(x, y)
+                    bucket_id2 = self.__get_bucket(c_x, c_y)
+                    bucket_id3 = self.__get_bucket(p_x, p_y)
 
-                j = self.bucket_sizes[bucket_id1]
-                self.hash_buckets[bucket_id1, j] = cid
-                self.bucket_sizes[bucket_id1] += 1
-                
-                if j >= self.bucket_max_n:
-                    self.__double_bucket_size()
-
-                if bucket_id2 != bucket_id1:
-                    j = self.bucket_sizes[bucket_id2]
-                    self.hash_buckets[bucket_id2, j] = cid
-                    self.bucket_sizes[bucket_id2] += 1
+                    j = self.bucket_sizes[bucket_id1]
+                    self.hash_buckets[bucket_id1, j] = cid
+                    self.bucket_sizes[bucket_id1] += 1
 
                     if j >= self.bucket_max_n:
                         self.__double_bucket_size()
 
-                elif bucket_id3 != bucket_id1:
-                    j = self.bucket_sizes[bucket_id3]
-                    self.hash_buckets[bucket_id3, j] = cid
-                    self.bucket_sizes[bucket_id3] += 1
+                    if bucket_id2 != bucket_id1:
+                        j = self.bucket_sizes[bucket_id2]
+                        self.hash_buckets[bucket_id2, j] = cid
+                        self.bucket_sizes[bucket_id2] += 1
 
-                    if j >= self.bucket_max_n:
-                        self.__double_bucket_size()
+                        if j >= self.bucket_max_n:
+                            self.__double_bucket_size()
 
-                    # raise ValueError('Bucket Overflow.')
-                # assert j <
-    
+                    elif bucket_id3 != bucket_id1:
+                        j = self.bucket_sizes[bucket_id3]
+                        self.hash_buckets[bucket_id3, j] = cid
+                        self.bucket_sizes[bucket_id3] += 1
+
+                        if j >= self.bucket_max_n:
+                            self.__double_bucket_size()
+
     cdef void __double_bucket_size(self):
         print('doubling bucket size')
         # Create new buckets of double size.
+        print(self.hash_buckets.shape)
         new = np.zeros((self.num_buckets, self.bucket_max_n*2), dtype='i')
         # Copy over old values.
         new[:, :self.bucket_max_n] = self.hash_buckets
         self.hash_buckets = new
+        print(self.hash_buckets.shape)
         self.bucket_max_n *= 2
 
     cdef bint single_light_collision(self, Plant plant, double x0, double y0, int id_exclude):

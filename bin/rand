@@ -10,8 +10,6 @@ from plant_growth.evaluate import evaluate
 
 import MultiNEAT as NEAT
 
-view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
-
 genome = NEAT.Genome(
     0, # ID
     constants.NUM_INPUTS,
@@ -32,9 +30,27 @@ pop = NEAT.Population(
     14 # Random number generator seed.
 )
 
-def display_func(world):
-    plot(view, world)
+# random.seed(time.time())
+# view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 
+def display_func(world):
+
+    pass
+    # plot(view, world)
+
+class NetworkDummy(object):
+    def Input(self, ls):
+        pass
+    def ActivateFast(self):
+        pass
+    def Flush(self):
+        pass
+    def Output(self):
+        return [random.random()/2, 0, 0]
+
+t1 = time.time()
 genome = NEAT.GetGenomeList(pop)[2]
-evaluate(genome, display=display_func, break_early=False)
-view.hold()
+net = NEAT.NeuralNetwork()
+evaluate(NetworkDummy(), display=display_func, break_early=False)
+print(time.time() - t1)
+# view.hold()

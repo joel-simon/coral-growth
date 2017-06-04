@@ -11,14 +11,12 @@ cimport numpy as np
 
 from random import random
 
-from plant_growth.vec2D cimport Vec2D
 from plant_growth.world cimport World
 
 from plant_growth import constants
 from plant_growth cimport geometry
 
 from meshpy.triangle import MeshInfo, build, refine
-from PIL import Image, ImageDraw
 
 def round_trip_connect(start, end):
     return [(i, i+1) for i in range(start, end)] + [(end, start)]
@@ -44,21 +42,24 @@ cdef class Plant:
         self.n_cells = 0
         self.max_i = 0
 
-        self.cell_x = np.empty(constants.MAX_CELLS)
-        self.cell_y = np.empty(constants.MAX_CELLS)
+        self.cell_x = np.zeros(constants.MAX_CELLS)
+        self.cell_y = np.zeros(constants.MAX_CELLS)
 
-        self.cell_norm = np.empty((constants.MAX_CELLS, 2))
+        self.cell_next_x = np.zeros(constants.MAX_CELLS)
+        self.cell_next_y = np.zeros(constants.MAX_CELLS)
+
+        self.cell_norm  = np.zeros((constants.MAX_CELLS, 2))
         self.cell_water = np.zeros(constants.MAX_CELLS)
         self.cell_light = np.zeros(constants.MAX_CELLS)
         self.cell_curvature = np.zeros(constants.MAX_CELLS)
+
         self.cell_flower = np.zeros(constants.MAX_CELLS, dtype='i')
-        self.cell_alive = np.ones(constants.MAX_CELLS, dtype='i')
+        self.cell_alive  = np.zeros(constants.MAX_CELLS, dtype='i')
 
         self.cell_next = np.zeros(constants.MAX_CELLS, dtype='i')
         self.cell_prev = np.zeros(constants.MAX_CELLS, dtype='i')
-        # self.cell_signals = np.zeros(constants.MAX_CELLS)
 
-        self.ordered_cell = np.zeros(constants.MAX_CELLS, dtype='i')
+        self.cell_order = np.zeros(constants.MAX_CELLS, dtype='i')
         self.cell_inputs = [0 for _ in range(constants.NUM_INPUTS+1)]
 
         self.grid = np.zeros((world.width, world.height), dtype='i')
@@ -72,7 +73,6 @@ cdef class Plant:
 
         # self._calculate_mesh()
         self._calculate_norms()
-        self._calculate_collision_grid()
         self._calculate_light()
         self._calculate_water()
         self._calculate_curvature()
@@ -96,59 +96,88 @@ cdef class Plant:
             self.alive = False
 
     cpdef void grow(self):
-        cdef double growth, x_cell, y_cell, x_prev, y_prev, x_next, y_next
+        cdef double growth, x_prev, y_prev, x_next, y_next, cell_x, cell_y
         cdef bint flower, death
-        cdef double[:] inputs
-        cdef int cid, cid_prev, cid_next
+        cdef int i, cid, cid_prev, cid_next
 
-        for cid in range(self.max_i):
-            if self.cell_alive[cid]:
+        for i in range(self.n_cells):
+            cid = self.cell_order[i]
+            assert(self.cell_alive[cid])
+
+            cell_x = self.cell_x[cid]
+            cell_y = self.cell_y[cid]
+
+            # Transfer values to cell_input buffer.
+            self._cell_input(cid)
+
+            # Compute feed-forward neteork results.
+            output = self._output()
+
+            # Three possible output actions.
+            growth = output[0] * constants.CELL_MAX_GROWTH
+            flower = output[1] > .5
+            smooth = output[2] > .5
+
+            # An underground cell may not flower.
+            if self.cell_water[cid]:
+                self.cell_flower[cid] = False
+
+            elif flower:
+                self.cell_flower[cid] = True
+
+            if smooth:# and self.cell_curvature[cid] < 0:
+                # Move to 50% between self and neighbors.
                 cid_prev = self.cell_prev[cid] # id of cell before
                 cid_next = self.cell_next[cid] # id of cell after
 
-                x_cell = self.cell_x[cid]
-                y_cell = self.cell_y[cid]
+
                 x_prev = self.cell_x[cid_prev]
                 y_prev = self.cell_y[cid_prev]
                 x_next = self.cell_x[cid_next]
                 y_next = self.cell_y[cid_next]
 
-                # Transfer values to cell_input buffer.
-                self._cell_input(cid)
+                self.cell_x[cid] = cell_x/2.0 + (x_prev + x_next) / 4.0
+                self.cell_y[cid] = cell_y/2.0 + (y_prev + y_next) / 4.0
 
-                # Compute feed-forward neteork results.
-                output = self._output()
+            # Move Cell.
+            self.cell_next_x[cid] = cell_x + self.cell_norm[cid, 0] * growth
+            self.cell_next_y[cid] = cell_y + self.cell_norm[cid, 1] * growth
 
-                # Three possible output actions.
-                growth = output[0] * constants.CELL_MAX_GROWTH
-                flower = output[1] > .5
-                smooth = output[2] > .5
+    cdef list split_links(self):
+        cdef int cid, id_prev
+        cdef double dist, x, y, dx, dy
 
-                # An underground cell may not flower.
-                if self.cell_water[cid]:
-                    self.cell_flower[cid] = False
-                    flower = False
+        to_split = []
+        inserted = []
 
-                if smooth:# and self.cell_curvature[cid] < 0:
-                # if False:
-                    # pass
-                    self.cell_x[cid] = self.cell_x[cid]/2.0 + (x_prev + x_next) / 4.0
-                    self.cell_y[cid] = self.cell_y[cid]/2.0 + (y_prev + y_next) / 4.0
-            
-                x_test = x_cell + self.cell_norm[cid, 0] * 3 * growth
-                y_test = y_cell + self.cell_norm[cid, 1] * 3 * growth
-                if self._valid_growth(x_test, y_test, x_prev, y_prev, x_next, y_next):
-                    self.cell_x[cid] += self.cell_norm[cid, 0] * growth
-                    self.cell_y[cid] += self.cell_norm[cid, 1] * growth
+        if self.n_cells >= constants.MAX_CELLS:
+            return
 
-                if not self.cell_water[cid] and flower:
-                    if self.energy >= constants.FLOWER_COST:
-                        self.energy -= constants.FLOWER_COST
-                        self.cell_flower[cid] = True
+        for cid in range(self.max_i):
+            if self.cell_alive[cid]:
+                id_prev = self.cell_prev[cid]
 
+                dx = self.cell_x[cid] - self.cell_x[id_prev]
+                dy = self.cell_y[cid] - self.cell_y[id_prev]
+                dist = sqrt(dx*dx + dy*dy)
 
-        self._split_links()
-        self._order_cells()
+                if dist > constants.MAX_EDGE_LENGTH:
+                    to_split.append(cid)
+
+                # elif dist < constants.MIN_EDGE_LENGTH:
+                #     self._destroy_cell(cid)
+
+        for cid in to_split:
+            id_prev = self.cell_prev[cid]
+
+            if self.n_cells >= constants.MAX_CELLS:
+                break
+
+            x = (self.cell_x[cid] + self.cell_x[id_prev]) / 2.0
+            y = (self.cell_y[cid] + self.cell_y[id_prev]) / 2.0
+            inserted.append(self._create_cell(x, y, before=cid))
+
+        return inserted
 
     cpdef void create_circle(self, double x, double y, double r, int n):
         cdef int i
@@ -190,14 +219,16 @@ cdef class Plant:
 
         if len(self.open_ids):
             cid = self.open_ids.pop()
-            self.cell_alive[cid] = True
             self.max_i = max(self.max_i, cid) + 1
-
         else:
             cid = self.n_cells
             self.max_i = self.n_cells + 1
 
+        if self.cell_head == None:
+            self.cell_head = cid
+
         self.n_cells += 1
+        self.cell_alive[cid] = True
         self.cell_x[cid] = x
         self.cell_y[cid] = y
 
@@ -240,13 +271,14 @@ cdef class Plant:
         # self.cell_inputs[7] = random()
         self.cell_inputs[6] = 1 # The last input is always used as bias.
 
-    cdef void _order_cells(self):
+    cdef void order_cells(self):
         cdef int cid, i
         cid = self.cell_head
-        for i in range(self.max_i):
-            if self.cell_alive[i]:
-                self.ordered_cell[i] = cid
-                cid = self.cell_next[cid]
+
+        for i in range(self.n_cells):
+            assert(self.cell_alive[cid])
+            self.cell_order[i] = cid
+            cid = self.cell_next[cid]
 
     cdef list _output(self):
         self.network.Flush()
@@ -274,29 +306,13 @@ cdef class Plant:
         if angle > constants.MAX_ANGLE:
             return False
 
-        if self.grid[<int>x_test, <int>y_test]:
-            return False
-
-        x = <int>((x_test + x_prev) / 2.)
-        y = <int>((y_test + y_prev) / 2.)
-        if self.grid[x, y]:
-            return False
-
-        x = <int>((x_test + x_next) / 2.)
-        y = <int>((y_test + y_next) / 2.)
-        if self.grid[x, y]:
-            return False
-
-        return True
-
     cdef object _make_polygon(self):
         cdef int i, cid
         polygon = []
 
-        for i in range(self.max_i):
-            if self.cell_alive[i]:
-                cid = self.ordered_cell[i]
-                polygon.append((self.cell_x[cid], self.cell_y[cid]))
+        for i in range(self.n_cells):
+            cid = self.cell_order[i]
+            polygon.append((self.cell_x[cid], self.cell_y[cid]))
 
         return polygon
 
@@ -335,45 +351,6 @@ cdef class Plant:
 
                 self.cell_norm[cid, 0] = norm_x
                 self.cell_norm[cid, 1] = norm_y
-
-    cdef void _split_links(self):
-        cdef int cid, id_prev
-        cdef double dist, x, y, dx, dy
-
-        inserts = []
-
-        if self.n_cells >= constants.MAX_CELLS:
-            return
-
-        for cid in range(self.max_i):
-            if self.cell_alive[cid]:
-                id_prev = self.cell_prev[cid]
-
-                dx = self.cell_x[cid] - self.cell_x[id_prev]
-                dy = self.cell_y[cid] - self.cell_y[id_prev]
-                dist = sqrt(dx*dx + dy*dy)
-
-                if dist > constants.MAX_EDGE_LENGTH:
-                    inserts.append(cid)
-
-                # elif dist < constants.MIN_EDGE_LENGTH:
-                #     self._destroy_cell(cid)
-
-        for cid in inserts:
-            id_prev = self.cell_prev[cid]
-
-            if self.n_cells >= constants.MAX_CELLS:
-                break
-
-            x = (self.cell_x[cid] + self.cell_x[id_prev]) / 2.0
-            y = (self.cell_y[cid] + self.cell_y[id_prev]) / 2.0
-            self._create_cell(x, y, before=cid)
-
-    cdef void _calculate_collision_grid(self):
-        img = Image.new('L', (self.world.width, self.world.height), 0)
-        ImageDraw.Draw(img).polygon(self.polygon, outline=0, fill=1)
-        np.copyto(np.asarray(self.grid).T, img)
-        # self.grid = np.asarray(img, dtype=np.uint8).T
 
     cdef void _calculate_light(self):
         cdef int cid

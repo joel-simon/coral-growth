@@ -4,25 +4,18 @@ cdef inline int myround(double x, int base):
     return int(base * round(x/base))
 
 cdef class World:
-    cdef public int width, height, soil_height, max_plants#, group_width, num_buckets, bucket_max_n
-    cdef public double light
+    cdef public int width, height, soil_height, max_plants
     cdef public list plants
-
-    cdef double cos_light, sin_light
-    cdef int[:] bucket_sizes
-
-    cdef public int[:, :] hash_buckets
+    cdef public object sh
 
     cpdef int add_plant(self, double x, double y, double r, network, double efficiency)
 
     cpdef void simulation_step(self)
 
-    # cdef int __get_bucket(self, double x, double y)
+    cdef void __insert_new(self, Plant plant, list ids) except *
 
-    # cdef void __double_bucket_size(self)
+    cdef bint __segment_has_intersection(self, int id0, Plant plant)
 
-    # cdef bint single_light_collision(self, Plant plant, double x0, double y0, int id_exclude)
+    cdef void __fix_collision(self, Plant plant) except *
 
     cdef void calculate_light(self, Plant plant)
-
-    cdef void __update(self)

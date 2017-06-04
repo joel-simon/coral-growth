@@ -58,7 +58,7 @@ class PygameDraw(object):
         else:
             pygame.draw.polygon(self.surface, color, points, t)
 
-    def draw_circle(self, position, radius, color, width=1):
+    def draw_circle(self, position, radius, color, width=0):
         position = self.map_point(position)
         r  = int(radius*self.scale)
         width = int(width*self.scale)

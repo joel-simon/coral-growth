@@ -23,7 +23,15 @@ constants.SEED_SEGMENTS = 128
 
 net = NEAT.NeuralNetwork()
 genome.BuildPhenotype(net)
-world = World(600, 600, math.pi/4, 0)
+
+world_params = {
+    'width': constants.WORLD_WIDTH,
+    'height': constants.WORLD_HEIGHT,
+    'soil_height': constants.SOIL_HEIGHT,
+    'max_plants': 1,
+}
+
+world = World(world_params)
 
 world.add_plant(300, 300, 100, net, 1)
 

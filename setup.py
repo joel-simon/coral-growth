@@ -13,18 +13,12 @@ import numpy
 
 _extra = ['-ffast-math']
 
-_macros = [('CYTHON_TRACE', '1')]
-# _macros = None
+# _macros = [('CYTHON_TRACE', '1')]
+_macros = None
 
 compiler_directives = {'linetrace': True, 'profile': True}
 
 extensions = [
-    Extension(
-        'plant_growth/vec2D',
-        sources = ['./plant_growth/vec2D.pyx'],
-        extra_compile_args = _extra,
-        define_macros=_macros
-    ),
     Extension(
         'plant_growth/geometry',
         sources = ['./plant_growth/geometry.pyx'],

@@ -2,16 +2,15 @@ import math
 import random
 
 from plant_growth import constants
-from plant_growth.vec2D import Vec2D
 from plant_growth.world import World
 
 import MultiNEAT as NEAT
 
-def evaluate(genome, display=None, break_early=True):
-    
-    net = NEAT.NeuralNetwork()
-    genome.BuildPhenotype(net)
-    
+def evaluate(net, display=None, break_early=True):
+
+    # net = NEAT.NeuralNetwork()
+    # genome.BuildPhenotype(net)
+
     world_params = {
         'width': constants.WORLD_WIDTH,
         'height': constants.WORLD_HEIGHT,
@@ -29,6 +28,7 @@ def evaluate(genome, display=None, break_early=True):
     world.add_plant(x, y, r, net, constants.PLANT_EFFICIENCY)
 
     last_volume = 0
+
     for s in range(constants.SIMULATION_STEPS):
         world.simulation_step()
 

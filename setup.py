@@ -37,6 +37,12 @@ extensions = [
         extra_compile_args = _extra,
         define_macros=_macros
     ),
+    Extension(
+        'plant_growth/spatial_hash',
+        sources = ['./plant_growth/spatial_hash.pyx'],
+        extra_compile_args = _extra,
+        define_macros=_macros
+    ),
 ]
 
 setup(

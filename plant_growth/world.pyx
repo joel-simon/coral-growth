@@ -13,7 +13,7 @@ cimport numpy as np
 from plant_growth.plant cimport Plant
 from plant_growth import constants
 from plant_growth cimport geometry
-from plant_growth.spatial_hash import SpatialHash
+from plant_growth.spatial_hash cimport SpatialHash
 
 cdef class World:
     def __init__(self, object params):
@@ -64,7 +64,7 @@ cdef class World:
             if plant.alive:
                 plant.grow()
 
-        self.__fix_collisions()
+        self.__update_positions()
 
         for plant in self.plants:
             if plant.alive:
@@ -91,12 +91,35 @@ cdef class World:
             self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1],
                                     plant.cell_x[id2], plant.cell_y[id2])
 
-    def __fix_collisions(self):
-        # cdef Plant plant
-        # cdef
+    cdef void __update_positions(self):
+        cdef Plant plant
+        cdef int id0, id1, id2, i
+        cdef double old_x, old_y
+
         for plant in self.plants:
-            if plant.alive:
-                self.__fix_collision(plant)
+            if not plant.alive:
+                continue
+
+            for i in range(plant.n_cells):
+                id1 = plant.cell_order[i]
+            # for id1 in plant.cell_order[:plant.n_cells]:
+                id0 = plant.cell_prev[id1]
+                id2 = plant.cell_next[id1]
+
+                old_x, old_y = plant.cell_x[id1], plant.cell_y[id1]
+
+                plant.cell_x[id1] = plant.cell_next_x[id1]
+                plant.cell_y[id1] = plant.cell_next_y[id1]
+
+                if self.__segment_has_intersection(id1, plant) or \
+                   self.__segment_has_intersection(id0, plant):
+                    # Undo movement.
+                    plant.cell_x[id1] = old_x
+                    plant.cell_y[id1] = old_y
+                else:
+                    self.sh.move_object(id0, plant.cell_x[id0], plant.cell_y[id0], old_x, old_y, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
+                    self.sh.move_object(id1, old_x, old_y, plant.cell_x[id2], plant.cell_y[id2], plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
+
 
     cdef bint __segment_has_intersection(self, int id0, Plant plant):
         cdef int id1, id2, id3
@@ -119,32 +142,6 @@ cdef class World:
                     return True
 
         return False
-
-    cdef void __fix_collision(self, Plant plant) except *:
-        cdef int id0, id1, id2
-        cdef double old_x, old_y
-
-        for id1 in plant.cell_order[:plant.n_cells]:
-            id0 = plant.cell_prev[id1]
-            id2 = plant.cell_next[id1]
-
-            old_x, old_y = plant.cell_x[id1], plant.cell_y[id1]
-
-            plant.cell_x[id1] = plant.cell_next_x[id1]
-            plant.cell_y[id1] = plant.cell_next_y[id1]
-
-            if self.__segment_has_intersection(id1, plant) or self.__segment_has_intersection(id0, plant):
-                # Undo movement.
-                plant.cell_x[id1] = old_x
-                plant.cell_y[id1] = old_y
-            else:
-                self.sh.move_object(id0, plant.cell_x[id0], plant.cell_y[id0], old_x, old_y, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
-                # self.sh.remove_object(id0, plant.cell_x[id0], plant.cell_y[id0], old_x, old_y)
-                # self.sh.add_object(id0, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
-
-                self.sh.move_object(id1, old_x, old_y, plant.cell_x[id2], plant.cell_y[id2], plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
-                # self.sh.remove_object(id1, old_x, old_y, plant.cell_x[id2], plant.cell_y[id2])
-                # self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
 
     cdef void calculate_light(self, Plant plant):
         """

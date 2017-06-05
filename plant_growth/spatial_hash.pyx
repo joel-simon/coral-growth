@@ -61,12 +61,7 @@ cdef class SpatialHash:
         cdef set potentials
 
         cells = self.__cells_for_rect(x1, y1, x2, y2)
-        potentials = set()
-
-        for c in cells:
-            if c in self.d:
-                potentials.update(self.d[c])
-
+        potentials = set().union(*(self.d[c] for c in cells if c in self.d))
         potentials.discard(key) # obj cannot intersect itself
 
         return potentials

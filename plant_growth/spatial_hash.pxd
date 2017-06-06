@@ -6,8 +6,8 @@ cdef class SpatialHash:
 
     cdef void add_object(self, int key, double x1, double y1, double x2, double y2)
 
-    cdef void remove_object(self, int key, double x1, double y1, double x2, double y2)
+    cdef void remove_object(self, int key, double x1, double y1, double x2, double y2) except *
 
-    cdef void move_object(self, int key, double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4)
+    cdef void move_object(self, int key, double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4) except *
 
     cdef set potential_collisions(self, int key, double x1, double y1, double x2, double y2)

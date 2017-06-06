@@ -1,11 +1,14 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: initializedcheck=False
-# cython: nonecheck=False
+# cython: nonecheck=True
 # cython: cdivision=True
 
 from __future__ import print_function
 from libc.math cimport cos, sin, round
+from math import isnan
+
+import heapq
 
 import numpy as np
 cimport numpy as np
@@ -14,6 +17,18 @@ from plant_growth.plant cimport Plant
 from plant_growth import constants
 from plant_growth cimport geometry
 from plant_growth.spatial_hash cimport SpatialHash
+
+cdef int right_neighbor(int cid, Plant plant):
+    cdef int id_prev = plant.cell_prev[cid]
+    cdef int id_next = plant.cell_next[cid]
+
+    if plant.cell_x[id_next] > plant.cell_x[id_prev]:
+        return id_next
+    else:
+        return id_prev
+
+# cdef heap_delete(heap, id):
+
 
 cdef class World:
     def __init__(self, object params):
@@ -30,7 +45,7 @@ cdef class World:
         # self.plant_x = np.zeros((self.max_plants, constants.MAX_CELLS))
         # self.plant_y = np.zeros((self.max_plants, constants.MAX_CELLS))
 
-    cpdef int add_plant(self, double x, double y, double r, network, double efficiency):
+    cpdef int add_plant(self, double x, double y, double r, network, double efficiency) except -1:
         # if len(self.__open_plant_ids) == 0:
         #     raise ValueError()
 
@@ -54,7 +69,7 @@ cdef class World:
     # cdef void kill_plant(self, Plant plant):
     #     self.plant_alive[plant.id] = 0
 
-    cpdef void simulation_step(self):
+    cpdef void simulation_step(self) except *:
         """ The main function called from outside.
             We assume the plant attributes begin up to date.
         """
@@ -91,7 +106,7 @@ cdef class World:
             self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1],
                                     plant.cell_x[id2], plant.cell_y[id2])
 
-    cdef void __update_positions(self):
+    cdef void __update_positions(self) except *:
         cdef Plant plant
         cdef int id0, id1, id2, i
         cdef double old_x, old_y
@@ -102,14 +117,17 @@ cdef class World:
 
             for i in range(plant.n_cells):
                 id1 = plant.cell_order[i]
-            # for id1 in plant.cell_order[:plant.n_cells]:
                 id0 = plant.cell_prev[id1]
                 id2 = plant.cell_next[id1]
 
                 old_x, old_y = plant.cell_x[id1], plant.cell_y[id1]
 
+                assert (not isnan(plant.cell_next_x[id1]))
+                assert (not isnan(plant.cell_next_y[id1]))
+
                 plant.cell_x[id1] = plant.cell_next_x[id1]
                 plant.cell_y[id1] = plant.cell_next_y[id1]
+
 
                 if self.__segment_has_intersection(id1, plant) or \
                    self.__segment_has_intersection(id0, plant):
@@ -143,44 +161,75 @@ cdef class World:
 
         return False
 
-    cdef void calculate_light(self, Plant plant):
+    cdef void calculate_light(self, Plant plant) except *:
         """
+        A sweep line algorithm that maintains a heap of tallest open segments.
+        For every new segment, if the open segment is above it, there is no light.
         We assume there are no segment intersections.
         """
-        cdef int i, cell_left, cell_right, cell_index
+        cdef int i, cid, cid_prev, cid_next, cid_left, cid_right
         cdef double x0, y0, x1, y1, x2, y2, slope
-        cdef bint is_above
+        cdef bint is_lit
         cdef long[:] cells_indexes_ordered
+        cdef list minheap = []
 
         # TODO: compare with merge sort and insertion sort for speed.
+        # cdef void ins_sort(double[:] k):
+        #     cdef n = len(k)
+        #     for i in range(1, n):    #since we want to swap an item with previous one, we start from 1
+        #         j = i                    #bcoz reducing i directly will mess our for loop, so we reduce its copy j instead
+        #         while j > 0 and k[j] < k[j-1]: #j>0 bcoz no point going till k[0] since there is no value to its left to be swapped
+        #             k[j], k[j-1] = k[j-1], k[j] #syntactic sugar: swap the items, if right one is smaller.
+        #             j = j - 1 #take k[j] all the way left to the place where it has a smaller/no value to its left.
+        #     # return k
+
         cells_indexes_ordered = np.asarray(plant.cell_x[:plant.max_i]).argsort()
 
         for i in range(plant.max_i):
             plant.cell_light[i] = 0
 
-        cell_left = cells_indexes_ordered[0]
-        plant.cell_light[cell_left] = 1
-
+        # Iterate across all points from left to right.
         for i in range(plant.max_i):
-            cell_index = cells_indexes_ordered[i]
+            cid = cells_indexes_ordered[i]
 
-            if plant.cell_alive[cell_index]:
-                x0 = plant.cell_x[cell_index]
-                y0 = plant.cell_y[cell_index]
+            # Neither dead nor underground cells collect light.
+            if not plant.cell_alive[cid]:
+                continue
 
-                x1, y1 = plant.cell_x[cell_left], plant.cell_y[cell_left]
+            is_lit = False
+            x0 = plant.cell_x[cid]
+            y0 = plant.cell_y[cid]
 
-                if plant.cell_x[plant.cell_next[cell_left]] > plant.cell_x[plant.cell_prev[cell_left]]:
-                    cell_right = plant.cell_next[cell_left]
-                else:
-                    cell_right = plant.cell_prev[cell_left]
+            cid_prev = plant.cell_prev[cid]
+            cid_next = plant.cell_next[cid]
 
-                x2, y2 = plant.cell_x[cell_right], plant.cell_y[cell_right]
+            # At a new point, remove any closing segments.
+            if plant.cell_x[cid_prev] < x0:
+                minheap.remove((-plant.cell_y[cid_prev], (cid_prev, cid)))
 
+            if plant.cell_x[cid_next] < x0:
+                minheap.remove((-plant.cell_y[cid_next], (cid_next, cid)))
+
+            if len(minheap) == 0:
+                is_lit = True
+            else:
+                y1, (cid_left, cid_right) = minheap[0]
+                y1 *= -1
+                x1 = plant.cell_x[cid_left]
+                x2 = plant.cell_x[cid_right]
+                y2 = plant.cell_y[cid_right]
+                # See if point is above segment.
                 slope = (y2 - y1) / (x2 - x1)
-                is_above = y0 >= slope*(x0-x1) + y1
+                is_lit = (y0 >= slope * (x0 - x1) + y1)
 
-                if x0 > x2 or is_above:
-                    plant.cell_light[cell_index] = 1
-                    cell_left = cell_index
+            # Open any new segments.
+            if plant.cell_x[cid_prev] > x0:
+                heapq.heappush(minheap, (-y0 , (cid, cid_prev)))
 
+            if plant.cell_x[cid_next] > x0:
+                heapq.heappush(minheap, (-y0 , (cid, cid_next)))
+
+            if is_lit and y0 >= self.soil_height:
+                plant.cell_light[cid] = 1
+
+        assert len(minheap) == 0

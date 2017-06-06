@@ -3,9 +3,9 @@
 # cython: initializedcheck=False
 # cython: nonecheck=False
 # cython: cdivision=True
-
+from __future__ import print_function
 from libc.math cimport M_PI, M_PI_2, log, sqrt, fmin, fmax, acos, cos, sin, abs, atan2
-
+from math import isnan
 import numpy as np
 cimport numpy as np
 
@@ -65,7 +65,7 @@ cdef class Plant:
         self.grid = np.zeros((world.width, world.height), dtype='i')
         self.open_ids = []
 
-    cpdef void update_attributes(self):
+    cpdef void update_attributes(self) except *:
         cdef double e_production, e_consumption
 
         self.polygon = self._make_polygon()
@@ -73,8 +73,8 @@ cdef class Plant:
 
         # self._calculate_mesh()
         self._calculate_norms()
-        self._calculate_light()
         self._calculate_water()
+        self._calculate_light()
         self._calculate_curvature()
         self._calculate_flowers()
 
@@ -96,8 +96,8 @@ cdef class Plant:
             self.alive = False
 
     cpdef void grow(self):
-        cdef double growth, x_prev, y_prev, x_next, y_next, cell_x, cell_y
-        cdef bint flower, death
+        cdef double growth, x_new, y_new, x_prev, y_prev, x_next, y_next, cell_x, cell_y
+        cdef bint flower, smooth
         cdef int i, cid, cid_prev, cid_next
 
         for i in range(self.n_cells):
@@ -116,7 +116,7 @@ cdef class Plant:
             # Three possible output actions.
             growth = output[0] * constants.CELL_MAX_GROWTH
             flower = output[1] > .5
-            smooth = output[2] > .5
+            smooth = 0#output[2] > .5
 
             # An underground cell may not flower.
             if self.cell_water[cid]:
@@ -136,12 +136,18 @@ cdef class Plant:
                 x_next = self.cell_x[cid_next]
                 y_next = self.cell_y[cid_next]
 
+
                 self.cell_x[cid] = cell_x/2.0 + (x_prev + x_next) / 4.0
                 self.cell_y[cid] = cell_y/2.0 + (y_prev + y_next) / 4.0
+                
 
             # Move Cell.
-            self.cell_next_x[cid] = cell_x + self.cell_norm[cid, 0] * growth
-            self.cell_next_y[cid] = cell_y + self.cell_norm[cid, 1] * growth
+            x_new = cell_x + self.cell_norm[cid, 0] * growth
+            y_new = cell_y + self.cell_norm[cid, 1] * growth
+            
+            if self._valid_growth(cid, x_new, y_new):
+                self.cell_next_x[cid] = x_new
+                self.cell_next_y[cid] = y_new
 
     cdef list split_links(self):
         cdef int cid, id_prev
@@ -287,24 +293,33 @@ cdef class Plant:
         output = self.network.Output()
         return output
 
-    cdef bint _valid_growth(self, double x_test, double y_test, double x_prev, double y_prev, double x_next, double y_next):
-        cdef int x, y
-        cdef double x1, y1, x2, y2, angle
+    cdef bint _valid_growth(self, int cid, double x, double y):
+        cdef int cid_prev, cid_next
+        cdef double x1, y1, x2, y2, angle, x_prev, y_prev, x_next, y_next
+        cid_prev = self.cell_prev[cid] # id of cell before
+        cid_next = self.cell_next[cid] # id of cell after
+        
+        x_prev = self.cell_x[cid_prev]
+        y_prev = self.cell_y[cid_prev]
+        x_next = self.cell_x[cid_next]
+        y_next = self.cell_y[cid_next]
 
-        if x_test < 0 or y_test < 0:
+        if x < 0 or y < 0:
             return False
 
-        if x_test >= self.world.width or y_test >= self.world.height:
+        if x >= self.world.width or y >= self.world.height:
             return False
 
-        x1 = x_next - x_test
-        y1 = y_next - y_test
-        x2 = x_prev - x_test
-        y2 = y_prev - y_test
+        x1 = x_next - x
+        y1 = y_next - y
+        x2 = x_prev - x
+        y2 = y_prev - y
         angle = geometry.angle_clockwise(x1, y1, x2, y2)
 
         if angle > constants.MAX_ANGLE:
             return False
+
+        return True
 
     cdef object _make_polygon(self):
         cdef int i, cid
@@ -352,7 +367,7 @@ cdef class Plant:
                 self.cell_norm[cid, 0] = norm_x
                 self.cell_norm[cid, 1] = norm_y
 
-    cdef void _calculate_light(self):
+    cdef void _calculate_light(self) except *:
         cdef int cid
         cdef double angle, light
         self.world.calculate_light(self)
@@ -386,10 +401,11 @@ cdef class Plant:
                     self.cell_water[cid] = 0
 
     cdef void _calculate_curvature(self):
-        cdef int cid, id_prev, id_next
+        cdef int i, cid, id_prev, id_next
         cdef double x1, y1, x2, y2, angle
 
-        for cid in range(self.max_i):
+        for i in range(self.n_cells):
+            cid = self.cell_order[i]
             if self.cell_alive[cid]:
                 id_prev = self.cell_prev[cid]
                 id_next = self.cell_next[cid]
@@ -400,6 +416,9 @@ cdef class Plant:
                 y2 = self.cell_y[id_prev] - self.cell_y[cid]
 
                 angle = geometry.angle_clockwise(x1, y1, x2, y2)
+                if isnan(angle):
+                    print('nan angle', (round(self.cell_x[cid], 5), round(self.cell_y[cid], 5)), (round(self.cell_x[id_next], 5), round(self.cell_y[id_next], 5)), (round(self.cell_x[id_prev], 5), round(self.cell_y[id_prev], 5)))
+                    print(x1, y1, x2, y2)
                 self.cell_curvature[cid] = angle
 
     cdef void _calculate_flowers(self):

@@ -55,8 +55,9 @@ cdef double angle(double x1, double y1, double x2, double y2):
     l1 = sqrt(x1*x1 + y1*y1)
     l2 = sqrt(x2*x2 + y2*y2)
     cosx = (x1*x2 + y1*y2) / (l1*l2)
-
-    return acos(cosx)
+    # the value must be in range [-1, 1]
+    # sometime for unknown reasons the value can be -1.0000000000000002 which causes nan chaos
+    return acos(fmin(fmax(-1.0,cosx), 1.0))
 
 cdef double angle_clockwise(double x1, double y1, double x2, double y2):
     cdef double a, det

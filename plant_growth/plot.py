@@ -24,7 +24,8 @@ def plot(view, world, title=None):
 
     for plant in world.plants:
         view.draw_polygon(plant.polygon, (20, 200, 20))
-        # print(plant.cell_x[0], plant.cell_next_x[0])
+
+        # print(list(plant.cell_light[:plant.max_i]))
 
         for i in range(plant.n_cells):
             cid = plant.cell_order[i]
@@ -53,6 +54,7 @@ def plot(view, world, title=None):
             if plant.cell_alive[cid]:
                 c_x = plant.cell_x[cid]
                 c_y = plant.cell_y[cid]
+                light = plant.cell_light[cid]
 
                 if plant.cell_flower[cid]:
                     view.draw_circle((c_x, c_y), 1, (200, 0, 200, 150), width=0)
@@ -60,10 +62,15 @@ def plot(view, world, title=None):
                 # elif plant.cell_water[cid]:
                 #     view.draw_circle((c_x, c_y), 1, (0, 0, 200), width=0)
 
-                elif plant.cell_light[cid]:
-                    light = min(1, max(0, plant.cell_light[cid]))
-                    color = (int(255*light), int(248*light), 0, 255)
-                    view.draw_circle((c_x, c_y), 1, color, width=0)
+                # elif light != 0:
+                #     assert light <= 1.0
+                #     # light  = 1.0
+                #     # assert light >= 0, light
+                #     if light < 0:
+                #         color = (200, 0, 0)
+                #     else:
+                #         color = (int(255*light), int(248*light), 0, 255)
+                #     view.draw_circle((c_x, c_y), 1, color, width=0)
 
     view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 150), width=0)
 

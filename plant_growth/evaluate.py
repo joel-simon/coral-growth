@@ -4,7 +4,7 @@ import random
 from plant_growth import constants
 from plant_growth.world import World
 
-import MultiNEAT as NEAT
+# import MultiNEAT as NEAT
 
 def evaluate(net, display=None, break_early=True):
 
@@ -26,8 +26,6 @@ def evaluate(net, display=None, break_early=True):
     y = constants.SOIL_HEIGHT
     r = constants.SEED_RADIUS
     world.add_plant(x, y, r, net, constants.PLANT_EFFICIENCY)
-
-    last_volume = 0
 
     for s in range(constants.SIMULATION_STEPS):
         world.simulation_step()

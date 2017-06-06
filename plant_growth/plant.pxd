@@ -13,7 +13,7 @@ cdef class Plant:
     cdef public double[:,:] cell_norm
     cdef list cell_inputs, open_ids
 
-    cpdef void update_attributes(self)
+    cpdef void update_attributes(self) except *
     cpdef void grow(self)
     cdef list split_links(self)
     cdef void order_cells(self)
@@ -26,12 +26,14 @@ cdef class Plant:
     # cdef void _destroy_cell(self, int cid)
     cdef void _cell_input(self, int cid)
     cdef list _output(self)
-    cdef bint _valid_growth(self, double x_test, double y_test, double x_prev,
-                                  double y_prev, double x_next, double y_next)
+    # cdef bint _valid_growth(self, double x_test, double y_test, double x_prev,
+                                  # double y_prev, double x_next, double y_next)
+    cdef bint _valid_growth(self, int cid, double x, double y)
+
     cdef object _make_polygon(self)
     cpdef void _calculate_mesh(self)
     cdef void _calculate_norms(self)
-    cdef void _calculate_light(self)
+    cdef void _calculate_light(self) except *
     cdef void _calculate_water(self)
     cdef void _calculate_curvature(self)
     cdef void _calculate_flowers(self)

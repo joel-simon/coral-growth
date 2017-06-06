@@ -20,7 +20,10 @@ if __name__ == '__main__':
     file_path = sys.argv[1]
     assert(os.path.exists(file_path))
     genome = NEAT.Genome(file_path)
+    net = NEAT.NeuralNetwork()
+    genome.BuildPhenotype(net)
     t1 = time.time()
-    evaluate(genome, display=display_func)
+    print(net)
+    evaluate(net, display=display_func)
     print('done in ', time.time() - t1)
     view.hold()

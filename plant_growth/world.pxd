@@ -6,14 +6,14 @@ cdef class World:
     cdef public list plants
     cdef public SpatialHash sh
 
-    cpdef int add_plant(self, double x, double y, double r, network, double efficiency)
+    cpdef int add_plant(self, double x, double y, double r, network, double efficiency) except -1
 
-    cpdef void simulation_step(self)
+    cpdef void simulation_step(self) except *
 
-    cdef void __update_positions(self)
+    cdef void __update_positions(self) except *
 
     cdef void __insert_new(self, Plant plant, list ids) except *
 
     cdef bint __segment_has_intersection(self, int id0, Plant plant)
 
-    cdef void calculate_light(self, Plant plant)
+    cdef void calculate_light(self, Plant plant) except *

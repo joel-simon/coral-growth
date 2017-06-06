@@ -50,8 +50,11 @@ def run(out_dir):
         print('Starting generation', generation)
 
         genome_list = NEAT.GetGenomeList(pop)
+        
         for genome in genome_list:
-            plant = evaluate(genome)
+            net = NEAT.NeuralNetwork()
+            genome.BuildPhenotype(net)
+            plant = evaluate(net)
             fitness = plant.total_flowering
             fitness = 0
 
@@ -72,8 +75,10 @@ def run(out_dir):
 
         if maxf != last_fitness:
             best = pop.GetBestGenome()
+            net = NEAT.NeuralNetwork()
+            best.BuildPhenotype(net)
             best.Save(out_dir+'/best_%i' % generation)
-            evaluate(best, display=display_func)
+            evaluate(net, display=display_func)
             view.save(out_dir+'/best_%i.png' % generation)
             last_fitness = maxf
 

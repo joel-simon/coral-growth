@@ -4,13 +4,11 @@ import random
 from plant_growth import constants
 from plant_growth.world import World
 
-# import MultiNEAT as NEAT
+import MultiNEAT as NEAT
 
-def evaluate(net, display=None, break_early=True):
+random.seed(0)
 
-    # net = NEAT.NeuralNetwork()
-    # genome.BuildPhenotype(net)
-
+def simulate_single(network, display=None, break_early=True):
     world_params = {
         'width': constants.WORLD_WIDTH,
         'height': constants.WORLD_HEIGHT,
@@ -20,12 +18,10 @@ def evaluate(net, display=None, break_early=True):
 
     world = World(world_params)
 
-    random.seed(0)
-
     x = constants.WORLD_WIDTH / 2.0
     y = constants.SOIL_HEIGHT
     r = constants.SEED_RADIUS
-    world.add_plant(x, y, r, net, constants.PLANT_EFFICIENCY)
+    world.add_plant(x, y, r, network, constants.PLANT_EFFICIENCY)
 
     for s in range(constants.SIMULATION_STEPS):
         world.simulation_step()
@@ -44,3 +40,10 @@ def evaluate(net, display=None, break_early=True):
         print()
 
     return world.plants[0]
+
+def evaluate_genome(genome, display=None, break_early=True):
+    network = NEAT.NeuralNetwork()
+    genome.BuildPhenotype(network)
+    plant = simulate_single(network, display, break_early)
+    return plant
+

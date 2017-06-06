@@ -1,7 +1,7 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: initializedcheck=False
-# cython: nonecheck=True
+# cython: nonecheck=False
 # cython: cdivision=True
 
 from __future__ import print_function

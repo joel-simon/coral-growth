@@ -11,7 +11,7 @@ from datetime import datetime
 from plant_growth import constants, neat_params
 from plant_growth.pygameDraw import PygameDraw
 from plant_growth.plot import plot
-from plant_growth.evaluate import evaluate
+from plant_growth.evaluate import evaluate_genome
 from subprocess import call
 
 import MultiNEAT as NEAT
@@ -36,7 +36,6 @@ pop = NEAT.Population(
     int(time.time()) # Random number generator seed.
 )
 
-
 def run(out_dir):
     view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 
@@ -50,18 +49,16 @@ def run(out_dir):
         print('Starting generation', generation)
 
         genome_list = NEAT.GetGenomeList(pop)
-        
+
         for genome in genome_list:
-            net = NEAT.NeuralNetwork()
-            genome.BuildPhenotype(net)
-            plant = evaluate(net)
+            plant = evaluate_genome(genome)
             fitness = plant.total_flowering
             fitness = 0
 
             for cid in range(plant.max_i):
                 if plant.cell_flower[cid]:
                     fitness += plant.cell_y[cid]
-            
+
             genome.SetFitness(fitness)
 
         fitnesses = [g.Fitness for g in genome_list]
@@ -75,10 +72,8 @@ def run(out_dir):
 
         if maxf != last_fitness:
             best = pop.GetBestGenome()
-            net = NEAT.NeuralNetwork()
-            best.BuildPhenotype(net)
             best.Save(out_dir+'/best_%i' % generation)
-            evaluate(net, display=display_func)
+            evaluate(best, display=display_func)
             view.save(out_dir+'/best_%i.png' % generation)
             last_fitness = maxf
 

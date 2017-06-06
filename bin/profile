@@ -3,7 +3,7 @@ import sys, os, time
 sys.path.append(os.path.abspath('..'))
 
 from plant_growth import constants
-from plant_growth.evaluate import evaluate
+from plant_growth.evaluate import evaluate_genome
 
 import MultiNEAT as NEAT
 # import line_profiler
@@ -19,5 +19,5 @@ if __name__ == '__main__':
     t1 = time.time()
     n = 1
     for _ in range(n):
-        evaluate(genome, display=display_func)
+        evaluate_genome(genome, display=display_func)
     print('average time ', (time.time() - t1)/n)

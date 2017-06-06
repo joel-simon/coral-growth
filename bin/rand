@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath('..'))
 from plant_growth import constants, neat_params
 from plant_growth.pygameDraw import PygameDraw
 from plant_growth.plot import plot
-from plant_growth.evaluate import evaluate
+from plant_growth.evaluate import simulate_single
 
 import MultiNEAT as NEAT
 
@@ -31,12 +31,12 @@ pop = NEAT.Population(
 )
 
 # random.seed(time.time())
-view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
+# view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 
 def display_func(world):
 
     pass
-    plot(view, world)
+    # plot(view, world)
 
 class NetworkDummy(object):
     def Input(self, ls):
@@ -51,6 +51,6 @@ class NetworkDummy(object):
 t1 = time.time()
 # genome = NEAT.GetGenomeList(pop)[0]
 net = NEAT.NeuralNetwork()
-evaluate(NetworkDummy(), display=display_func, break_early=False)
+simulate_single(NetworkDummy(), display=display_func, break_early=False)
 print(time.time() - t1)
-view.hold()
+# view.hold()

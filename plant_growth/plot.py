@@ -57,7 +57,7 @@ def plot(view, world, title=None):
                 light = plant.cell_light[cid]
 
                 if plant.cell_flower[cid]:
-                    view.draw_circle((c_x, c_y), 1, (200, 0, 200, 150), width=0)
+                    view.draw_circle((c_x, c_y), 2, (200, 0, 200, 150), width=0)
 
                 # elif plant.cell_water[cid]:
                 #     view.draw_circle((c_x, c_y), 1, (0, 0, 200), width=0)

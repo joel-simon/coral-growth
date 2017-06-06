@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath('..'))
 from plant_growth import constants
 from plant_growth.pygameDraw import PygameDraw
 from plant_growth.plot import plot
-from plant_growth.evaluate import evaluate
+from plant_growth.evaluate import evaluate_genome
 import MultiNEAT as NEAT
 import time
 
@@ -24,6 +24,6 @@ if __name__ == '__main__':
     genome.BuildPhenotype(net)
     t1 = time.time()
     print(net)
-    evaluate(net, display=display_func)
+    evaluate_genome(net, display=display_func)
     print('done in ', time.time() - t1)
     view.hold()

@@ -31,26 +31,29 @@ pop = NEAT.Population(
 )
 
 # random.seed(time.time())
-# view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
+view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 
 def display_func(world):
 
-    pass
-    # plot(view, world)
+    # pass
+    plot(view, world)
 
 class NetworkDummy(object):
     def Input(self, ls):
-        pass
+        # print(ls[0])
+        self.ls = ls
     def ActivateFast(self):
         pass
     def Flush(self):
         pass
     def Output(self):
-        return [random.random(), 0, 0]
+        f = (self.ls[0]+1)/2
+        # print(self.ls[0], f)
+        return [f, 0, 0]
 
 t1 = time.time()
 # genome = NEAT.GetGenomeList(pop)[0]
 net = NEAT.NeuralNetwork()
 simulate_single(NetworkDummy(), display=display_func, break_early=False)
 print(time.time() - t1)
-# view.hold()
+view.hold()

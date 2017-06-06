@@ -55,7 +55,8 @@ def run(out_dir):
             fitness = plant.total_flowering
             fitness = 0
 
-            for cid in range(plant.max_i):
+            for i in range(plant.n_cells):
+                cid = plant.cell_order[i]
                 if plant.cell_flower[cid]:
                     fitness += plant.cell_y[cid]
 
@@ -73,7 +74,7 @@ def run(out_dir):
         if maxf != last_fitness:
             best = pop.GetBestGenome()
             best.Save(out_dir+'/best_%i' % generation)
-            evaluate(best, display=display_func)
+            evaluate_genome(best, display=display_func)
             view.save(out_dir+'/best_%i.png' % generation)
             last_fitness = maxf
 

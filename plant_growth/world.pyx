@@ -183,13 +183,14 @@ cdef class World:
         #             j = j - 1 #take k[j] all the way left to the place where it has a smaller/no value to its left.
         #     # return k
 
-        cells_indexes_ordered = np.asarray(plant.cell_x[:plant.max_i]).argsort()
+        cells_indexes_ordered = np.asarray(plant.cell_x[:plant.n_cells]).argsort()
 
-        for i in range(plant.max_i):
+        for i in range(plant.n_cells):
+            cid = plant.cell_order[i]
             plant.cell_light[i] = 0
 
         # Iterate across all points from left to right.
-        for i in range(plant.max_i):
+        for i in range(plant.n_cells):
             cid = cells_indexes_ordered[i]
 
             # Neither dead nor underground cells collect light.

@@ -25,32 +25,27 @@ def plot(view, world, title=None):
     for plant in world.plants:
         view.draw_polygon(plant.polygon, (20, 200, 20))
 
-        # print(list(plant.cell_light[:plant.max_i]))
-
         for i in range(plant.n_cells):
             cid = plant.cell_order[i]
             assert(plant.cell_alive[cid])
 
             prev_id = plant.cell_prev[cid]
-            # cell_light = plant.cell_light[cid]
-            # prev_light = plant.cell_light[prev_id]
-            c_x = plant.cell_x[cid]
-            c_y = plant.cell_y[cid]
-            p_x = plant.cell_x[prev_id]
-            p_y = plant.cell_y[prev_id]
 
-    #         light = min(1, max(0, plant.cell_light[cid]))
-    #         color = (int(255*light), int(248*light), 0, 255)
-            color = (0,0,0)
-            view.draw_line((c_x, c_y), (p_x, p_y), color, width=1)
+            p1 = (plant.cell_x[cid], plant.cell_y[cid])
+            p2 = (plant.cell_x[prev_id], plant.cell_y[prev_id])
+
+            light = (plant.cell_light[cid] + plant.cell_light[prev_id])/2
+
+            color = (int(255*light), int(248*light), 0, 255)
+            view.draw_line(p1, p2, color, width=1)
 
         if plant.mesh:
             for face in plant.mesh.elements:
                 poly = [plant.mesh.points[f] for f in face]
                 view.draw_lines(poly+[poly[0]], (50, 150, 50))
 
-
-        for cid in range(plant.max_i):
+        for i in range(plant.n_cells):
+            cid = plant.cell_order[i]
             if plant.cell_alive[cid]:
                 c_x = plant.cell_x[cid]
                 c_y = plant.cell_y[cid]

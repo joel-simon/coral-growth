@@ -115,6 +115,14 @@ class PygameDraw(object):
         else:
             pygame.draw.rect(self.surface, color, rect, width)
 
+    def draw_alpha_rect(self, rect, color, alpha):
+        x, y = self.map_point((rect[0], rect[1]))
+        w, h = int(self.scale*rect[2]), int(self.scale*rect[3])
+        s = pygame.Surface((w, h), pygame.SRCALPHA)   # per-pixel alpha
+        s.fill(color + (alpha,))
+        # print(y, self.h)
+        self.surface.blit(s, (x, y-h))
+
     def draw_text(self, position, string, font=8, color=
         BLACK, center=False):
         font = int(self.scale * font)

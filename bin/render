@@ -40,13 +40,10 @@ if __name__ == '__main__':
     networks = []
 
     for name in file_names:
-        print(name)
         match = networks_re.search(name)
         if match:
             gen = int(match.groups()[0])
             networks.append((gen, os.path.join(dirname, name)))
-        else:
-            print('Invalid name found:', name)
 
     if len(networks) == 0:
         raise ValueError('No networks found.')

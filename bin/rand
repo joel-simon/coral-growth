@@ -49,7 +49,7 @@ class NetworkDummy(object):
     def Output(self):
         f = (self.ls[0]+1)/2
         # print(self.ls[0], f)
-        return [f, 0, 0]
+        return [random.random(), 0, 0]
 
 t1 = time.time()
 # genome = NEAT.GetGenomeList(pop)[0]

@@ -19,11 +19,30 @@ def contiguous_lit_cells(plant):
 def plot(view, world, title=None):
     width, height = world.width, world.height
     view.start_draw()
-    view.draw_rect((0, 0, width, height), (0, 102, 200), width=0)
-    view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 150), width=0)
+
+    # view.draw_rect((0, 0, width, height), (0, 102, 200), width=0)
+    # view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 150), width=0)
+
+    # background_color = (210,210,210)
+    # background_color = (199, 206, 199)
+    background_color = (69, 84, 156)
+    
+    # plant_color = (20, 200, 20)
+    plant_color = (146, 215, 101)
+    plant_color = (105, 176, 104)
+    
+    plant_thickness = 2
+    flower_color = (200, 10, 200)
+    dirt_color = (156, 109, 69)
+    # dirt_color = (211, 137, 71)
+
+    view.draw_rect((0, 0, width, height), background_color, width=0)
+    # view.draw_rect((0, 0, width, world.soil_height), (0,0,0, 150), width=0)
+
+    view.draw_rect((0, 0, width, world.soil_height), dirt_color, width=0)
 
     for plant in world.plants:
-        view.draw_polygon(plant.polygon, (20, 200, 20))
+        view.draw_polygon(plant.polygon, plant_color)
 
         for i in range(plant.n_cells):
             cid = plant.cell_order[i]
@@ -34,10 +53,11 @@ def plot(view, world, title=None):
             p1 = (plant.cell_x[cid], plant.cell_y[cid])
             p2 = (plant.cell_x[prev_id], plant.cell_y[prev_id])
 
-            light = (plant.cell_light[cid] + plant.cell_light[prev_id])/2
+            # light = (plant.cell_light[cid] + plant.cell_light[prev_id])/2
 
-            color = (int(255*light), int(248*light), 0, 255)
-            view.draw_line(p1, p2, color, width=1)
+            # color = (int(255*light), int(248*light), 0, 255)
+            color = (0,0,0)
+            view.draw_line(p1, p2, color, width=plant_thickness)
 
         if plant.mesh:
             for face in plant.mesh.elements:
@@ -52,7 +72,7 @@ def plot(view, world, title=None):
                 light = plant.cell_light[cid]
 
                 if plant.cell_flower[cid]:
-                    view.draw_circle((c_x, c_y), 2, (200, 0, 200, 150), width=0)
+                    view.draw_circle((c_x, c_y), 2, flower_color, width=0)
 
                 # elif plant.cell_water[cid]:
                 #     view.draw_circle((c_x, c_y), 1, (0, 0, 200), width=0)
@@ -67,7 +87,9 @@ def plot(view, world, title=None):
                 #         color = (int(255*light), int(248*light), 0, 255)
                 #     view.draw_circle((c_x, c_y), 1, color, width=0)
 
-    view.draw_rect((0, 0, width, world.soil_height), (153, 102, 51, 150), width=0)
+        # view.draw_line((0, world.soil_height), (world.width, world.soil_height), dirt_color, width=plant_thickness)
+
+    view.draw_alpha_rect((0, 0, width, world.soil_height), dirt_color, 100)
 
     for i, plant in enumerate(world.plants):
         x = (i * 400) + 10

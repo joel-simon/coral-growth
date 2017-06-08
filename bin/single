@@ -52,8 +52,8 @@ def run(out_dir):
 
         for genome in genome_list:
             plant = evaluate_genome(genome)
-            fitness = plant.total_flowering
             fitness = 0
+            # fitness = plant.total_flowering
 
             for i in range(plant.n_cells):
                 cid = plant.cell_order[i]

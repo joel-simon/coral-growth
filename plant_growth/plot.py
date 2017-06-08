@@ -28,10 +28,10 @@ def plot(view, world, title=None):
     background_color = (69, 84, 156)
     
     # plant_color = (20, 200, 20)
-    plant_color = (146, 215, 101)
-    plant_color = (105, 176, 104)
+    # plant_color = (146, 215, 101)
+    plant_color = (111, 181, 109)
     
-    plant_thickness = 2
+    plant_thickness = 1
     flower_color = (200, 10, 200)
     dirt_color = (156, 109, 69)
     # dirt_color = (211, 137, 71)
@@ -53,10 +53,10 @@ def plot(view, world, title=None):
             p1 = (plant.cell_x[cid], plant.cell_y[cid])
             p2 = (plant.cell_x[prev_id], plant.cell_y[prev_id])
 
-            # light = (plant.cell_light[cid] + plant.cell_light[prev_id])/2
+            light = (plant.cell_light[cid] + plant.cell_light[prev_id])/2
 
-            # color = (int(255*light), int(248*light), 0, 255)
-            color = (0,0,0)
+            color = (int(255*light), int(248*light), 0, 255)
+            # color = (0,0,0)
             view.draw_line(p1, p2, color, width=plant_thickness)
 
         if plant.mesh:
@@ -72,7 +72,7 @@ def plot(view, world, title=None):
                 light = plant.cell_light[cid]
 
                 if plant.cell_flower[cid]:
-                    view.draw_circle((c_x, c_y), 2, flower_color, width=0)
+                    view.draw_circle((c_x, c_y), 1, flower_color, width=0)
 
                 # elif plant.cell_water[cid]:
                 #     view.draw_circle((c_x, c_y), 1, (0, 0, 200), width=0)
@@ -102,9 +102,8 @@ def plot(view, world, title=None):
         view.draw_text((x, height-20-y), "Light: %.4f"%plant.light, font=16)
         view.draw_text((x, height-40-y), "Water: %.4f"%plant.water, font=16)
         view.draw_text((x, height-60-y), "Volume: %.4f"%plant.volume, font=16)
-        view.draw_text((x, height-80-y), "Energy: %.4f"%plant.energy, font=16)
-        view.draw_text((x, height-100-y), "consumption: %.4f"%plant.consumption, font=16)
+        view.draw_text((x, height-100-y), "energy_usage: %.4f"%plant.energy_usage, font=16)
         view.draw_text((x, height-120-y), "Num cells: %i"%plant.n_cells, font=16)
         view.draw_text((x, height-140-y), "Num flowers: %i"%plant.num_flowers, font=16)
-    # view.draw_circle(world.light, 10, (255, 255, 0), width=0)
+
     view.end_draw()

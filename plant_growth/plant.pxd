@@ -2,10 +2,10 @@ from plant_growth.world cimport World
 
 cdef class Plant:
     cdef public object network, polygon, mesh
-    cdef public double efficiency, energy, volume, water, light, total_flowering, consumption, max_age
+    cdef public double efficiency, energy_usage, volume, water, light, total_flowering, max_age
     cdef public bint alive
     cdef public int age, n_cells, cell_head, cell_tail, num_flowers
-    cdef public double[:] cell_x, cell_y, cell_water, cell_light, cell_curvature, cell_next_x, cell_next_y
+    cdef public double[:] cell_x, cell_y, cell_water, cell_light, cell_energy, cell_curvature, cell_next_x, cell_next_y
     cdef public int[:] cell_next, cell_prev, cell_flower, cell_order, cell_alive
 
     cdef World world

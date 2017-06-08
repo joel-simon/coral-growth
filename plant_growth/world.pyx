@@ -18,18 +18,6 @@ from plant_growth import constants
 from plant_growth cimport geometry
 from plant_growth.spatial_hash cimport SpatialHash
 
-cdef int right_neighbor(int cid, Plant plant):
-    cdef int id_prev = plant.cell_prev[cid]
-    cdef int id_next = plant.cell_next[cid]
-
-    if plant.cell_x[id_next] > plant.cell_x[id_prev]:
-        return id_next
-    else:
-        return id_prev
-
-# cdef heap_delete(heap, id):
-
-
 cdef class World:
     def __init__(self, object params):
         self.width  = params['width']

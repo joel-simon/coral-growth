@@ -27,7 +27,6 @@ cdef class Plant:
         self.network = network
         self.efficiency = efficiency
 
-        self.energy = 0
         self.volume = 0
         self.water = 0
         self.light = 0
@@ -35,7 +34,7 @@ cdef class Plant:
 
         self.num_flowers = 0
         self.total_flowering = 0
-        self.consumption = 0
+        # self.consumption = 0
         self.age = 0
         self.max_age = float(constants.SIMULATION_STEPS)
 
@@ -51,7 +50,7 @@ cdef class Plant:
         self.cell_water = np.zeros(constants.MAX_CELLS)
         self.cell_light = np.zeros(constants.MAX_CELLS)
         self.cell_curvature = np.zeros(constants.MAX_CELLS)
-
+        self.cell_energy = np.zeros(constants.MAX_CELLS)
         self.cell_flower = np.zeros(constants.MAX_CELLS, dtype='i')
         self.cell_alive  = np.zeros(constants.MAX_CELLS, dtype='i')
 
@@ -64,7 +63,7 @@ cdef class Plant:
         self.open_ids = []
 
     cpdef void update_attributes(self) except *:
-        cdef double e_production, e_consumption
+        cdef double energy_production, energy_consumption
 
         self.polygon = self._make_polygon()
         self.volume = geometry.polygon_area(self.polygon)
@@ -75,19 +74,22 @@ cdef class Plant:
         self._calculate_light()
         self._calculate_curvature()
         self._calculate_flowers()
+        
+        self.light *= constants.LIGHT_EFFICIENCY
+        self.water *= constants.WATER_EFFICIENCY
 
-        e_production = min(self.water, self.light)
-        e_consumption = (self.volume / self.efficiency) + (constants.FLOWER_COST * self.num_flowers)
-        self.energy = e_production - e_consumption
+        energy_production = min(self.water, self.light)
+        energy_consumption = self.volume / self.efficiency
+        energy_consumption += constants.FLOWER_COST * self.num_flowers
 
-        if e_production > 0:
-            self.consumption =  e_consumption / e_production
+        if energy_production > 0:
+            self.energy_usage = energy_consumption / energy_production
         else:
-            self.consumption = 0
+            self.energy_usage = 0
 
         self.age += 1
 
-        if self.energy <= 0.0:
+        if self.energy_usage > 1.0:
             self.alive = False
 
         if self.n_cells >= constants.MAX_CELLS:
@@ -276,7 +278,7 @@ cdef class Plant:
         self.cell_inputs[1] = (self.cell_water[cid]*2) - 1
         self.cell_inputs[2] = (self.cell_curvature[cid]/(M_PI)) - 1
         self.cell_inputs[3] = (self.cell_flower[cid]*2) - 1
-        self.cell_inputs[4] = (self.consumption*2) - 1
+        self.cell_inputs[4] = (self.energy_usage*2) - 1
         self.cell_inputs[5] = log(self.water / self.light)
         self.cell_inputs[6] = 1 # The last input is always used as bias.
         # self.cell_inputs[6] = sin(self.age)
@@ -378,6 +380,8 @@ cdef class Plant:
     cdef void _calculate_light(self) except *:
         cdef int i, cid
         cdef double angle, light
+        
+        self.light = 0
         self.world.calculate_light(self)
 
         for i in range(self.n_cells):
@@ -398,7 +402,7 @@ cdef class Plant:
 
                 # Flowers do not contribute light.
                 if not self.cell_flower[cid]:
-                    self.light += light * constants.LIGHT_EFFICIENCY
+                    self.light += light
             else:
                 assert self.cell_light[cid]==0, self.cell_light[cid]
 
@@ -410,7 +414,7 @@ cdef class Plant:
             cid = self.cell_order[i]
             if self.cell_y[cid] < constants.SOIL_HEIGHT:
                 self.cell_water[cid] = 1
-                self.water += constants.WATER_EFFICIENCY
+                self.water += 1
             else:
                 self.cell_water[cid] = 0
 

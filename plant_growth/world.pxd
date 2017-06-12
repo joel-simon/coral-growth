@@ -1,3 +1,7 @@
+# from libcpp.set cimport set
+# from libcpp.vector cimport vector
+# from libcpp.map cimport map
+
 from plant_growth.plant cimport Plant
 from plant_growth.spatial_hash cimport SpatialHash
 
@@ -14,6 +18,8 @@ cdef class World:
 
     cdef void __insert_new(self, Plant plant, list ids) except *
 
-    cdef bint __segment_has_intersection(self, int id0, Plant plant)
+    cdef inline bint __segment_has_intersection(self, int id0, Plant plant)
 
     cdef void calculate_light(self, Plant plant) except *
+
+    cdef inline bint __valid_move(self, Plant plant, int cid, double x, double y)

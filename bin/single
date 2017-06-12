@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import division, print_function
 import math, random, os, time, sys
+import shutil
 sys.path.append(os.path.abspath('..'))
 
 import time
@@ -52,14 +53,7 @@ def run(out_dir):
 
         for genome in genome_list:
             plant = evaluate_genome(genome)
-            fitness = 0
-            # fitness = plant.total_flowering
-
-            for i in range(plant.n_cells):
-                cid = plant.cell_order[i]
-                if plant.cell_flower[cid]:
-                    fitness += plant.cell_y[cid]
-
+            fitness = plant.gametes
             genome.SetFitness(fitness)
 
         fitnesses = [g.Fitness for g in genome_list]
@@ -68,6 +62,7 @@ def run(out_dir):
 
         runtime = time.time() - t
         t = time.time()
+
         print('Generation ran in %f, %f per plant' % (runtime, runtime/len(genome_list)))
         print('Max fitness:', maxf, 'Mean fitness:', mean)
 
@@ -84,10 +79,10 @@ def run(out_dir):
     print('Run Complete.')
 
 if __name__ == '__main__':
+    # print(os.path.abspath('..'))
     uid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
     out_dir = "out_{:%B_%d_%Y_%H-%M}".format(datetime.now())+uid
-
     os.makedirs(out_dir)
-
+    shutil.copy(os.path.abspath('..')+'/plant_growth/constants.py', os.path.join(out_dir, 'constants.py'))
     run(out_dir)
     # call('./render_all '+out_dir, shell=True)

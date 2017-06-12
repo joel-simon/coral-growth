@@ -3,7 +3,6 @@
 # cython: initializedcheck=False
 # cython: nonecheck=False
 # cython: cdivision=True
-
 from __future__ import print_function
 from libc.math cimport cos, sin, round
 from math import isnan
@@ -22,7 +21,6 @@ cdef class World:
     def __init__(self, object params):
         self.width  = params['width']
         self.height = params['height']
-        self.soil_height = params['soil_height']
         self.max_plants  = params['max_plants']
 
         self.plants = []
@@ -97,7 +95,7 @@ cdef class World:
     cdef void __update_positions(self) except *:
         cdef Plant plant
         cdef int id0, id1, id2, i
-        cdef double old_x, old_y
+        cdef double old_x, old_y, new_x, new_y
 
         for plant in self.plants:
             if not plant.alive:
@@ -105,18 +103,40 @@ cdef class World:
 
             for i in range(plant.n_cells):
                 id1 = plant.cell_order[i]
+
+                if not plant.cell_alive[id1]:
+                    continue
+
                 id0 = plant.cell_prev[id1]
                 id2 = plant.cell_next[id1]
 
-                old_x, old_y = plant.cell_x[id1], plant.cell_y[id1]
+                old_x = plant.cell_x[id1]
+                old_y = plant.cell_y[id1]
 
-                assert (not isnan(plant.cell_next_x[id1]))
-                assert (not isnan(plant.cell_next_y[id1]))
+                new_x = plant.cell_next_x[id1]
+                new_y = plant.cell_next_y[id1]
 
-                plant.cell_x[id1] = plant.cell_next_x[id1]
-                plant.cell_y[id1] = plant.cell_next_y[id1]
+                if new_x < 0:
+                    new_x = 0
+                elif new_x >= self.width:
+                    new_x = self.width - 1
 
+                if new_y < 0:
+                    new_y = 0
+                elif new_y >= self.height:
+                    new_y = self.height - 1
 
+                assert (not isnan(new_x))
+                assert (not isnan(new_y))
+
+                # if self.__valid_move(plant, id1, new_x, new_y):
+                #     plant.cell_x[id1] = new_x
+                #     plant.cell_y[id1] = new_y
+                #     self.sh.move_object(id0, plant.cell_x[id0], plant.cell_y[id0], old_x, old_y, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
+                #     self.sh.move_object(id1, old_x, old_y, plant.cell_x[id2], plant.cell_y[id2], plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
+
+                plant.cell_x[id1] = new_x
+                plant.cell_y[id1] = new_y
                 if self.__segment_has_intersection(id1, plant) or \
                    self.__segment_has_intersection(id0, plant):
                     # Undo movement.
@@ -126,8 +146,47 @@ cdef class World:
                     self.sh.move_object(id0, plant.cell_x[id0], plant.cell_y[id0], old_x, old_y, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
                     self.sh.move_object(id1, old_x, old_y, plant.cell_x[id2], plant.cell_y[id2], plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
 
+    cdef bint __valid_move(self, Plant plant, int cid, double x, double y):
+        cdef int cid_prev, cid_next, cid2, cid3
+        cdef double x0, y0, x1, y1, x2, y2, x3, y3, min_x, min_y, max_x, max_y
 
-    cdef bint __segment_has_intersection(self, int id0, Plant plant):
+        cid_prev = plant.cell_prev[cid]
+        cid_next = plant.cell_next[cid]
+
+        x_prev = plant.cell_x[cid_prev]
+        y_prev = plant.cell_y[cid_prev]
+        x_next = plant.cell_x[cid_next]
+        y_next = plant.cell_y[cid_next]
+
+        min_x = min(x, x_prev, x_next)
+        max_x = max(x, x_prev, x_next)
+        min_y = min(y, y_prev, y_next)
+        max_y = max(y, y_prev, y_next)
+
+        cdef set collisions = self.sh.potential_collisions(min_x, min_y, max_x, max_y)
+        for cid2 in collisions:
+            cid3 = plant.cell_next[cid2]
+
+            if cid2 == cid or cid2 == cid_prev or cid2 == cid_next:
+                continue
+
+            if cid3 == cid_prev:
+                continue
+
+            x2 = plant.cell_x[cid2]
+            y2 = plant.cell_y[cid2]
+            x3 = plant.cell_x[cid3]
+            y3 = plant.cell_y[cid3]
+
+            if geometry.intersect(x, y, x_prev, y_prev, x2, y2, x3, y3):
+                return 0
+
+            if geometry.intersect(x, y, x_next, y_next, x2, y2, x3, y3):
+                return 0
+
+        return 1
+
+    cdef inline bint __segment_has_intersection(self, int id0, Plant plant):
         cdef int id1, id2, id3
         cdef double x0, y0, x1, y1, x2, y2, x3, y3
         id1 = plant.cell_next[id0]
@@ -136,7 +195,8 @@ cdef class World:
         x1 = plant.cell_x[id1]
         y1 = plant.cell_y[id1]
 
-        for id2 in self.sh.potential_collisions(id0, x0, y0, x1, y1):
+        cdef set collisions = self.sh.potential_collisions(x0, y0, x1, y1)
+        for id2 in collisions:
             id3 = plant.cell_next[id2]
             x2 = plant.cell_x[id2]
             y2 = plant.cell_y[id2]
@@ -173,6 +233,7 @@ cdef class World:
 
         cells_indexes_ordered = np.asarray(plant.cell_x[:plant.n_cells]).argsort()
 
+
         for i in range(plant.n_cells):
             cid = plant.cell_order[i]
             plant.cell_light[i] = 0
@@ -180,10 +241,6 @@ cdef class World:
         # Iterate across all points from left to right.
         for i in range(plant.n_cells):
             cid = cells_indexes_ordered[i]
-
-            # Neither dead nor underground cells collect light.
-            if not plant.cell_alive[cid]:
-                continue
 
             is_lit = False
             x0 = plant.cell_x[cid]
@@ -218,7 +275,7 @@ cdef class World:
             if plant.cell_x[cid_next] > x0:
                 heapq.heappush(minheap, (-y0 , (cid, cid_next)))
 
-            if is_lit and y0 >= self.soil_height:
+            if is_lit and plant.cell_alive[cid]:
                 plant.cell_light[cid] = 1
 
         assert len(minheap) == 0

@@ -47,14 +47,18 @@ class NetworkDummy(object):
     def Flush(self):
         pass
     def Output(self):
+        norm_x = (self.ls[4] +1)/2.0
+        # print(norm_x)
         # f = (self.ls[0]+1)/2
         # print(self.ls[0], f)
         # return [random.random(), 0, 0]
-        return [0,0,0]
+        out = [random.random(), 0, 0, 0]
+        assert len(out) == constants.NUM_OUTPUTS
+        return out
 
 t1 = time.time()
 # genome = NEAT.GetGenomeList(pop)[0]
 net = NEAT.NeuralNetwork()
 simulate_single(NetworkDummy(), display=display_func, break_early=False)
-print(time.time() - t1)
+print('Finished in:', time.time() - t1)
 view.hold()

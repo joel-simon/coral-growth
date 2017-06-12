@@ -17,7 +17,7 @@ if __name__ == '__main__':
     assert(os.path.exists(file_path))
     genome = NEAT.Genome(file_path)
     t1 = time.time()
-    n = 1
+    n = 2
     for _ in range(n):
         evaluate_genome(genome, display=display_func)
     print('average time ', (time.time() - t1)/n)

@@ -11,16 +11,17 @@ def simulate_single(network, display=None, break_early=True):
     world_params = {
         'width': constants.WORLD_WIDTH,
         'height': constants.WORLD_HEIGHT,
-        'soil_height': constants.SOIL_HEIGHT,
         'max_plants': 1,
     }
 
     world = World(world_params)
 
     x = constants.WORLD_WIDTH / 2.0
-    y = constants.SOIL_HEIGHT
+    y = constants.SEED_RADIUS
     r = constants.SEED_RADIUS
     world.add_plant(x, y, r, network, constants.PLANT_EFFICIENCY)
+
+    # volumes = []
 
     for s in range(constants.SIMULATION_STEPS):
         world.simulation_step()
@@ -31,6 +32,11 @@ def simulate_single(network, display=None, break_early=True):
         if break_early:
             if not world.plants[0].alive:
                 break
+
+            # if world.plants[0].volume == volumes[-1]:
+            #     break
+
+        # volumes.append(world.plants[0].volume)
 
     if display:
         print('Evaluate finished.')

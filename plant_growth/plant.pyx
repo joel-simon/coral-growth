@@ -1,4 +1,4 @@
-# cython: boundscheck=False
+# cython: boundscheck=True
 # cython: wraparound=False
 # cython: initializedcheck=False
 # cython: nonecheck=False
@@ -6,20 +6,15 @@
 from __future__ import print_function
 from libc.math cimport M_PI, M_PI_2, log, sqrt, fmin, fmax, acos, cos, sin, abs, atan2
 from math import isnan
+from random import random, shuffle
+
 import numpy as np
 cimport numpy as np
-
-from random import random
-
-from plant_growth.world cimport World
-
-from plant_growth import constants
-from plant_growth cimport geometry
-
 from meshpy.triangle import MeshInfo, build, refine
 
-def round_trip_connect(start, end):
-    return [(i, i+1) for i in range(start, end)] + [(end, start)]
+from plant_growth.world cimport World
+from plant_growth import constants
+from plant_growth cimport geometry
 
 cdef class Plant:
     def __init__(self, world, network, efficiency):
@@ -28,77 +23,45 @@ cdef class Plant:
         self.efficiency = efficiency
 
         self.volume = 0
-        self.water = 0
-        self.light = 0
         self.alive = True
-
-        self.num_flowers = 0
-        self.total_flowering = 0
-        # self.consumption = 0
+        self.gametes = 0
         self.age = 0
-        self.max_age = float(constants.SIMULATION_STEPS)
-
         self.n_cells = 0
+        self.energy = 0
 
+        # Constants
+        self.cell_min_energy  = constants.cell_min_energy
+        self.cell_growth_energy_usage = constants.cell_growth_energy_usage
+        self.cell_max_growth = constants.CELL_MAX_GROWTH
+
+        # Cell data
         self.cell_x = np.zeros(constants.MAX_CELLS)
         self.cell_y = np.zeros(constants.MAX_CELLS)
-
         self.cell_next_x = np.zeros(constants.MAX_CELLS)
         self.cell_next_y = np.zeros(constants.MAX_CELLS)
-
         self.cell_norm  = np.zeros((constants.MAX_CELLS, 2))
-        self.cell_water = np.zeros(constants.MAX_CELLS)
         self.cell_light = np.zeros(constants.MAX_CELLS)
         self.cell_curvature = np.zeros(constants.MAX_CELLS)
-        self.cell_energy = np.zeros(constants.MAX_CELLS)
-        self.cell_flower = np.zeros(constants.MAX_CELLS, dtype='i')
+        # self.cell_energy = np.zeros(constants.MAX_CELLS)
+        self.cell_type = np.zeros(constants.MAX_CELLS, dtype='i')
         self.cell_alive  = np.zeros(constants.MAX_CELLS, dtype='i')
-
         self.cell_next = np.zeros(constants.MAX_CELLS, dtype='i')
         self.cell_prev = np.zeros(constants.MAX_CELLS, dtype='i')
-
         self.cell_order = np.zeros(constants.MAX_CELLS, dtype='i')
         self.cell_inputs = [0 for _ in range(constants.NUM_INPUTS+1)]
 
-        self.open_ids = []
+    cdef void grow(self) except *:
+        """ Calculate the changes to plant by neural network.
+            Set cell_next_x and cell_next_y values while decreasing cell_light.
+        """
+        cdef int i, cid
+        cdef list output
+        cdef double energy_demand, energy_supply, energy_spent, growth, new_x, new_y
+        cdef double next_area, area_change, growth_scalar, energy_usage
 
-    cpdef void update_attributes(self) except *:
-        cdef double energy_production, energy_consumption
+        cdef bint verbose = False
 
-        self.polygon = self._make_polygon()
-        self.volume = geometry.polygon_area(self.polygon)
-
-        # self._calculate_mesh()
-        self._calculate_norms()
-        self._calculate_water()
-        self._calculate_light()
-        self._calculate_curvature()
-        self._calculate_flowers()
-        
-        self.light *= constants.LIGHT_EFFICIENCY
-        self.water *= constants.WATER_EFFICIENCY
-
-        energy_production = min(self.water, self.light)
-        energy_consumption = self.volume / self.efficiency
-        energy_consumption += constants.FLOWER_COST * self.num_flowers
-
-        if energy_production > 0:
-            self.energy_usage = energy_consumption / energy_production
-        else:
-            self.energy_usage = 0
-
-        self.age += 1
-
-        if self.energy_usage > 1.0:
-            self.alive = False
-
-        if self.n_cells >= constants.MAX_CELLS:
-            self.alive = False
-
-    cpdef void grow(self):
-        cdef double growth, x_new, y_new, x_prev, y_prev, x_next, y_next, cell_x, cell_y
-        cdef bint flower, smooth
-        cdef int i, cid, cid_prev, cid_next
+        cdef double[:] growth_amounts = np.zeros(constants.MAX_CELLS)
 
         for i in range(self.n_cells):
             cid = self.cell_order[i]
@@ -106,50 +69,161 @@ cdef class Plant:
             if not self.cell_alive[cid]:
                 continue
 
-            cell_x = self.cell_x[cid]
-            cell_y = self.cell_y[cid]
-
             # Transfer values to cell_input buffer.
             self._cell_input(cid)
 
-            # Compute feed-forward neteork results.
+            # Compute feed-forward network results.
             output = self._output()
 
-            # Three possible output actions.
-            growth = output[0] * constants.CELL_MAX_GROWTH
-            flower = output[1] > .5
-            # smooth = 0#output[2] > .5
+            # death = output[1] > .5
 
-            # An underground cell may not flower.
-            if self.cell_water[cid]:
-                self.cell_flower[cid] = False
-
-            elif flower:
-                self.cell_flower[cid] = True
-
-            # if smooth:# and self.cell_curvature[cid] < 0:
-            #     # Move to 50% between self and neighbors.
-            #     cid_prev = self.cell_prev[cid] # id of cell before
-            #     cid_next = self.cell_next[cid] # id of cell after
+            if output[2] > output[3]:
+                if output[2] > .5:
+                    self.cell_type[cid] = 1
+            else:
+                if output[3] > .5:
+                    self.cell_type[cid] = 2
 
 
-            #     x_prev = self.cell_x[cid_prev]
-            #     y_prev = self.cell_y[cid_prev]
-            #     x_next = self.cell_x[cid_next]
-            #     y_next = self.cell_y[cid_next]
+            growth = output[0] * self.cell_max_growth
+            growth_amounts[cid] = growth
+
+            # if death:
+            #     self.cell_alive[cid] = 0
+            #     self.cell_next_x[cid] = self.cell_x[cid]
+            #     self.cell_next_y[cid] = self.cell_y[cid]
+            #     continue
+
+            # energy_demand = output[0] * self.cell_growth_energy_usage
+            # energy_supply = max(0, self.cell_energy[cid] - self.cell_min_energy)
+            # energy_spent = min(energy_demand, energy_supply)
+            # growth = (energy_spent / self.cell_growth_energy_usage) * self.cell_max_growth
+
+            # print(output[0], energy_demand, energy_supply)
+            # print(output[0], energy_supply, energy_spent, growth, self.cell_energy[cid])
+
+            # assert growth >= 0
+
+            # self.cell_energy[cid] -= energy_spent
+
+            # # Move Cell.
+            new_x = self.cell_x[cid] + self.cell_norm[cid, 0] * growth
+            new_y = self.cell_y[cid] + self.cell_norm[cid, 1] * growth
+
+            if self._valid_growth(cid, new_x, new_y):
+                self.cell_next_x[cid] = new_x
+                self.cell_next_y[cid] = new_y
+            else:
+                growth_amounts[cid] = 0
+                self.cell_next_x[cid] = self.cell_x[cid]
+                self.cell_next_y[cid] = self.cell_y[cid]
+
+        # Calculate area of growth to see how much energy is needed.
+        cdef list next_polygon = []
+        for i in range(self.n_cells):
+            cid = self.cell_order[i]
+            next_polygon.append((self.cell_next_x[cid], self.cell_next_y[cid]))
+
+        next_area = geometry.polygon_area(next_polygon)
+        area_change = next_area - self.volume
+        energy_demand = area_change * self.cell_growth_energy_usage
+
+        assert area_change >= 0
+
+        if energy_demand == 0:
+            growth_scalar = 0
+        else:
+            growth_scalar = min(1, self.energy / energy_demand)
+
+        energy_usage = energy_demand * growth_scalar
+        energy_usage = min(energy_usage, self.energy) # This is just to deal with rounding errors.
+
+        if verbose:
+            print('Area Change:', area_change)
+            print('Energy Demand:', energy_demand)
+            print('Growth Scalar:', growth_scalar)
+            print('Energy', self.energy)
+            print('Energy usage', energy_usage)
+            print()
+
+        for i in range(self.n_cells):
+            cid = self.cell_order[i]
+            growth = growth_amounts[cid] * growth_scalar
+            new_x = self.cell_x[cid] + self.cell_norm[cid, 0] * growth
+            new_y = self.cell_y[cid] + self.cell_norm[cid, 1] * growth
+            self.cell_next_x[cid] = new_x
+            self.cell_next_y[cid] = new_y
+
+        self.energy -= energy_usage
+        assert self.energy >= 0
+        self.gametes += self.energy
 
 
-            #     self.cell_x[cid] = cell_x/2.0 + (x_prev + x_next) / 4.0
-            #     self.cell_y[cid] = cell_y/2.0 + (y_prev + y_next) / 4.0
+    cdef void update_attributes(self) except *:
+        """ In each simulation step, grow is called on all plants. then update_attributes
+            Grow has used upp all spare energy.
+        """
+        cdef int i, cid
+        cdef double spare_energy
+        # print('update attributes')
+        self._make_polygon()
+        self.volume = geometry.polygon_area(self.polygon) # Call after _make_polygon()
+        self._calculate_norms()
+        self._calculate_light() # Call after _calculate_norms()
+        self._calculate_curvature()
+        self.energy = sum(self.cell_light[:self.n_cells]) # Call after _calculate_light()
+        self.age += 1
 
+        # For now the energy is simply the light value.
+        # for i in range(self.n_cells):
+        #     cid = self.cell_order[i]
+        #     self.cell_energy[cid] = self.cell_light[cid]
 
-            # Move Cell.
-            x_new = cell_x + self.cell_norm[cid, 0] * growth
-            y_new = cell_y + self.cell_norm[cid, 1] * growth
+        # spare_energy = self._calculate_energy_transfer()
 
-            if self._valid_growth(cid, x_new, y_new):
-                self.cell_next_x[cid] = x_new
-                self.cell_next_y[cid] = y_new
+        # for i in range(self.n_cells):
+        #     cid = self.cell_order[i]
+        #     if self.cell_y[cid] < constants.SOIL_HEIGHT:
+        #         self.cell_alive[cid] = False
+
+    cdef double _calculate_energy_transfer(self) except *:
+        """
+        """
+        cdef int i, cid
+        cdef double transfer
+        cdef double plant_spare_energy = 0
+        cdef double n_needy_cells = 0
+
+        for i in range(self.n_cells):
+            cid = self.cell_order[i]
+            if not self.cell_alive[cid]:
+                continue
+            if self.cell_energy[cid] < self.cell_min_energy:
+                n_needy_cells += 1
+            else:
+                plant_spare_energy += self.cell_energy[cid] - self.cell_min_energy
+
+        # print('%i needy cells and %f spare'%(n_needy_cells, plant_spare_energy))
+        cdef list cid_list = [self.cell_order[i] for i in range(self.n_cells)]
+        shuffle(cid_list)
+
+        for i in range(self.n_cells):
+            # cid = self.cell_order[i]
+            cid = cid_list[i]
+
+            if not self.cell_alive[cid]:
+                continue
+
+            if self.cell_energy[cid] < self.cell_min_energy:
+                transfer = self.cell_min_energy - self.cell_energy[cid]
+
+                if transfer <= plant_spare_energy:
+                    self.cell_energy[cid] += transfer
+                    plant_spare_energy -= transfer
+                else:
+                    self.cell_alive[cid] = False
+
+        return plant_spare_energy
 
     cdef list split_links(self):
         cdef int i, cid, id_prev
@@ -160,7 +234,7 @@ cdef class Plant:
         inserted = []
 
         if self.n_cells >= constants.MAX_CELLS:
-            return
+            return []
 
         for i in range(self.n_cells):
             cid = self.cell_order[i]
@@ -232,10 +306,6 @@ cdef class Plant:
     cdef int _create_cell(self, double x, double y, before=None):
         cdef int cid
         assert self.n_cells <= constants.MAX_CELLS
-
-        # if len(self.open_ids):
-        #     cid = self.open_ids.pop()
-        # else:
         cid = self.n_cells
 
         if self.cell_head == None:
@@ -254,36 +324,20 @@ cdef class Plant:
 
         return cid
 
-    # cdef void _destroy_cell(self, int cid):
-    #     """ Mark the cell as dead, but for now do not remove.
-    #     """
-    #     # cdef int next_id = self.cell_next[cid]
-    #     # cdef int prev_id = self.cell_prev[cid]
-
-    #     # self.cell_next[prev_id] = next_id
-    #     # self.cell_prev[next_id] = prev_id
-
-    #     # if cid == self.cell_head:
-    #     #     self.cell_head = next_id
-
-    #     self.cell_alive[cid] = False
-    #     # self.open_ids.append(cid)
-
-    #     # self.n_cells -= 1
-
     cdef void _cell_input(self, int cid):
         """ Map cell stats to nerual input in [-1, 1] range.
         """
         self.cell_inputs[0] = (self.cell_light[cid]*2) - 1
-        self.cell_inputs[1] = (self.cell_water[cid]*2) - 1
-        self.cell_inputs[2] = (self.cell_curvature[cid]/(M_PI)) - 1
-        self.cell_inputs[3] = (self.cell_flower[cid]*2) - 1
-        self.cell_inputs[4] = (self.energy_usage*2) - 1
-        self.cell_inputs[5] = log(self.water / self.light)
-        self.cell_inputs[6] = 1 # The last input is always used as bias.
-        # self.cell_inputs[6] = sin(self.age)
-        # self.cell_inputs[7] = sin(self.age/2.0)
-        # self.cell_inputs[6] = (2 * self.age / self.max_age) - 1
+        self.cell_inputs[1] = (self.cell_curvature[cid]/(M_PI)) - 1
+        self.cell_inputs[2] = (self.energy_usage*2) - 1
+
+        if self.cell_type[cid] == 1:
+            self.cell_inputs[3] = 1
+
+        elif self.cell_type[cid] == 2:
+            self.cell_inputs[4] = 1
+
+        self.cell_inputs[5] = 1 # The last input is always used as bias.
         # self.cell_inputs[7] = random()
 
     cdef void order_cells(self):
@@ -291,7 +345,7 @@ cdef class Plant:
         cid = self.cell_head
 
         for i in range(self.n_cells):
-            assert(self.cell_alive[cid])
+            # assert(self.cell_alive[cid])
             self.cell_order[i] = cid
             cid = self.cell_next[cid]
 
@@ -313,39 +367,38 @@ cdef class Plant:
         x_next = self.cell_x[cid_next]
         y_next = self.cell_y[cid_next]
 
-        if x < 0 or y < 0:
-            return False
+        # if x < 0 or y < 0:
+        #     return False
 
-        if x >= self.world.width or y >= self.world.height:
-            return False
+        # if x >= self.world.width or y >= self.world.height:
+        #     return False
 
         x1 = x_next - x
         y1 = y_next - y
         x2 = x_prev - x
         y2 = y_prev - y
         angle = geometry.angle_clockwise(x1, y1, x2, y2)
-
+        # print(angle)
         if angle > constants.MAX_ANGLE:
             return False
 
         return True
 
-    cdef object _make_polygon(self):
+    cdef void _make_polygon(self):
         cdef int i, cid
-        polygon = []
-
+        self.polygon = []
         for i in range(self.n_cells):
             cid = self.cell_order[i]
-            if self.cell_alive[cid]:
-                polygon.append((self.cell_x[cid], self.cell_y[cid]))
-
-        return polygon
+            self.polygon.append((self.cell_x[cid], self.cell_y[cid]))
 
     cpdef void _calculate_mesh(self):
-        mesh_info = MeshInfo()
-        mesh_info.set_points(self.polygon)
-        mesh_info.set_facets(round_trip_connect(0, len(self.polygon)-1))
-        self.mesh = build(mesh_info)
+        pass
+        # def round_trip_connect(start, end):
+        #     return [(i, i+1) for i in range(start, end)] + [(end, start)]
+        # mesh_info = MeshInfo()
+        # mesh_info.set_points(self.polygon)
+        # mesh_info.set_facets(round_trip_connect(0, len(self.polygon)-1))
+        # self.mesh = build(mesh_info)
 
     cdef void _calculate_norms(self):
         cdef int i, cid, cid_prev, cid_next
@@ -379,14 +432,22 @@ cdef class Plant:
 
     cdef void _calculate_light(self) except *:
         cdef int i, cid
-        cdef double angle, light
-        
+        cdef double angle, light, height_percentage, light_min
+
+        light_min = 0.5
+
         self.light = 0
         self.world.calculate_light(self)
 
         for i in range(self.n_cells):
             cid = self.cell_order[i]
+
+            if not self.cell_alive[cid]:
+                continue
+
             if self.cell_light[cid] > 0:
+
+                height_percentage = self.cell_y[cid] / float(self.world.height)
 
                 # angle in radians (will be no values > pi or < 0)
                 angle = atan2(self.cell_norm[cid, 1], self.cell_norm[cid, 0])
@@ -397,26 +458,12 @@ cdef class Plant:
                     # map angle to [0, 1]
                     light = 1 - abs(M_PI_2 - angle) / M_PI_2
 
+                # Map value from min to 1 by height
+                light = light_min + (1 - light_min)*light*height_percentage
+
                 assert (0 <= light <= 1), light
+
                 self.cell_light[cid] = light
-
-                # Flowers do not contribute light.
-                if not self.cell_flower[cid]:
-                    self.light += light
-            else:
-                assert self.cell_light[cid]==0, self.cell_light[cid]
-
-    cdef void _calculate_water(self):
-        cdef int i, cid
-        self.water = 0
-
-        for i in range(self.n_cells):
-            cid = self.cell_order[i]
-            if self.cell_y[cid] < constants.SOIL_HEIGHT:
-                self.cell_water[cid] = 1
-                self.water += 1
-            else:
-                self.cell_water[cid] = 0
 
     cdef void _calculate_curvature(self):
         cdef int i, cid, id_prev, id_next
@@ -435,19 +482,3 @@ cdef class Plant:
 
                 angle = geometry.angle_clockwise(x1, y1, x2, y2)
                 self.cell_curvature[cid] = angle
-
-    cdef void _calculate_flowers(self):
-        cdef int i, cid
-        cdef bint flower
-        cdef double y_cell
-
-        self.num_flowers = 0
-
-        for i in range(self.n_cells):
-            cid = self.cell_order[i]
-            flower = self.cell_flower[cid]
-            y_cell = self.cell_y[cid]
-
-            if flower:
-                self.num_flowers += 1
-                self.total_flowering += y_cell - self.world.soil_height

@@ -11,12 +11,18 @@ from Cython.Build import cythonize
 from Cython.Distutils import build_ext
 import numpy
 
-_extra = ['-ffast-math']
+_extra = [
+    '-ffast-math',
+    '-Wno-unused-function',
+# _extra +=[
+    # '-stdlib=libc++',
+    # '-std=c++11',
+    # '-mmacosx-version-min=10.8',
+]
 
-# _macros = [('CYTHON_TRACE', '1')]
+_macros = [('CYTHON_TRACE', '1')]
 _macros = None
-
-compiler_directives = {'linetrace': True, 'profile': True}
+compiler_directives = {'linetrace': False, 'profile': False}
 
 extensions = [
     Extension(
@@ -40,8 +46,13 @@ extensions = [
     Extension(
         'plant_growth/spatial_hash',
         sources = ['./plant_growth/spatial_hash.pyx'],
+        # language="c++",
+        # language="c++",
+        # libraries=["stdc++",'libtest'],
+        # cmdclass = {'build_ext': build_ext},
         extra_compile_args = _extra,
-        define_macros=_macros
+        define_macros=_macros,
+
     ),
 ]
 
@@ -53,6 +64,7 @@ setup(
     license = 'MIT',
     cmdclass={'build_ext' : build_ext},
     include_dirs = [numpy.get_include()],
+
     ext_modules = cythonize(
         extensions,
         include_path = [numpy.get_include()],

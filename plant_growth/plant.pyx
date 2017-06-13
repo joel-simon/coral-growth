@@ -10,7 +10,7 @@ from random import random, shuffle
 
 import numpy as np
 cimport numpy as np
-from meshpy.triangle import MeshInfo, build, refine
+# from meshpy.triangle import MeshInfo, build, refine
 
 from plant_growth.world cimport World
 from plant_growth import constants
@@ -27,6 +27,7 @@ cdef class Plant:
         self.gametes = 0
         self.age = 0
         self.n_cells = 0
+        self.max_cells = constants.MAX_CELLS
         self.energy = 0
 
         # Constants
@@ -35,19 +36,19 @@ cdef class Plant:
         self.cell_max_growth = constants.CELL_MAX_GROWTH
 
         # Cell data
-        self.cell_x = np.zeros(constants.MAX_CELLS)
-        self.cell_y = np.zeros(constants.MAX_CELLS)
-        self.cell_next_x = np.zeros(constants.MAX_CELLS)
-        self.cell_next_y = np.zeros(constants.MAX_CELLS)
-        self.cell_norm  = np.zeros((constants.MAX_CELLS, 2))
-        self.cell_light = np.zeros(constants.MAX_CELLS)
-        self.cell_curvature = np.zeros(constants.MAX_CELLS)
-        # self.cell_energy = np.zeros(constants.MAX_CELLS)
-        self.cell_type = np.zeros(constants.MAX_CELLS, dtype='i')
-        self.cell_alive  = np.zeros(constants.MAX_CELLS, dtype='i')
-        self.cell_next = np.zeros(constants.MAX_CELLS, dtype='i')
-        self.cell_prev = np.zeros(constants.MAX_CELLS, dtype='i')
-        self.cell_order = np.zeros(constants.MAX_CELLS, dtype='i')
+        self.cell_x = np.zeros(self.max_cells)
+        self.cell_y = np.zeros(self.max_cells)
+        self.cell_next_x = np.zeros(self.max_cells)
+        self.cell_next_y = np.zeros(self.max_cells)
+        self.cell_norm  = np.zeros((self.max_cells, 2))
+        self.cell_light = np.zeros(self.max_cells)
+        self.cell_curvature = np.zeros(self.max_cells)
+        # self.cell_energy = np.zeros(self.max_cells)
+        self.cell_type = np.zeros(self.max_cells, dtype='i')
+        self.cell_alive  = np.zeros(self.max_cells, dtype='i')
+        self.cell_next = np.zeros(self.max_cells, dtype='i')
+        self.cell_prev = np.zeros(self.max_cells, dtype='i')
+        self.cell_order = np.zeros(self.max_cells, dtype='i')
         self.cell_inputs = [0 for _ in range(constants.NUM_INPUTS+1)]
 
     cdef void grow(self) except *:
@@ -61,7 +62,7 @@ cdef class Plant:
 
         cdef bint verbose = False
 
-        cdef double[:] growth_amounts = np.zeros(constants.MAX_CELLS)
+        cdef double[:] growth_amounts = np.zeros(self.max_cells)
 
         for i in range(self.n_cells):
             cid = self.cell_order[i]

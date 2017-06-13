@@ -5,7 +5,7 @@ cdef class Plant:
     cdef public double efficiency, energy, energy_usage, gametes, volume, light, max_age, \
                         cell_growth_energy_usage, cell_min_energy, cell_max_growth
     cdef public bint alive
-    cdef public int age, n_cells, cell_head, cell_tail, num_flowers
+    cdef public int age, n_cells, max_cells, cell_head, cell_tail, num_flowers
     cdef public double[:] cell_x, cell_y, cell_water, cell_light, cell_energy, cell_curvature, cell_next_x, cell_next_y
     cdef public int[:] cell_next, cell_prev, cell_flower, cell_order, cell_alive, cell_type
 

@@ -22,7 +22,7 @@ _extra = [
 
 _macros = [('CYTHON_TRACE', '1')]
 _macros = None
-compiler_directives = {'linetrace': False, 'profile': False}
+compiler_directives = {'linetrace': False, 'profile': True}
 
 extensions = [
     Extension(

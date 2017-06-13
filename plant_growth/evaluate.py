@@ -11,7 +11,7 @@ def simulate_single(network, display=None, break_early=True):
     world_params = {
         'width': constants.WORLD_WIDTH,
         'height': constants.WORLD_HEIGHT,
-        'max_plants': 1,
+        'max_plants': 10,
     }
 
     world = World(world_params)

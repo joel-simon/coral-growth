@@ -12,10 +12,6 @@ cdef class World:
     cdef dict cell_tree_ids, tree_cell_ids
     cdef object tree
 
-    cdef inline void collision_add_segment(self, id, double x0, double y0, double x1, double y1)
-
-    cdef inline void collision_move_segment(self, int id, double x0, double y0, double x1, double y1)
-
     cpdef int add_plant(self, double x, double y, double r, network, double efficiency) except -1
 
     cpdef void simulation_step(self) except *

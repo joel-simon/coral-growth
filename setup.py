@@ -46,14 +46,9 @@ extensions = [
     Extension(
         'plant_growth/spatial_hash',
         sources = ['./plant_growth/spatial_hash.pyx'],
-        # language="c++",
-        # language="c++",
-        # libraries=["stdc++",'libtest'],
-        # cmdclass = {'build_ext': build_ext},
         extra_compile_args = _extra,
         define_macros=_macros,
-
-    ),
+    )
 ]
 
 setup(

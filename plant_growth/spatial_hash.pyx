@@ -19,7 +19,7 @@ cdef class SpatialHash:
         self.cell_size = cell_size
         self.d = dict()
         self.bid_buffer = np.zeros(100, dtype='i')
-        
+
         self.count = 0
         self.n = 0
 
@@ -44,7 +44,7 @@ cdef class SpatialHash:
                 n += 1
                 cx += 1.0
             cy += 1.0
-        
+
         self.count += n
         self.n += 1
         assert n < 100

@@ -8,9 +8,6 @@ from libc.math cimport cos, sin, round
 from math import isnan
 
 import heapq
-
-import aabb
-
 import numpy as np
 cimport numpy as np
 
@@ -26,58 +23,15 @@ cdef class World:
         self.max_plants  = params['max_plants']
         self.max_cells = self.max_plants * constants.MAX_CELLS
         self.plants = []
-        # self.sh = SpatialHash(cell_size=constants.CELL_SIZE)
+        self.sh = SpatialHash(cell_size=constants.CELL_SIZE)
 
-        self.tree = aabb.Tree(2, nParticles=self.max_cells)
-        # self.cell_tree_ids = dict()#np.zeros(self.max_cells, dtype='i')
-        # self.tree_cell_ids = dict()#np.zeros(self.max_cells, dtype='i')
-        # self.__open_plant_ids = list(reversed(range(self.max_plants)))
-        # self.plant_alive = np.zeros(self.max_plants)
         # self.plant_x = np.zeros((self.max_plants, constants.MAX_CELLS))
         # self.plant_y = np.zeros((self.max_plants, constants.MAX_CELLS))
 
-    cdef inline void collision_add_segment(self, id, double x0, double y0, double x1, double y1):
-        """ tree notes
-            use user given idexes like r* tree
-            y values that are teh same
-        """
-        # p0 = aabb.DoubleVector(2)
-        # p1 = aabb.DoubleVector(2)
-        if y0 == y1:
-            y1 += 1
-        if x0 == x1:
-            x1 += 1
-        # p0[0] = min(x0, x1)
-        # p0[1] = min(y0, y1)
-        # p1[0] = max(x0, x1)
-        # p1[1] = max(y0, y1)
-        self.tree.insertParticle(x0, y0, x1, y1)
-
-    cdef inline void collision_move_segment(self, int id, double x0, double y0, double x1, double y1):
-        # p0 = aabb.DoubleVector(2)
-        # p1 = aabb.DoubleVector(2)
-        if y0 == y1:
-            y1 += 1
-        if x0 == x1:
-            x1 += 1
-        # p0[0] = min(x0, x1)
-        # p0[1] = min(y0, y1)
-        # p1[0] = max(x0, x1)
-        # p1[1] = max(y0, y1)
-        self.tree.updateParticle(id, x0, y0, x1, y1)
-
     cpdef int add_plant(self, double x, double y, double r, network, double efficiency) except -1:
-        # if len(self.__open_plant_ids) == 0:
-        #     raise ValueError()
-
-        # cdef int plant_id = self.__open_plant_ids.pop()
-        # cdef object x_arr = self.plant_x[plant_id]
-
         cdef int id1, id2
         cdef Plant plant = Plant(self, network, efficiency)
 
-
-        # self.plant_alive[plant_id] = 1
         plant.create_circle(x, y, r, constants.SEED_SEGMENTS)
         self.plants.append(plant)
         plant.order_cells()
@@ -85,13 +39,9 @@ cdef class World:
 
         for id1 in plant.cell_order[:plant.n_cells]:
             id2 = plant.cell_next[id1]
-            self.collision_add_segment(id1, plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
-            # self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
+            self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
 
         return 0 # To eventually become plant id.
-
-    # cdef void kill_plant(self, Plant plant):
-    #     self.plant_alive[plant.id] = 0
 
     cpdef void simulation_step(self) except *:
         """ The main function called from outside.
@@ -123,16 +73,14 @@ cdef class World:
         for id1 in ids:
             id0 = plant.cell_prev[id1]
             id2 = plant.cell_next[id1]
+            self.sh.move_object(id0,
+                                    plant.cell_x[id0], plant.cell_y[id0],
+                                    plant.cell_x[id2], plant.cell_y[id2],
+                                    plant.cell_x[id0], plant.cell_y[id0],
+                                    plant.cell_x[id1], plant.cell_y[id1])
 
-            self.collision_move_segment(id0, plant.cell_x[id0], plant.cell_y[id0],
-                                            plant.cell_x[id1], plant.cell_y[id1])
-            # self.sh.add_object(id0, plant.cell_x[id0], plant.cell_y[id0],
-            #                         plant.cell_x[id1], plant.cell_y[id1])
-
-            self.collision_add_segment(id1, plant.cell_x[id1], plant.cell_y[id1],
+            self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1],
                                     plant.cell_x[id2], plant.cell_y[id2])
-            # self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1],
-            #                         plant.cell_x[id2], plant.cell_y[id2])
 
     cdef void __update_positions(self) except *:
         cdef Plant plant
@@ -185,12 +133,8 @@ cdef class World:
                     plant.cell_x[id1] = old_x
                     plant.cell_y[id1] = old_y
                 else:
-
-                    self.collision_move_segment(id0, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
-                    self.collision_move_segment(id1, plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
-
-                    # self.sh.move_object(id0, plant.cell_x[id0], plant.cell_y[id0], old_x, old_y, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
-                    # self.sh.move_object(id1, old_x, old_y, plant.cell_x[id2], plant.cell_y[id2], plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
+                    self.sh.move_object(id0, plant.cell_x[id0], plant.cell_y[id0], old_x, old_y, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
+                    self.sh.move_object(id1, old_x, old_y, plant.cell_x[id2], plant.cell_y[id2], plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
 
     cdef bint __valid_move(self, Plant plant, int cid, double x, double y):
         cdef int cid_prev, cid_next, cid2, cid3
@@ -232,65 +176,38 @@ cdef class World:
 
         return 1
 
-    # cdef inline bint __segment_has_intersection(self, int id0, Plant plant):
-    #     cdef int id1, id2, id3, c
-    #     cdef double x0, y0, x1, y1, x2, y2, x3, y3
-    #     id1 = plant.cell_next[id0]
-    #     x0 = plant.cell_x[id0]
-    #     y0 = plant.cell_y[id0]
-    #     x1 = plant.cell_x[id1]
-    #     y1 = plant.cell_y[id1]
-
-    #     cdef int n = self.sh.__cells_for_rect(x0, y0, x1, y1)
-    #     cdef dict d = self.sh.d
-    #     cdef set bucket
-
-    #     for i in range(n):
-    #         c = self.sh.bid_buffer[i]
-    #         try:
-    #             bucket = d[c]
-    #             for id2 in bucket:
-    #                 id3 = plant.cell_next[id2]
-    #                 if id2 != id1 and id3 != id0:
-    #                     x2 = plant.cell_x[id2]
-    #                     y2 = plant.cell_y[id2]
-    #                     x3 = plant.cell_x[id3]
-    #                     y3 = plant.cell_y[id3]
-    #                     if geometry.intersect(x0, y0, x1, y1, x2, y2, x3, y3):
-    #                         return True
-    #         except KeyError:
-    #             pass
-
-    #     return False
-
     cdef inline bint __segment_has_intersection(self, int id0, Plant plant):
-        cdef int id1, id2, id3
+        cdef int id1, id2, id3, c
         cdef double x0, y0, x1, y1, x2, y2, x3, y3
         id1 = plant.cell_next[id0]
         x0 = plant.cell_x[id0]
         y0 = plant.cell_y[id0]
         x1 = plant.cell_x[id1]
         y1 = plant.cell_y[id1]
-        p0 = aabb.DoubleVector(2)
-        p1 = aabb.DoubleVector(2)
-        p0[0] = min(x0, x1)
-        p0[1] = min(y0, y1)
-        p1[0] = max(x0, x1)
-        p1[1] = max(y0, y1)
-        AABB = aabb.AABB(p0, p1)
-        particles = self.tree.query(AABB)
 
-        for id2 in particles:
-            id3 = plant.cell_next[id2]
-            if id2 != id1 and id3 != id0:
-                x2 = plant.cell_x[id2]
-                y2 = plant.cell_y[id2]
-                x3 = plant.cell_x[id3]
-                y3 = plant.cell_y[id3]
-                if geometry.intersect(x0, y0, x1, y1, x2, y2, x3, y3):
-                    return True
+        cdef int n = self.sh.__cells_for_rect(x0, y0, x1, y1)
+        cdef dict d = self.sh.d
+        cdef set bucket
+
+        for i in range(n):
+            c = self.sh.bid_buffer[i]
+            try:
+                bucket = d[c]
+                for id2 in bucket:
+                    id3 = plant.cell_next[id2]
+                    if id2 != id1 and id3 != id0:
+                        x2 = plant.cell_x[id2]
+                        y2 = plant.cell_y[id2]
+                        x3 = plant.cell_x[id3]
+                        y3 = plant.cell_y[id3]
+                        if geometry.intersect(x0, y0, x1, y1, x2, y2, x3, y3):
+                            return True
+            except KeyError:
+                pass
 
         return False
+
+
     cdef void calculate_light(self, Plant plant) except *:
         """
         A sweep line algorithm that maintains a heap of tallest open segments.

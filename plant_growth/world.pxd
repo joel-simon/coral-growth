@@ -6,7 +6,7 @@ from plant_growth.plant cimport Plant
 from plant_growth.spatial_hash cimport SpatialHash
 
 cdef class World:
-    cdef public int width, height, soil_height, max_plants, max_cells
+    cdef public int width, height, soil_height, max_plants, max_cells, use_physics
     cdef public list plants
     cdef public SpatialHash sh
     cdef dict cell_tree_ids, tree_cell_ids

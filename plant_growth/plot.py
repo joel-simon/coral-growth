@@ -4,17 +4,20 @@ import numpy as np
 import pygame
 from math import pi as M_PI
 
-def contiguous_lit_cells(plant):
-    run = []
-    for i in range(plant.n_cells):
-        cid = plant.cell_order[i]
+# def contiguous_lit_cells(plant):
+#     run = []
+#     for i in range(plant.n_cells):
+#         cid = plant.cell_order[i]
 
-        if plant.cell_light[cid] > 0:
-            run.append(cid)
+#         if plant.cell_light[cid] > 0:
+#             run.append(cid)
 
-        elif len(run):
-            yield run
-            run = []
+#         elif len(run):
+#             yield run
+#             run = []
+
+# def plot_mesh(view, points, edges):
+    
 
 def plot(view, world, title=None):
     width, height = world.width, world.height
@@ -59,7 +62,9 @@ def plot(view, world, title=None):
         if plant.mesh:
             for face in plant.mesh.elements:
                 poly = [plant.mesh.points[f] for f in face]
-                view.draw_lines(poly+[poly[0]], (50, 150, 50))
+                view.draw_lines(poly+[poly[0]], (100, 100, 100)) # (50, 150, 50)
+            # for point in list(plant.mesh.points)[:plant.n_cells]:
+            #     view.draw_circle(point, 2, flower_color)
 
         for i in range(plant.n_cells):
             cid = plant.cell_order[i]
@@ -68,9 +73,9 @@ def plot(view, world, title=None):
             c_y = plant.cell_y[cid]
 
             if plant.cell_type[cid] == 1:
-                view.draw_circle((c_x, c_y), .5, (200,0,0), width=0)
+                view.draw_circle((c_x, c_y), 1, (200,0,0), width=0)
             elif plant.cell_type[cid] == 2:
-                view.draw_circle((c_x, c_y), .5, (0,0,200), width=0)
+                view.draw_circle((c_x, c_y), 1, (0,0,200), width=0)
 
         #         view.draw_circle((c_x, c_y), 2, (255, 255, 255), width=0)
         # #         c_x = plant.cell_x[cid]

@@ -12,7 +12,7 @@ WORLD_HEIGHT = 800
 SOIL_HEIGHT = 50
 
 SEED_SEGMENTS = 32
-SEED_RADIUS = 16
+SEED_RADIUS = 32
 
 USE_TIME_CYCLE = True
 TIME_CYCLE = 100 #todo evovle
@@ -34,4 +34,7 @@ cell_min_energy = .1
 # cell_growth_energy_usage = 1*(1-cell_min_energy) # Full growth will use 90% of energy.
 
 
-cell_growth_energy_usage = .2
+cell_growth_energy_usage = .05
+
+
+use_physics = True

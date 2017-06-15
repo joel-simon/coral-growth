@@ -10,7 +10,7 @@ from random import random, shuffle
 
 import numpy as np
 cimport numpy as np
-# from meshpy.triangle import MeshInfo, build, refine
+from meshpy.triangle import MeshInfo, build, refine
 
 from plant_growth.world cimport World
 from plant_growth import constants
@@ -63,6 +63,8 @@ cdef class Plant:
         cdef bint verbose = False
 
         cdef double[:] growth_amounts = np.zeros(self.max_cells)
+
+        cdef double mesh
 
         for i in range(self.n_cells):
             cid = self.cell_order[i]
@@ -159,7 +161,6 @@ cdef class Plant:
         assert self.energy >= 0
         self.gametes += self.energy
 
-
     cdef void update_attributes(self) except *:
         """ In each simulation step, grow is called on all plants. then update_attributes
             Grow has used upp all spare energy.
@@ -169,6 +170,7 @@ cdef class Plant:
         # print('update attributes')
         self._make_polygon()
         self.volume = geometry.polygon_area(self.polygon) # Call after _make_polygon()
+        # self._calculate_mesh()
         self._calculate_norms()
         self._calculate_light() # Call after _calculate_norms()
         self._calculate_curvature()
@@ -393,13 +395,15 @@ cdef class Plant:
             self.polygon.append((self.cell_x[cid], self.cell_y[cid]))
 
     cpdef void _calculate_mesh(self):
-        pass
+        # pass
         # def round_trip_connect(start, end):
-        #     return [(i, i+1) for i in range(start, end)] + [(end, start)]
-        # mesh_info = MeshInfo()
-        # mesh_info.set_points(self.polygon)
-        # mesh_info.set_facets(round_trip_connect(0, len(self.polygon)-1))
-        # self.mesh = build(mesh_info)
+        #     return
+        mesh_info = MeshInfo()
+        mesh_info.set_points(self.polygon)
+        end = len(self.polygon)-1
+        facets = [(i, i+1) for i in range(0, end)] + [(end, 0)]
+        mesh_info.set_facets(facets)
+        self.mesh = build(mesh_info)
 
     cdef void _calculate_norms(self):
         cdef int i, cid, cid_prev, cid_next

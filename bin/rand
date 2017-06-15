@@ -52,7 +52,7 @@ class NetworkDummy(object):
         # f = (self.ls[0]+1)/2
         # print(self.ls[0], f)
         # return [random.random(), 0, 0]
-        out = [random.random(), 0, 0, 0]
+        out = [random.random()*3, 0, 0, 0]
         assert len(out) == constants.NUM_OUTPUTS
         return out
 

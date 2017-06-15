@@ -15,12 +15,14 @@ from plant_growth.plant cimport Plant
 from plant_growth import constants
 from plant_growth cimport geometry
 from plant_growth.spatial_hash cimport SpatialHash
+from plant_growth.physics import compute_deformation
 
 cdef class World:
     def __init__(self, object params):
         self.width  = params['width']
         self.height = params['height']
         self.max_plants  = params['max_plants']
+        self.use_physics = params['use_physics']
         self.max_cells = self.max_plants * constants.MAX_CELLS
         self.plants = []
         self.sh = SpatialHash(cell_size=constants.CELL_SIZE)
@@ -52,6 +54,8 @@ cdef class World:
         for plant in self.plants:
             if plant.alive:
                 plant.grow()
+                if self.use_physics:
+                    compute_deformation(plant)
 
         self.__update_positions()
 

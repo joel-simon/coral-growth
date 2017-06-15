@@ -12,6 +12,7 @@ def simulate_single(network, display=None, break_early=True):
         'width': constants.WORLD_WIDTH,
         'height': constants.WORLD_HEIGHT,
         'max_plants': 10,
+        'use_physics': constants.use_physics,
     }
 
     world = World(world_params)
@@ -44,6 +45,17 @@ def simulate_single(network, display=None, break_early=True):
         print('\tn_cells =', world.plants[0].n_cells)
         print()
 
+    # For creating a debug mesh.
+    # import pickle
+    # import numpy as np
+    # world.use_physics = True
+    # world.simulation_step()
+    # mesh = dict()
+    # mesh['points'] = np.array(world.plants[0].mesh.points)
+    # mesh['edges'] = np.array(world.plants[0].mesh.faces)
+    # pickle.dump(mesh, open('plant_mesh.p', 'wb'))
+    # display(world)
+    
     return world.plants[0]
 
 def evaluate_genome(genome, display=None, break_early=True):

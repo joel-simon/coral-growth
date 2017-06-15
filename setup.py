@@ -14,15 +14,11 @@ import numpy
 _extra = [
     '-ffast-math',
     '-Wno-unused-function',
-# _extra +=[
-    # '-stdlib=libc++',
-    # '-std=c++11',
-    # '-mmacosx-version-min=10.8',
 ]
 
 _macros = [('CYTHON_TRACE', '1')]
 _macros = None
-compiler_directives = {'linetrace': False, 'profile': True}
+compiler_directives = {'linetrace': False, 'profile': False}
 
 extensions = [
     Extension(
@@ -46,6 +42,12 @@ extensions = [
     Extension(
         'plant_growth/spatial_hash',
         sources = ['./plant_growth/spatial_hash.pyx'],
+        extra_compile_args = _extra,
+        define_macros=_macros,
+    ),
+    Extension(
+        'plant_growth/spring_system',
+        sources = ['./plant_growth/spring_system.pyx'],
         extra_compile_args = _extra,
         define_macros=_macros,
     )

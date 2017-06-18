@@ -23,7 +23,7 @@ cdef class Plant:
 
     cdef void _insert_before(self, int node, int new_node)
     cdef void _append(self, int new_node)
-    cdef int _create_cell(self, double x, double y, before=*)
+    cpdef int create_cell(self, double x, double y, insert_before=*)
     # cdef void _destroy_cell(self, int cid)
     cdef void _cell_input(self, int cid)
     cdef list _output(self)

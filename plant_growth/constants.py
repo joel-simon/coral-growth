@@ -11,8 +11,8 @@ WORLD_WIDTH = 1200
 WORLD_HEIGHT = 800
 SOIL_HEIGHT = 50
 
-SEED_SEGMENTS = 32
-SEED_RADIUS = 32
+SEED_SEGMENTS = 16#32
+SEED_RADIUS = 64#32
 
 USE_TIME_CYCLE = True
 TIME_CYCLE = 100 #todo evovle
@@ -37,4 +37,4 @@ cell_min_energy = .1
 cell_growth_energy_usage = .05
 
 
-use_physics = True
+use_physics = False

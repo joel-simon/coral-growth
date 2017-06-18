@@ -30,6 +30,7 @@ pop = NEAT.Population(
     14 # Random number generator seed.
 )
 
+constants.cell_growth_energy_usage = .01
 # random.seed(time.time())
 view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 

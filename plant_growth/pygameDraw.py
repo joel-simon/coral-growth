@@ -123,8 +123,7 @@ class PygameDraw(object):
         # print(y, self.h)
         self.surface.blit(s, (x, y-h))
 
-    def draw_text(self, position, string, font=8, color=
-        BLACK, center=False):
+    def draw_text(self, position, string, font=8, color=BLACK, center=False):
         font = int(self.scale * font)
         x, y = self.map_point(position)
         if font not in self.fonts:

@@ -51,6 +51,8 @@ cdef class Plant:
         self.cell_order = np.zeros(self.max_cells, dtype='i')
         self.cell_inputs = [0 for _ in range(constants.NUM_INPUTS+1)]
 
+        # self.mesh = create_mesh(self)
+
     cdef void grow(self) except *:
         """ Calculate the changes to plant by neural network.
             Set cell_next_x and cell_next_y values while decreasing cell_light.
@@ -254,12 +256,6 @@ cdef class Plant:
             if dist > constants.MAX_EDGE_LENGTH:
                 to_split.append(cid)
 
-            # elif dist < constants.MIN_EDGE_LENGTH:
-            #     to_remove.append(cid)
-
-        # for cid in to_remove:
-        #     self._destroy_cell(cid)
-
         for cid in to_split:
             id_prev = self.cell_prev[cid]
 
@@ -268,7 +264,7 @@ cdef class Plant:
 
             x = (self.cell_x[cid] + self.cell_x[id_prev]) / 2.0
             y = (self.cell_y[cid] + self.cell_y[id_prev]) / 2.0
-            inserted.append(self._create_cell(x, y, before=cid))
+            inserted.append(self.create_cell(x, y, insert_before=cid))
 
         return inserted
 
@@ -279,10 +275,10 @@ cdef class Plant:
             a = 2 * i * M_PI / n
             xx = x + cos(a) * r
             yy = y + sin(a) * r
-            self._create_cell(xx, yy)
+            self.create_cell(xx, yy)
 
     cdef void _insert_before(self, int node, int new_node):
-        """ Called by _create_cell
+        """ Called by create_cell
         """
         cdef int prev_node = self.cell_prev[node]
         self.cell_next[prev_node] = new_node
@@ -294,7 +290,7 @@ cdef class Plant:
             self.cell_head = new_node
 
     cdef void _append(self, int new_node):
-        """ Called by _create_cell
+        """ Called by create_cell
         """
         if self.cell_head is None:
             self.cell_head = new_node
@@ -306,7 +302,7 @@ cdef class Plant:
             self.cell_tail = new_node
             self.cell_prev[self.cell_head] = self.cell_tail
 
-    cdef int _create_cell(self, double x, double y, before=None):
+    cpdef int create_cell(self, double x, double y, insert_before=None):
         cdef int cid
         assert self.n_cells <= constants.MAX_CELLS
         cid = self.n_cells
@@ -319,8 +315,8 @@ cdef class Plant:
         self.cell_x[cid] = x
         self.cell_y[cid] = y
 
-        if before:
-            self._insert_before(before, cid)
+        if insert_before:
+            self._insert_before(insert_before, cid)
 
         else:
             self._append(cid)

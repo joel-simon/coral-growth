@@ -17,6 +17,8 @@ from plant_growth cimport geometry
 from plant_growth.spatial_hash cimport SpatialHash
 from plant_growth.physics import compute_deformation
 
+from plant_growth import tmp
+
 cdef class World:
     def __init__(self, object params):
         self.width  = params['width']
@@ -38,7 +40,8 @@ cdef class World:
         self.plants.append(plant)
         plant.order_cells()
         plant.update_attributes()
-
+        plant.mesh = tmp.create_mesh(plant)
+        
         for id1 in plant.cell_order[:plant.n_cells]:
             id2 = plant.cell_next[id1]
             self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
@@ -61,7 +64,9 @@ cdef class World:
 
         for plant in self.plants:
             if plant.alive:
-                self.__insert_new(plant, plant.split_links())
+                new_cids = tmp.update_mesh(plant)
+                self.__insert_new(plant, new_cids)
+                # self.__insert_new(plant, plant.split_links())
                 plant.order_cells()
                 plant.update_attributes()
 

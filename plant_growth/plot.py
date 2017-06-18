@@ -3,7 +3,7 @@ from colorsys import hsv_to_rgb
 import numpy as np
 import pygame
 from math import pi as M_PI
-
+from plant_growth.mesh import Mesh
 # def contiguous_lit_cells(plant):
 #     run = []
 #     for i in range(plant.n_cells):
@@ -17,7 +17,7 @@ from math import pi as M_PI
 #             run = []
 
 # def plot_mesh(view, points, edges):
-    
+
 
 def plot(view, world, title=None):
     width, height = world.width, world.height
@@ -60,9 +60,15 @@ def plot(view, world, title=None):
             view.draw_line(p1, p2, color, width=plant_thickness)
 
         if plant.mesh:
-            for face in plant.mesh.elements:
-                poly = [plant.mesh.points[f] for f in face]
-                view.draw_lines(poly+[poly[0]], (100, 100, 100)) # (50, 150, 50)
+            if isinstance(plant.mesh, Mesh):
+                for face in plant.mesh.faces:
+                    poly = [(v.x, v.y) for v in face.verts()]
+                    view.draw_lines(poly+[poly[0]], (0, 0, 0)) # (50, 150, 50)
+
+            else:
+                for face in plant.mesh.elements:
+                    poly = [plant.mesh.points[f] for f in face]
+                    view.draw_lines(poly+[poly[0]], (0, 0, 0)) # (50, 150, 50)
             # for point in list(plant.mesh.points)[:plant.n_cells]:
             #     view.draw_circle(point, 2, flower_color)
 

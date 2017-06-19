@@ -17,7 +17,16 @@ from plant_growth.mesh import Mesh
 #             run = []
 
 # def plot_mesh(view, points, edges):
+def draw_mesh(view, mesh):
+    if isinstance(mesh, Mesh):
+        for face in mesh.faces:
+            poly = [(v.x, v.y) for v in face.verts()]
+            view.draw_lines(poly+[poly[0]], (100, 100, 100)) # (50, 150, 50)
 
+    else:
+        for face in mesh.elements:
+            poly = [mesh.points[f] for f in face]
+            view.draw_lines(poly+[poly[0]], (100, 100, 100)) # (50, 150, 50)
 
 def plot(view, world, title=None):
     width, height = world.width, world.height
@@ -33,7 +42,7 @@ def plot(view, world, title=None):
     # plant_color = (146, 215, 101)
     plant_color = (111, 181, 109)
 
-    plant_thickness = 1
+    plant_thickness = 2
     flower_color = (200, 10, 200)
     dirt_color = (156, 109, 69)
     # dirt_color = (211, 137, 71)
@@ -43,6 +52,9 @@ def plot(view, world, title=None):
     for plant in world.plants:
         # print(list(plant.cell_alive[:plant.n_cells]))
         view.draw_polygon(plant.polygon, plant_color)
+
+        if plant.mesh:
+            draw_mesh(view, plant.mesh)
 
         for i in range(plant.n_cells):
             cid = plant.cell_order[i]
@@ -57,18 +69,9 @@ def plot(view, world, title=None):
                 color = (255, 255, 255)
             else:
                 color = (int(255*light), int(248*light), 0, 255)
+                
             view.draw_line(p1, p2, color, width=plant_thickness)
 
-        if plant.mesh:
-            if isinstance(plant.mesh, Mesh):
-                for face in plant.mesh.faces:
-                    poly = [(v.x, v.y) for v in face.verts()]
-                    view.draw_lines(poly+[poly[0]], (0, 0, 0)) # (50, 150, 50)
-
-            else:
-                for face in plant.mesh.elements:
-                    poly = [plant.mesh.points[f] for f in face]
-                    view.draw_lines(poly+[poly[0]], (0, 0, 0)) # (50, 150, 50)
             # for point in list(plant.mesh.points)[:plant.n_cells]:
             #     view.draw_circle(point, 2, flower_color)
 

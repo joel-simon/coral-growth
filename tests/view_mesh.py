@@ -35,7 +35,7 @@ def draw_mesh(mesh, off_x=0, off_y=0):
 
 view.start_draw()
 draw_mesh(mesh, -125, +125)
-# print(list(mesh.neighbors(mesh.verts[12])))
+
 new_verts = set()
 
 for edge in copy.copy(mesh.edges):
@@ -52,15 +52,16 @@ for edge in copy.copy(mesh.edges):
     if edge.is_boundary():
         continue
     mesh.flip_if_better(edge)
-    # p1 = edge.he.next.next.vert
-    # p2 = edge.he.twin.next.next.vert
-    # if (v1.id in new_verts) ^ (v2.id in new_verts):
-    #     # print((p1.id in new_verts) ,(v.id in new_verts))
-    #     print('flipping', edge)
-    #     if edge.length() > math.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2):
-    #         mesh.edge_flip(edge)
 
 draw_mesh(mesh, -125, -125)
 view.end_draw()
+
+for v in [mesh.verts[12], mesh.verts[23]]:
+    print(v.id)
+    try:
+        print(v.id, [vn.id for vn in mesh.neighbors(v)])
+    except Exception as e:
+        raise e
+
 
 view.hold()

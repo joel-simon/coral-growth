@@ -10,7 +10,8 @@ cimport numpy as np
 
 cpdef int spring_simulation(double[:,:] points, long[:,:] edges, int[:] fixed, \
                              int iters, double delta, double gravity, \
-                             double damping, object view=False) except -1:
+                             double damping, double[:] deformation,\
+                             object view=False) except -1:
     """ Mass spring system with verlet integration.
     """
     cdef:
@@ -18,6 +19,7 @@ cpdef int spring_simulation(double[:,:] points, long[:,:] edges, int[:] fixed, \
         int n_e = edges.shape[0]
         double delta2 = delta*delta
         int i_e, p_i, p_j
+        double total_deformation
         double dx, dy, length, factor, correction_x, correction_y, new_x, new_y, x, y
     cdef:
         double[:, :] previous = np.copy(points)
@@ -25,6 +27,7 @@ cpdef int spring_simulation(double[:,:] points, long[:,:] edges, int[:] fixed, \
         double[:,:] acceleration = np.zeros((n_p, 2))
 
     assert 0 <= damping <= 1
+    assert len(deformation) == len(edges)
 
     for i_e in range(n_e):
         p_i = edges[i_e, 0]
@@ -35,6 +38,7 @@ cpdef int spring_simulation(double[:,:] points, long[:,:] edges, int[:] fixed, \
         target[i_e] = length
 
     for _ in range(iters):
+        total_deformation = 0
         for i_e in range(n_e):
             # Resolve joint.
             p_i = edges[i_e, 0]
@@ -43,11 +47,13 @@ cpdef int spring_simulation(double[:,:] points, long[:,:] edges, int[:] fixed, \
             dx = points[p_j, 0] - points[p_i, 0]
             dy = points[p_j, 1] - points[p_i, 1]
 
-
             length = sqrt(dx*dx + dy*dy)
 
-            assert length > 0
+            if length == 0:
+                raise ValueError('Zero edge length.')
 
+            deformation[i_e] = (target[i_e] - length) / target[i_e]
+            total_deformation += deformation[i_e]
             factor = (length - target[i_e]) / (length * 2.0)
             correction_x = dx * factor
             correction_y = dy * factor
@@ -81,9 +87,9 @@ cpdef int spring_simulation(double[:,:] points, long[:,:] edges, int[:] fixed, \
                 points[i_p, 1] = new_y
 
                 acceleration[i_p, 0] = 0
-                acceleration[i_p, 1] = 1
+                acceleration[i_p, 1] = 0
 
         if view:
-            view(points, edges)
+            view(points, edges, deformation)
 
     return 1

@@ -18,15 +18,21 @@ from plant_growth.mesh import Mesh
 
 # def plot_mesh(view, points, edges):
 def draw_mesh(view, mesh):
-    if isinstance(mesh, Mesh):
-        for face in mesh.faces:
-            poly = [(v.x, v.y) for v in face.verts()]
-            view.draw_lines(poly+[poly[0]], (100, 100, 100)) # (50, 150, 50)
-
-    else:
-        for face in mesh.elements:
-            poly = [mesh.points[f] for f in face]
-            view.draw_lines(poly+[poly[0]], (100, 100, 100)) # (50, 150, 50)
+    # if isinstance(mesh, Mesh):
+    # for face in mesh.faces:
+    #     poly = [(v.x, v.y) for v in face.verts()]
+    #     view.draw_lines(poly+[poly[0]], (100, 100, 100)) # (50, 150, 50)
+    for edge in mesh.edges:
+        v1, v2 = edge.verts()
+        d = edge.strain
+        r = min(255, max(0, int(abs(d)*255.0)))
+        color = (r, 0, 0)
+        if d > .2:
+            view.draw_line((v1.x, v1.y), (v2.x, v2.y), color, 1.5)
+    # else:
+    #     for face in mesh.elements:
+    #         poly = [mesh.points[f] for f in face]
+    #         view.draw_lines(poly+[poly[0]], (100, 100, 100)) # (50, 150, 50)
 
 def plot(view, world, title=None):
     width, height = world.width, world.height
@@ -69,7 +75,7 @@ def plot(view, world, title=None):
                 color = (255, 255, 255)
             else:
                 color = (int(255*light), int(248*light), 0, 255)
-                
+
             view.draw_line(p1, p2, color, width=plant_thickness)
 
             # for point in list(plant.mesh.points)[:plant.n_cells]:

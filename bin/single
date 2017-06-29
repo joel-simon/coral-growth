@@ -55,6 +55,9 @@ def run(out_dir):
             plant = evaluate_genome(genome)
             fitness = plant.gametes
             genome.SetFitness(fitness)
+            print('.', end='', flush=True)
+
+        print()
 
         fitnesses = [g.Fitness for g in genome_list]
         mean = sum(fitnesses) / float(len(fitnesses))
@@ -82,7 +85,7 @@ if __name__ == '__main__':
     # print(os.path.abspath('..'))
     uid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
     print('Run ID =', uid)
-    out_dir = "out_{:%B_%d_%Y_%H-%M}".format(datetime.now())+uid
+    out_dir = "out_{:%B_%d_%Y_%H-%M}_".format(datetime.now())+uid
     os.makedirs(out_dir)
     shutil.copy(os.path.abspath('..')+'/plant_growth/constants.py', os.path.join(out_dir, 'constants.py'))
     run(out_dir)

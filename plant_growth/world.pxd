@@ -6,13 +6,13 @@ from plant_growth.plant cimport Plant
 from plant_growth.spatial_hash cimport SpatialHash
 
 cdef class World:
-    cdef public int width, height, soil_height, max_plants, max_cells, use_physics
+    cdef public int width, height, soil_height, max_plants, max_cells, use_physics, step
     cdef public list plants
     cdef public SpatialHash sh
     cdef dict cell_tree_ids, tree_cell_ids
     cdef object tree
 
-    cpdef int add_plant(self, double x, double y, double r, network, double efficiency) except -1
+    cpdef int add_plant(self, list seed_poly, object network, double efficiency) except -1
 
     cpdef void simulation_step(self) except *
 

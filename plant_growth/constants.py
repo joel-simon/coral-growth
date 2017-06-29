@@ -1,18 +1,18 @@
 from math import pi
 #Genome
-NUM_INPUTS = 5
+NUM_INPUTS = 6
 NUM_OUTPUTS = 4
 
-MAX_CELLS = 3000
+MAX_CELLS = 2000
 NUM_GENERATIONS = 100
-SIMULATION_STEPS = 300
+SIMULATION_STEPS = 200
 
 WORLD_WIDTH = 1200
 WORLD_HEIGHT = 800
 SOIL_HEIGHT = 50
 
 SEED_SEGMENTS = 32
-SEED_RADIUS = 32
+SEED_RADIUS = 24
 
 USE_TIME_CYCLE = True
 TIME_CYCLE = 100 #todo evovle
@@ -33,8 +33,9 @@ CELL_SIZE = MAX_EDGE_LENGTH * 1.25
 cell_min_energy = .1
 # cell_growth_energy_usage = 1*(1-cell_min_energy) # Full growth will use 90% of energy.
 
-
 cell_growth_energy_usage = .05
 
 
-use_physics = False
+MAX_DEFORMATION = .02
+PHYSICS_INTERVAL = 10
+use_physics = True

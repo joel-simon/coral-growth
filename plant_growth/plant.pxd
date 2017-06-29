@@ -6,7 +6,7 @@ cdef class Plant:
                         cell_growth_energy_usage, cell_min_energy, cell_max_growth
     cdef public bint alive
     cdef public int age, n_cells, max_cells, cell_head, cell_tail, num_flowers
-    cdef public double[:] cell_x, cell_y, cell_water, cell_light, cell_energy, cell_curvature, cell_next_x, cell_next_y
+    cdef public double[:] cell_x, cell_y, cell_water, cell_light, cell_energy, cell_strain, cell_curvature, cell_next_x, cell_next_y
     cdef public int[:] cell_next, cell_prev, cell_flower, cell_order, cell_alive, cell_type
 
     cdef World world
@@ -19,11 +19,11 @@ cdef class Plant:
     cdef list split_links(self)
     cdef void order_cells(self)
 
-    cpdef void create_circle(self, double x, double y, double r, int n)
+    # cpdef void create_circle(self, double x, double y, double r, int n)
 
     cdef void _insert_before(self, int node, int new_node)
     cdef void _append(self, int new_node)
-    cpdef int create_cell(self, double x, double y, insert_before=*)
+    cpdef int create_cell(self, double x, double y, insert_before=*) except -1
     # cdef void _destroy_cell(self, int cid)
     cdef void _cell_input(self, int cid)
     cdef list _output(self)
@@ -32,7 +32,7 @@ cdef class Plant:
     cdef bint _valid_growth(self, int cid, double x, double y)
 
     cdef void _make_polygon(self)
-    cpdef void _calculate_mesh(self)
+    cdef list update_mesh(self)
 
     cdef double _calculate_energy_transfer(self) except *
     cdef void _calculate_norms(self)

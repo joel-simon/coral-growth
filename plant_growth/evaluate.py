@@ -1,4 +1,4 @@
-import math
+from math import pi, cos, sin
 import random
 
 from plant_growth import constants
@@ -20,13 +20,16 @@ def simulate_single(network, display=None, break_early=True):
     x = constants.WORLD_WIDTH / 2.0
     y = constants.SEED_RADIUS
     r = constants.SEED_RADIUS
-    world.add_plant(x, y, r, network, constants.PLANT_EFFICIENCY)
 
-    # volumes = []
+    seed_poly = []
+    for i in range(constants.SEED_SEGMENTS):
+        a = 2 * i * pi / constants.SEED_SEGMENTS
+        seed_poly.append(( x + cos(a)*r, y + sin(a)*r))
+
+    world.add_plant(seed_poly, network, constants.PLANT_EFFICIENCY)
 
     for s in range(constants.SIMULATION_STEPS):
         world.simulation_step()
-
         if display:
             display(world)
 
@@ -36,7 +39,6 @@ def simulate_single(network, display=None, break_early=True):
 
             # if world.plants[0].volume == volumes[-1]:
             #     break
-
         # volumes.append(world.plants[0].volume)
 
     if display:
@@ -46,16 +48,18 @@ def simulate_single(network, display=None, break_early=True):
         print()
 
     # For creating a debug mesh.
-    # import pickle
-    # import numpy as np
-    # world.use_physics = True
-    # world.simulation_step()
-    # mesh = dict()
-    # mesh['points'] = np.array(world.plants[0].mesh.points)
-    # mesh['edges'] = np.array(world.plants[0].mesh.faces)
-    # pickle.dump(mesh, open('plant_mesh.p', 'wb'))
-    # display(world)
-    
+    if False:
+        import pickle
+        # import numpy as np
+        world.use_physics = True
+        world.simulation_step()
+        # mesh = dict()
+        # mesh['points'] = np.array(world.plants[0].mesh.points)
+        # mesh['edges'] = np.array(world.plants[0].mesh.faces)
+        pickle.dump(world.plants[0].mesh.to_arrays(), open('plant_mesh1.p', 'wb'))
+        display(world)
+        print('Dumped mesh')
+
     return world.plants[0]
 
 def evaluate_genome(genome, display=None, break_early=True):

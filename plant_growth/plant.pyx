@@ -16,8 +16,11 @@ from plant_growth.world cimport World
 from plant_growth import constants
 from plant_growth cimport geometry
 
+from plant_growth import plant_tmp
+from plant_growth.exceptions import MaxCellsException
+
 cdef class Plant:
-    def __init__(self, world, network, efficiency):
+    def __init__(self, world, seed_poly, network, efficiency):
         self.world = world
         self.network = network
         self.efficiency = efficiency
@@ -36,6 +39,7 @@ cdef class Plant:
         self.cell_max_growth = constants.CELL_MAX_GROWTH
 
         # Cell data
+        # self.boundary_cells = []
         self.cell_x = np.zeros(self.max_cells)
         self.cell_y = np.zeros(self.max_cells)
         self.cell_next_x = np.zeros(self.max_cells)
@@ -43,30 +47,34 @@ cdef class Plant:
         self.cell_norm  = np.zeros((self.max_cells, 2))
         self.cell_light = np.zeros(self.max_cells)
         self.cell_curvature = np.zeros(self.max_cells)
-        # self.cell_energy = np.zeros(self.max_cells)
+        self.cell_energy = np.zeros(self.max_cells)
+        self.cell_strain = np.zeros(self.max_cells)
         self.cell_type = np.zeros(self.max_cells, dtype='i')
         self.cell_alive  = np.zeros(self.max_cells, dtype='i')
         self.cell_next = np.zeros(self.max_cells, dtype='i')
         self.cell_prev = np.zeros(self.max_cells, dtype='i')
         self.cell_order = np.zeros(self.max_cells, dtype='i')
+
         self.cell_inputs = [0 for _ in range(constants.NUM_INPUTS+1)]
 
-        # self.mesh = create_mesh(self)
+        for x, y in seed_poly:
+            self.create_cell(x, y)
+
+        self.order_cells()
+        self.mesh = plant_tmp.create_mesh(self)
+        self.update_attributes()
 
     cdef void grow(self) except *:
         """ Calculate the changes to plant by neural network.
             Set cell_next_x and cell_next_y values while decreasing cell_light.
         """
-        cdef int i, cid
-        cdef list output
-        cdef double energy_demand, energy_supply, energy_spent, growth, new_x, new_y
-        cdef double next_area, area_change, growth_scalar, energy_usage
-
-        cdef bint verbose = False
-
-        cdef double[:] growth_amounts = np.zeros(self.max_cells)
-
-        cdef double mesh
+        cdef:
+            int i, cid
+            list output
+            double energy_demand, energy_supply, energy_spent, growth, new_x, new_y
+            double next_area, area_change, growth_scalar, energy_usage
+            bint verbose = False
+            double[:] growth_amounts = np.zeros(self.max_cells)
 
         for i in range(self.n_cells):
             cid = self.cell_order[i]
@@ -74,14 +82,18 @@ cdef class Plant:
             if not self.cell_alive[cid]:
                 continue
 
-            # Transfer values to cell_input buffer.
+            """ Transfer values to cell_input buffer.
+            """
             self._cell_input(cid)
 
-            # Compute feed-forward network results.
+            """ Compute feed-forward network results.
+            """
             output = self._output()
 
-            # death = output[1] > .5
-
+            """ Act on outputs:
+                * Check cell type changes.
+                * Move in nomral direction by growth amount.
+            """
             if output[2] > output[3]:
                 if output[2] > .5:
                     self.cell_type[cid] = 1
@@ -89,32 +101,14 @@ cdef class Plant:
                 if output[3] > .5:
                     self.cell_type[cid] = 2
 
-
             growth = output[0] * self.cell_max_growth
             growth_amounts[cid] = growth
 
-            # if death:
-            #     self.cell_alive[cid] = 0
-            #     self.cell_next_x[cid] = self.cell_x[cid]
-            #     self.cell_next_y[cid] = self.cell_y[cid]
-            #     continue
-
-            # energy_demand = output[0] * self.cell_growth_energy_usage
-            # energy_supply = max(0, self.cell_energy[cid] - self.cell_min_energy)
-            # energy_spent = min(energy_demand, energy_supply)
-            # growth = (energy_spent / self.cell_growth_energy_usage) * self.cell_max_growth
-
-            # print(output[0], energy_demand, energy_supply)
-            # print(output[0], energy_supply, energy_spent, growth, self.cell_energy[cid])
-
-            # assert growth >= 0
-
-            # self.cell_energy[cid] -= energy_spent
-
-            # # Move Cell.
             new_x = self.cell_x[cid] + self.cell_norm[cid, 0] * growth
             new_y = self.cell_y[cid] + self.cell_norm[cid, 1] * growth
 
+            """ Reject if the move if not in range or self-instersecting.
+            """
             if self._valid_growth(cid, new_x, new_y):
                 self.cell_next_x[cid] = new_x
                 self.cell_next_y[cid] = new_y
@@ -123,7 +117,10 @@ cdef class Plant:
                 self.cell_next_x[cid] = self.cell_x[cid]
                 self.cell_next_y[cid] = self.cell_y[cid]
 
-        # Calculate area of growth to see how much energy is needed.
+        """ Calculate area of growth to see how much energy is needed.
+            Scale overall growth down depending on available energy.
+        """
+
         cdef list next_polygon = []
         for i in range(self.n_cells):
             cid = self.cell_order[i]
@@ -159,37 +156,23 @@ cdef class Plant:
             self.cell_next_x[cid] = new_x
             self.cell_next_y[cid] = new_y
 
+        """ If all growth can be afforded, put excess into gamete production.
+        """
         self.energy -= energy_usage
         assert self.energy >= 0
         self.gametes += self.energy
 
     cdef void update_attributes(self) except *:
-        """ In each simulation step, grow is called on all plants. then update_attributes
-            Grow has used upp all spare energy.
+        """ In each simulation step, grow is called on all plants then update_attributes
+            Grow has used up all spare energy.
         """
-        cdef int i, cid
-        cdef double spare_energy
-        # print('update attributes')
         self._make_polygon()
         self.volume = geometry.polygon_area(self.polygon) # Call after _make_polygon()
-        # self._calculate_mesh()
         self._calculate_norms()
         self._calculate_light() # Call after _calculate_norms()
         self._calculate_curvature()
         self.energy = sum(self.cell_light[:self.n_cells]) # Call after _calculate_light()
         self.age += 1
-
-        # For now the energy is simply the light value.
-        # for i in range(self.n_cells):
-        #     cid = self.cell_order[i]
-        #     self.cell_energy[cid] = self.cell_light[cid]
-
-        # spare_energy = self._calculate_energy_transfer()
-
-        # for i in range(self.n_cells):
-        #     cid = self.cell_order[i]
-        #     if self.cell_y[cid] < constants.SOIL_HEIGHT:
-        #         self.cell_alive[cid] = False
 
     cdef double _calculate_energy_transfer(self) except *:
         """
@@ -268,15 +251,6 @@ cdef class Plant:
 
         return inserted
 
-    cpdef void create_circle(self, double x, double y, double r, int n):
-        cdef int i
-        cdef double a, xx, yy
-        for i in range(n):
-            a = 2 * i * M_PI / n
-            xx = x + cos(a) * r
-            yy = y + sin(a) * r
-            self.create_cell(xx, yy)
-
     cdef void _insert_before(self, int node, int new_node):
         """ Called by create_cell
         """
@@ -302,9 +276,12 @@ cdef class Plant:
             self.cell_tail = new_node
             self.cell_prev[self.cell_head] = self.cell_tail
 
-    cpdef int create_cell(self, double x, double y, insert_before=None):
+    cpdef int create_cell(self, double x, double y, insert_before=None) except -1:
         cdef int cid
-        assert self.n_cells <= constants.MAX_CELLS
+
+        if self.n_cells == constants.MAX_CELLS:
+            raise MaxCellsException()
+
         cid = self.n_cells
 
         if self.cell_head == None:
@@ -329,14 +306,15 @@ cdef class Plant:
         self.cell_inputs[0] = (self.cell_light[cid]*2) - 1
         self.cell_inputs[1] = (self.cell_curvature[cid]/(M_PI)) - 1
         self.cell_inputs[2] = (self.energy_usage*2) - 1
+        self.cell_inputs[3] = (self.cell_strain[cid]*2) - 1
 
         if self.cell_type[cid] == 1:
-            self.cell_inputs[3] = 1
-
-        elif self.cell_type[cid] == 2:
             self.cell_inputs[4] = 1
 
-        self.cell_inputs[5] = 1 # The last input is always used as bias.
+        elif self.cell_type[cid] == 2:
+            self.cell_inputs[5] = 1
+
+        self.cell_inputs[6] = 1 # The last input is always used as bias.
         # self.cell_inputs[7] = random()
 
     cdef void order_cells(self):
@@ -390,16 +368,8 @@ cdef class Plant:
             cid = self.cell_order[i]
             self.polygon.append((self.cell_x[cid], self.cell_y[cid]))
 
-    cpdef void _calculate_mesh(self):
-        # pass
-        # def round_trip_connect(start, end):
-        #     return
-        mesh_info = MeshInfo()
-        mesh_info.set_points(self.polygon)
-        end = len(self.polygon)-1
-        facets = [(i, i+1) for i in range(0, end)] + [(end, 0)]
-        mesh_info.set_facets(facets)
-        self.mesh = build(mesh_info)
+    cdef list update_mesh(self):
+        return plant_tmp.update_mesh(self)
 
     cdef void _calculate_norms(self):
         cdef int i, cid, cid_prev, cid_next

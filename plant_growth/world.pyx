@@ -3,8 +3,7 @@
 # cython: initializedcheck=False
 # cython: nonecheck=False
 # cython: cdivision=True
-from __future__ import print_function
-from libc.math cimport cos, sin, round
+from libc.math cimport cos, sin, round, M_PI
 from math import isnan
 
 import heapq
@@ -17,7 +16,6 @@ from plant_growth cimport geometry
 from plant_growth.spatial_hash cimport SpatialHash
 from plant_growth.physics import compute_deformation
 
-from plant_growth import tmp
 
 cdef class World:
     def __init__(self, object params):
@@ -32,16 +30,15 @@ cdef class World:
         # self.plant_x = np.zeros((self.max_plants, constants.MAX_CELLS))
         # self.plant_y = np.zeros((self.max_plants, constants.MAX_CELLS))
 
-    cpdef int add_plant(self, double x, double y, double r, network, double efficiency) except -1:
-        cdef int id1, id2
-        cdef Plant plant = Plant(self, network, efficiency)
+    cpdef int add_plant(self, list seed_poly, object network, double efficiency) except -1:
+        cdef:
+            int id1, id2
+            Plant plant = Plant(self, seed_poly, network, efficiency)
 
-        plant.create_circle(x, y, r, constants.SEED_SEGMENTS)
         self.plants.append(plant)
-        plant.order_cells()
-        plant.update_attributes()
-        plant.mesh = tmp.create_mesh(plant)
-        
+        # plant.order_cells()
+        # plant.update_attributes()
+
         for id1 in plant.cell_order[:plant.n_cells]:
             id2 = plant.cell_next[id1]
             self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
@@ -53,25 +50,30 @@ cdef class World:
             We assume the plant attributes begin up to date.
         """
         cdef Plant plant
+        cdef double max_d
 
         for plant in self.plants:
             if plant.alive:
                 plant.grow()
-                if self.use_physics:
-                    compute_deformation(plant)
+                if self.use_physics and self.step % constants.PHYSICS_INTERVAL == 0:
+                    max_d = compute_deformation(plant)
+                    if max_d == 1:
+                        plant.alive = False
+
 
         self.__update_positions()
 
         for plant in self.plants:
             if plant.alive:
-                new_cids = tmp.update_mesh(plant)
+                new_cids = plant.update_mesh()
                 self.__insert_new(plant, new_cids)
-                # self.__insert_new(plant, plant.split_links())
                 plant.order_cells()
                 plant.update_attributes()
 
                 if plant.n_cells >= plant.max_cells:
                     plant.alive = False
+
+        self.step += 1
 
     cdef void __insert_new(self, Plant plant, list ids) except *:
         """ Remove segments that were split and add new.

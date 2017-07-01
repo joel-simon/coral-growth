@@ -1,12 +1,10 @@
 from __future__ import division
 
-import math
 import numpy as np
-from collections import defaultdict
-import numpy as np
+cimport numpy as np
+from libc.math cimport sqrt
 
-class Vert:
-    # __slots__ = ['id', 'x', 'y', 'x0', 'y0', 'he', 'cid']
+cdef class Vert:
     def __init__(self, id, x, y, he=None):
         self.id = id
         self.x = x
@@ -23,14 +21,7 @@ class Vert:
         self.accel_y = 0
         self.fixed = False
 
-    def __str__(self):
-        return "Vert(%i, %f, %f, he=%r)" %(self.id, self.x, self.y, bool(self.he))
-
-    def is_boundary(self):
-        return self.cid != None
-
-class Edge:
-    # __slots__ = ['id', 'he', 'strain']
+cdef class Edge:
     def __init__(self, id, he=None):
         self.id = id
         self.he = he
@@ -39,51 +30,14 @@ class Edge:
         self.target = 0
         self.strain = 0
 
-    def __str__(self):
-        v1, v2 = self.verts()
-        return "Edge(%i, %i, length=%f)" % (v1.id, v2.id, self.length())
 
-    def verts(self):
-        yield self.he.vert
-        yield self.he.next.vert
-
-    def is_boundary(self):
-        return self.he.face == None or self.he.twin.face == None
-
-    def length(self):
-        p1 = self.he.vert
-        p2 = self.he.next.vert
-        return math.sqrt(((p1.x-p2.x)**2) + (p1.y-p2.y)**2)
-
-class Face:
+cdef class Face:
     __slots__ = ['id', 'he']
     def __init__(self, id, he=None):
         self.id = id
         self.he = he
 
-    def __str__(self):
-        return 'Face(verts=%s)' % str(tuple(v.id for v in self.verts()))
-
-    def verts(self):
-        yield self.he.vert
-        yield self.he.next.vert
-        yield self.he.next.next.vert
-
-    def halfs(self):
-        yield self.he
-        yield self.he.next
-        yield self.he.next.next
-
-    def center(self):
-        x = 0.0
-        y = 0.0
-        for v in self.verts():
-            x += v.x
-            y += v.y
-        return (x/3, y/3)
-
-class HalfEdge(object):
-    __slots__ = ['twin', 'next', 'vert', 'edge', 'face']
+cdef class HalfEdge(object):
     def __init__(self, twin=None, next=None, vert=None, edge=None, face=None):
         self.twin = twin
         self.next = next
@@ -91,11 +45,7 @@ class HalfEdge(object):
         self.edge = edge
         self.face = face
 
-    def __str__(self):
-        id2 = self.twin.vert.id
-        return "HalfEdge(from=%i, to=%i, face=%r)" % (self.vert.id, id2, bool(self.face))
-
-class Mesh:
+cdef class Mesh:
     def __init__(self, raw_points, raw_polygons):
         self.verts = []
         self.edges = []
@@ -128,7 +78,7 @@ class Mesh:
             for i, a in enumerate(poly):
                 b = poly[ (i+1) % len(poly) ]
                 pair = (self.verts[a], self.verts[b])
-                h_ab = self.__half(face=face, vert=self.verts[a])
+                h_ab = self.__half(face=face, vert=self.verts[a], twin=None, next=None, edge=None)
                 vertices_to_half[pair] = h_ab
                 pair_to_half[pair] = h_ab
                 face_half_edges.append(h_ab)
@@ -160,7 +110,6 @@ class Mesh:
         for start, (he, end) in he_boundary.items():
             he.next = he_boundary[end][0]
             self.boundary_start = he
-        self.__check_valid()
 
     def __str__(self):
         s = "Mesh"
@@ -168,32 +117,39 @@ class Mesh:
             s += "\n\tv_%i: %i, %i" % (v.id, int(v.x), int(v.y))
 
         for f in self.faces:
-            s += "\n\tf_%i: %s" % (f.id, str([v.id for v in f.verts()]))
+            s += "\n\tf_%i: %s" % (f.id, str([v.id for v in self.face_verts(f)]))
 
         return s
 
-    def __vert(self, x, y, he=None):
-        vert = Vert(self.__v_id, x, y, he)
+    # Constructor functions.
+    cdef Vert __vert(self, double x, double y, he=None):
+        cdef Vert vert = Vert(self.__v_id, x, y, he)
         self.__v_id += 1
         self.verts.append(vert)
         return vert
 
-    def __edge(self, he=None):
-        edge = Edge(self.__e_id, he)
+    cdef Edge __edge(self, he=None):
+        cdef Edge edge = Edge(self.__e_id, he)
         self.__e_id += 1
         self.edges.append(edge)
         return edge
 
-    def __face(self, he=None):
-        face = Face(self.__f_id, he)
+    cdef Face __face(self, he=None):
+        cdef Face face = Face(self.__f_id, he)
         self.__f_id += 1
         self.faces.append(face)
         if he:
             he.face = face
         return face
 
-    def __half(self, twin=None, next=None, vert=None, edge=None, face=None):
-        he = HalfEdge(twin, next, vert, edge, face)
+    cdef HalfEdge __half(self, HalfEdge twin=None, HalfEdge next=None, Vert vert=None, Edge edge=None, Face face=None):
+    # cdef HalfEdge __half(self, Twin* twin=NULL, HalfEdge* next=NULL, Vert* vert=NULL, Edge* edge=NULL, Face* face=NULL):
+        cdef HalfEdge he = HalfEdge(twin, next, vert, edge, face)
+        # he.twin = twin
+        # he.next = next
+        # he.vert = vert
+        # he.edge = edge
+        # he.face = face
         self.halfs.append(he)
         if twin:
             twin.twin = he
@@ -205,39 +161,14 @@ class Mesh:
             face.he = he
         return he
 
-    def neighbors(self, v):
-        h = v.he
-        start = h
+    # Meh modifying
+    cpdef void edge_flip(self, Edge edge):
+        cdef HalfEdge he1, he2, he11, he12, he22
+        cdef Vert v1, v2, v3, v4
+        cdef Face f1, f2
 
-        h_twin = h.twin
-        v = h_twin.vert
-        yield v
-        h = h_twin.next
-
-        while h != start:
-            h_twin = h.twin
-            v = h_twin.vert
-            yield v
-            h = h_twin.next
-
-    def edge_neighbors(self, v):
-        h = v.he
-        start = h
-
-        h_twin = h.twin
-        e = h_twin.edge
-        yield e
-        h = h_twin.next
-
-        while h != start:
-            h_twin = h.twin
-            e = h_twin.edge
-            yield e
-            h = h_twin.next
-
-    def edge_flip(self, edge):
         # http://mrl.nyu.edu/~dzorin/cg05/lecture11.pdf
-        if edge.is_boundary():
+        if self.is_boundary_edge(edge):
             return
 
         # Defining variables
@@ -252,7 +183,7 @@ class Mesh:
         v3, v4 = he12.vert, he22.vert
 
         # TODO: find out why this happens.
-        if v3 == v4:# assert(v3 != v4)
+        if v3 is v4:# assert(v3 != v4)
             return
 
         # Logic
@@ -267,18 +198,25 @@ class Mesh:
         he22.next = he11
         he22.face = f1
 
-        if f2.he == he22:
+        if f2.he is he22:
             f2.he = he12
-        if f1.he == he12:
+        if f1.he is he12:
             f1.he = he22
-        if v1.he == he1:
+        if v1.he is he1:
             v1.he = he21
-        if v2.he == he2:
+        if v2.he is he2:
             v2.he = he11
 
-    def edge_split(self, edge):
+    cpdef Vert edge_split(self, Edge edge):
         """ Split an external or internal edge and return new vertex.
         """
+        cdef Face other_face, f_nbc, f_anc, f_dna, f_dbn
+        cdef HalfEdge h_ab, h_ba, h_bc, h_ca, h_cn, h_nc, h_an, h_na, h_bn
+        cdef HalfEdge h_ad, h_db, h_dn, h_nd
+        cdef Edge e_an, e_nb, e_cn, e_nd
+        cdef Vert v_a, v_b, v_c, v_n
+        cdef double x, y
+
         if edge.he.face is None:
             edge.he = edge.he.twin
 
@@ -351,16 +289,16 @@ class Mesh:
 
         return v_n
 
-    def flip_if_better(self, edge):
+    cpdef void flip_if_better(self, Edge edge):
         e = .01
-        if edge.is_boundary():
+        if self.is_boundary_edge(edge):
             return
 
         p1 = edge.he.next.next.vert
         p2 = edge.he.twin.next.next.vert
-        d = math.sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2)
+        d = sqrt((p1.x-p2.x)**2 + (p1.y-p2.y)**2)
 
-        if edge.length() - d > e:
+        if self.edge_length(edge) - d > e:
             self.edge_flip(edge)
 
     def to_arrays(self):
@@ -374,72 +312,145 @@ class Mesh:
             points[i, 1] = vert.y
 
         for j, edge in enumerate(self.edges):
-            v1, v2 = edge.verts()
+            v1, v2 = self.edge_verts(edge)
             edges[j, 0] = v_to_i[v1]
             edges[j, 1] = v_to_i[v2]
 
         return {'points': points, 'edges': edges }
 
-    # def smooth(self):
-    def boundary(self):
+    cpdef void smooth(self):
+        """ Smooth each interior vertex by moving towared average of neighbors.
+        """
+        cdef:
+            Vert v
+            int i
+            double n
+
+        for v in self.verts:
+            if v.cid == None:
+                v.x0 = 0
+                v.y0 = 0
+                n = 0
+
+                neighbors = self.vert_neighbors(v)
+
+                for nv in neighbors:
+                    v.x0 += nv.x
+                    v.y0 += nv.y
+                    n += 1
+
+                v.y0 /= n
+                v.x0 /= n
+
+        for v in self.verts:
+            if v.cid == None:
+                v.x = v.x0
+                v.y = v.y0
+
+    cpdef list adapt(self, double max_edge_length):
+        cdef:
+            list new_verts = []
+            Edge edge
+            Vert vert, v1, v2
+
+        for edge in self.edges:
+            if self.edge_length(edge) > max_edge_length:
+                v1, v2 = self.edge_verts(edge)
+                vert = self.edge_split(edge)
+                new_verts.append((vert, v1, v2))
+
+        for edge in self.edges:
+            self.flip_if_better(edge)
+
+        self.smooth()
+
+        return new_verts
+
+    # Query
+    cpdef list face_verts(self, Face face):
+        cdef HalfEdge he = face.he
+        return [he.vert, he.next.vert, he.next.next.vert]
+
+    cpdef list face_halfs(self, Face face):
+        cdef HalfEdge he = Face.he
+        return [he, he.next, he.next.next]
+
+    cpdef tuple face_center(self, Face face):
+        cdef HalfEdge he = Face.he
+        cdef double x = he.vert.x + he.next.vert.x + he.next.next.vert.x
+        cdef double y = he.vert.y + he.next.vert.y + he.next.next.vert.y
+        return (x/3.0, y/3.0)
+
+    cpdef list boundary(self):
+        cdef list result = []
+        cdef HalfEdge he
         he = self.boundary_start
-        yield he
+        result.append(he)
         he = he.next
         while he != self.boundary_start:
-            yield he
+            result.append(he)
             he = he.next
+        return result
 
-    def __check_valid(self):
-        """ For debugging purposes only.
-        """
-        for v in self.verts:
-            self.__valid_vert(v)
+    cpdef bint is_boundary_edge(self, Edge e):
+        return e.he.face == None or e.he.twin.face == None
 
-        for he in self.halfs:
-            self.__valid_half(he)
+    cpdef bint is_boundary_vert(self, Vert v):
+        cdef Edge e
+        cdef list neighbors = self.edge_neighbors(v)
+        for e in neighbors:
+            if self.is_boundary_edge(e):
+                return True
+        return False
 
-        for e in self.edges:
-            self.__valid_edge(e)
+    cpdef list vert_neighbors(self, Vert v):
+        cdef:
+            HalfEdge h, start, h_twin
+            list result = []
+        h = v.he
+        start = h
 
-        for f in self.faces:
-            self.__valid_face(f)
+        h_twin = h.twin
+        v = h_twin.vert
+        result.append(v)
+        h = h_twin.next
 
-    def __valid_vert(self, v):
-        assert v.x != None
-        assert v.y != None
-        assert isinstance(v.he, HalfEdge)
-        assert v.he in self.halfs
+        while h != start:
+            h_twin = h.twin
+            v = h_twin.vert
+            result.append(v)
+            h = h_twin.next
 
-    def __valid_face(self, f):
-        assert f
-        assert isinstance(f.he, HalfEdge)
-        assert len(set(f.verts())) == 3
-        assert len(set([f.he, f.he.next, f.he.next.next])) == 3
-        assert f.he.next.next.next == f.he # valid circular linked list
-        assert f.he.face == f
-        assert f.he.next.face == f
-        assert f.he.next.next.face == f
+        return result
 
-    def __valid_edge(self, e):
-        assert isinstance(e.he, HalfEdge)
-        v1, v2 = e.verts()
-        assert v1 != v2, (v1.id, v2.id)
-        if e.he.twin:
-            assert e.he.twin.edge == e, (e, e.he.twin.edge)
-            assert e.he.face != e.he.twin.face, (str(e.he.face), str(e.he.twin.face))
+    cpdef list edge_neighbors(self, Vert v):
+        cdef:
+            HalfEdge h, start, h_twin
+            Edge e
+            list result = []
 
-    def __valid_half(self, he):
-        assert isinstance(he.twin, HalfEdge), str(he.twin)
-        assert he.twin.twin == he, he
-        assert isinstance(he.next, HalfEdge), str(he.next)
-        assert isinstance(he.vert, Vert), str(he.vert)
-        assert isinstance(he.edge, Edge), str(he.edge)
-        assert he.next in self.halfs
-        assert he.vert in self.verts
-        assert he.edge in self.edges
+        h = v.he
+        start = h
 
-        if he.face != None:
-            assert he.face in self.faces
-            assert isinstance(he.face, Face)
-        else:
-            assert isinstance(he.twin.face, Face)
+        h_twin = h.twin
+        e = h_twin.edge
+        result.append(e)
+        h = h_twin.next
+
+        while h != start:
+            h_twin = h.twin
+            e = h_twin.edge
+            result.append(e)
+            h = h_twin.next
+
+        return result
+
+    cpdef tuple edge_verts(self, Edge e):
+        return (e.he.vert, e.he.next.vert)
+
+    cpdef double edge_length(self, Edge e):
+        cdef Vert p1 = e.he.vert
+        cdef Vert p2 = e.he.next.vert
+        cdef double dx = p1.x-p2.x
+        cdef double dy = p1.y-p2.y
+        return sqrt(dx*dx + dy*dy)

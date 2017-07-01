@@ -68,7 +68,7 @@ def compute_deformation(plant, gravity=-.1, iters=200, delta=1.0/100, damping = 
         fixed[i] = vert.y < 10
 
     for j, edge in enumerate(mesh.edges):
-        v1, v2 = edge.verts()
+        v1, v2 = mesh.edge_verts(edge)
         edges[j, 0] = v_to_i[v1]
         edges[j, 1] = v_to_i[v2]
 

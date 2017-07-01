@@ -58,17 +58,19 @@ def update_mesh(plant):
         vert.x = plant.cell_x[cid]
         vert.y = plant.cell_y[cid]
 
+    # verts = mesh.adapt(MAX_EDGE_LENGTH)
+
     for edge in mesh.edges:
         l = MAX_EDGE_LENGTH #+ MAX_EDGE_LENGTH *.5 * (not edge.is_boundary())
-        if edge.length() > l:
-            edge.length()
+        if mesh.edge_length(edge) > l:
             to_split.append(edge)
 
     for edge in to_split:
-        v1, v2 = edge.verts()
+        v1, v2 = mesh.edge_verts(edge)
         vert = mesh.edge_split(edge)
 
-        if edge.is_boundary():
+        if mesh.is_boundary_edge(edge):
+        # if edge.is_boundary():
             cid1 = v1.cid
             cid2 = v2.cid
 
@@ -85,25 +87,9 @@ def update_mesh(plant):
             except MaxCellsException:
                 break
 
-    for edge in copy.copy(mesh.edges):
+    for edge in mesh.edges:
         mesh.flip_if_better(edge)
 
-    for v in mesh.verts:
-        if v.cid == None:
-            v.x0 = 0
-            v.y0 = 0
-            n = 0
-            neighbors = list(mesh.neighbors(v))
-            for nv in neighbors:
-                v.x0 += nv.x
-                v.y0 += nv.y
-                n += 1
-            v.y0 /= n
-            v.x0 /= n
-
-    for v in mesh.verts:
-        if v.cid == None:
-            v.x = v.x0
-            v.y = v.y0
+    mesh.smooth()
 
     return inserted

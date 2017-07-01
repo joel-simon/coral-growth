@@ -50,6 +50,12 @@ extensions = [
         sources = ['./plant_growth/spring_system.pyx'],
         extra_compile_args = _extra,
         define_macros=_macros,
+    ),
+    Extension(
+        'plant_growth/mesh',
+        sources = ['./plant_growth/mesh.pyx'],
+        extra_compile_args = _extra,
+        define_macros=_macros,
     )
 ]
 

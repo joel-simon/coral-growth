@@ -5,13 +5,19 @@ import pygame
 from math import pi as M_PI
 
 def draw_mesh(view, mesh):
-    for edge in mesh.edges:
-        v1, v2 = mesh.edge_verts(edge)
-        d = edge.strain
-        r = min(255, max(0, int(abs(d)*255.0)))
-        color = (r, 0, 0)
+    data = mesh.py_data()
+    edges = data['edges']
+    verts = data['vertices']
+
+    for edge in edges:
+        v1 = verts[edge[0]]
+        v2 = verts[edge[1]]
+
+        # d = edge.strain
+        # r = min(255, max(0, int(abs(d)*255.0)))
+        color = (0, 0, 0)
         # if d > .2:
-        view.draw_line((v1.x, v1.y), (v2.x, v2.y), color, 1.5)
+        view.draw_line(v1, v2, color, 1.0)
     # else:
     #     for face in mesh.elements:
     #         poly = [mesh.points[f] for f in face]
@@ -20,8 +26,6 @@ def draw_mesh(view, mesh):
 def plot(view, world, title=None):
     width, height = world.width, world.height
     view.start_draw()
-
-    # view.draw_rect((0, 0, width, height), (0, 102, 200), width=0)
 
     # background_color = (210,210,210)
     # background_color = (199, 206, 199)
@@ -41,8 +45,8 @@ def plot(view, world, title=None):
     for plant in world.plants:
         view.draw_polygon(plant.polygon, plant_color)
 
-        if plant.mesh:
-            draw_mesh(view, plant.mesh)
+        # if plant.mesh:
+        draw_mesh(view, plant.mesh)
 
         for i in range(plant.n_cells):
             cid = plant.cell_order[i]

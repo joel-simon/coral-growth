@@ -35,61 +35,56 @@ def create_mesh(plant):
     mesh.cid_to_vert = dict()
 
     """ Link verts to cids. """
-    for i, vert in enumerate(mesh.verts):
+    for i, vert in enumerate(mesh.get_verts()):
         if i < plant.n_cells:
             vert.cid = plant.cell_order[i]
             mesh.cid_to_vert[vert.cid] = vert
 
-
     return mesh
 
-def update_mesh(plant):
-    """ TO BECOME plant.update_mesh
-    """
-    """ return list of inserted veretx cids.
-    """
-    mesh = plant.mesh
-    to_split = []
-    inserted = []
+# def update_mesh(plant):
+#     """ TO BECOME plant.update_mesh
+#     """
+#     """ return list of inserted veretx cids.
+#     """
+#     mesh = plant.mesh
+#     to_split = []
+#     inserted = []
 
-    for i in range(plant.n_cells):
-        cid = plant.cell_order[i]
-        vert = mesh.cid_to_vert[cid]
-        vert.x = plant.cell_x[cid]
-        vert.y = plant.cell_y[cid]
+#     for i in range(plant.n_cells):
+#         cid = plant.cell_order[i]
+#         vert = mesh.cid_to_vert[cid]
+#         vert.x = plant.cell_x[cid]
+#         vert.y = plant.cell_y[cid]
 
-    # verts = mesh.adapt(MAX_EDGE_LENGTH)
+#     # verts = mesh.adapt(MAX_EDGE_LENGTH)
 
-    for edge in mesh.edges:
-        l = MAX_EDGE_LENGTH #+ MAX_EDGE_LENGTH *.5 * (not edge.is_boundary())
-        if mesh.edge_length(edge) > l:
-            to_split.append(edge)
+#     for edge in mesh.get_edges():
+#         l = MAX_EDGE_LENGTH #+ MAX_EDGE_LENGTH *.5 * (not edge.is_boundary())
+#         if mesh.edge_length(edge) > l:
+#             to_split.append(edge)
 
-    for edge in to_split:
-        v1, v2 = mesh.edge_verts(edge)
-        vert = mesh.edge_split(edge)
+#     for edge in to_split:
+#         v1, v2 = mesh.edge_verts(edge)
+#         vert = mesh.edge_split(edge)
 
-        if mesh.is_boundary_edge(edge):
-        # if edge.is_boundary():
-            cid1 = v1.cid
-            cid2 = v2.cid
+#         if mesh.is_boundary_edge(edge):
+#             cid1 = v1.cid
+#             cid2 = v2.cid
 
-            if plant.cell_next[cid2] == cid1:
-                cid1, cid2 = cid2, cid1
+#             if plant.cell_next[cid2] == cid1:
+#                 cid1, cid2 = cid2, cid1
 
-            x = vert.x
-            y = vert.y
+#             x = vert.x
+#             y = vert.y
 
-            try:
-                inserted.append(plant.create_cell(x, y, insert_before=cid2))
-                vert.cid = inserted[-1]
-                mesh.cid_to_vert[vert.cid] = vert
-            except MaxCellsException:
-                break
+#             try:
+#                 inserted.append(plant.create_cell(x, y, insert_before=cid2))
+#                 vert.cid = inserted[-1]
+#                 mesh.cid_to_vert[vert.cid] = vert
+#             except MaxCellsException:
+#                 break
 
-    for edge in mesh.edges:
-        mesh.flip_if_better(edge)
+#     mesh.smooth()
 
-    mesh.smooth()
-
-    return inserted
+#     return inserted

@@ -2,12 +2,10 @@
 from __future__ import division, print_function
 import math, random, os, time, sys
 sys.path.append(os.path.abspath('..'))
-
 from plant_growth import constants, neat_params
 from plant_growth.pygameDraw import PygameDraw
 from plant_growth.plot import plot
 from plant_growth.evaluate import simulate_single
-
 import MultiNEAT as NEAT
 
 genome = NEAT.Genome(
@@ -31,11 +29,9 @@ pop = NEAT.Population(
 )
 
 constants.cell_growth_energy_usage = .01
-# random.seed(time.time())
 view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 
 def display_func(world):
-
     # pass
     plot(view, world)
 

@@ -25,44 +25,33 @@ triangle_mesh = build(mesh_info)
 
 mesh = Mesh(triangle_mesh.points, triangle_mesh.elements)
 
+
 def draw_mesh(mesh, off_x=0, off_y=0):
-    for face in mesh.faces:
-        verts = [(v.x+off_x, v.y+off_y) for v in mesh.face_verts(face)]
-        view.draw_polygon(verts, (0,0,0), 1)
+    data = mesh.py_data()
+    edges = data['edges']
+    verts = data['vertices']
 
-    for vert in mesh.verts:
-        if mesh.is_boundary_vert(vert):
-            view.draw_circle((vert.x+off_x, vert.y+off_y), 2, (255, 0, 0), 0)
+    for edge in edges:
+        v1 = tuple(verts[edge[0]] + [off_x, off_y])
+        v2 = tuple(verts[edge[1]] + [off_x, off_y])
+        view.draw_line(v1, v2, (0,0,0), 1)
 
-    for vert in mesh.verts:
-        view.draw_text((vert.x+off_x, vert.y+off_y), str(vert.id), font=16, center=True)
+    for vert in verts:
+        view.draw_circle((vert[0]+off_x, vert[1]+off_y), 2, (255, 0, 0), 0)
+
+    for i, vert in enumerate(verts):
+        view.draw_text((vert[0]+off_x, vert[1]+off_y), str(i), font=16, center=True)
 
 view.start_draw()
 draw_mesh(mesh, -125, +125)
 
-new_verts = set()
-
-
-for edge in copy.copy(mesh.edges):
-    if not mesh.is_boundary_edge(edge):
-        vert = mesh.edge_split(edge)
-        new_verts.add(vert.id)
-
+mesh.split_edges(0)# Split all
 draw_mesh(mesh, 125, +125)
-for edge in mesh.edges:
-    v1, v2 = mesh.edge_verts(edge)
-    if mesh.is_boundary_edge(edge):
-        continue
-    mesh.flip_if_better(edge)
 
+mesh.smooth()
 draw_mesh(mesh, -125, -125)
+
 view.end_draw()
-
-for v in [mesh.verts[12], mesh.verts[23]]:
-    try:
-        print(v.id, [vn.id for vn in mesh.vert_neighbors(v)])
-    except Exception as e:
-        raise e
-
-
 view.hold()
+
+

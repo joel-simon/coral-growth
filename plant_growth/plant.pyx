@@ -1,5 +1,5 @@
-# cython: boundscheck=True
-# cython: wraparound=False
+# cython: boundscheck=False
+# cython: wraparound=True
 # cython: initializedcheck=False
 # cython: nonecheck=False
 # cython: cdivision=True
@@ -19,8 +19,16 @@ from plant_growth cimport geometry
 from plant_growth import plant_tmp
 from plant_growth.exceptions import MaxCellsException
 
+from plant_growth.mesh cimport Mesh, Node, Vert, Face, Edge
+from cymem.cymem cimport Pool
+
+from plant_growth.constants import MAX_EDGE_LENGTH
+
+from libc.stdint cimport uintptr_t
+
 cdef class Plant:
     def __init__(self, world, seed_poly, network, efficiency):
+        self.mem = Pool()
         self.world = world
         self.network = network
         self.efficiency = efficiency
@@ -39,7 +47,6 @@ cdef class Plant:
         self.cell_max_growth = constants.CELL_MAX_GROWTH
 
         # Cell data
-        # self.boundary_cells = []
         self.cell_x = np.zeros(self.max_cells)
         self.cell_y = np.zeros(self.max_cells)
         self.cell_next_x = np.zeros(self.max_cells)
@@ -54,15 +61,35 @@ cdef class Plant:
         self.cell_next = np.zeros(self.max_cells, dtype='i')
         self.cell_prev = np.zeros(self.max_cells, dtype='i')
         self.cell_order = np.zeros(self.max_cells, dtype='i')
-
+        self.cell_vert = <Vert**>self.mem.alloc(self.max_cells, sizeof(Vert*))
         self.cell_inputs = [0 for _ in range(constants.NUM_INPUTS+1)]
 
         for x, y in seed_poly:
             self.create_cell(x, y)
 
         self.order_cells()
-        self.mesh = plant_tmp.create_mesh(self)
+        self.create_mesh()
         self.update_attributes()
+
+    cdef void create_mesh(self) except *:
+        cdef:
+            Vert *vert
+            Node *node
+            Mesh mesh
+
+        triangle_mesh = plant_tmp.create_tri_mesh(self)
+        mesh = Mesh(triangle_mesh.points, triangle_mesh.elements)
+        """ Link verts to cids."""
+        node = mesh.verts
+        for i in range(mesh.n_verts):
+            vert = <Vert *>node.data
+            node = node.next
+            if vert.id < self.n_cells:
+                cid = self.cell_order[vert.id]
+                self.cell_vert[cid] = vert
+                vert.is_boundary = True
+
+        self.mesh = mesh
 
     cdef void grow(self) except *:
         """ Calculate the changes to plant by neural network.
@@ -369,7 +396,51 @@ cdef class Plant:
             self.polygon.append((self.cell_x[cid], self.cell_y[cid]))
 
     cdef list update_mesh(self):
-        return plant_tmp.update_mesh(self)
+        cdef list inserted = []
+
+        cdef:
+            int i, cid, cid1, cid2
+            (Vert *) vert, v1, v2
+            Node *node
+            Edge *edge
+            Mesh mesh = self.mesh
+
+        cdef double max_length = MAX_EDGE_LENGTH
+
+        for i in range(self.n_cells):
+            cid = self.cell_order[i]
+            vert = self.cell_vert[cid]
+            vert.x = self.cell_x[cid]
+            vert.y = self.cell_y[cid]
+
+        """ Split edges on exterior, these will create new cell objects.
+        """
+        for i in range(self.n_cells):
+            cid1 = self.cell_order[i]
+            cid2 = self.cell_next[cid1]
+            v1 = self.cell_vert[cid1]
+            v2 = self.cell_vert[cid2]
+
+            edge = mesh.edge_between(v1, v2)
+
+            if edge == NULL:
+                raise ValueError()
+
+            if mesh.edge_length(edge) > max_length:
+                vert = mesh.edge_split(edge)
+                try:
+                    cid = self.create_cell(vert.x, vert.y, insert_before=cid2)
+                    inserted.append(cid)
+                    self.cell_vert[cid] = vert
+
+                except MaxCellsException:
+                    break
+
+        # Split the interior edges.
+        mesh.split_edges(max_length)
+        mesh.smooth()
+
+        return inserted
 
     cdef void _calculate_norms(self):
         cdef int i, cid, cid_prev, cid_next

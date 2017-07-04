@@ -56,7 +56,7 @@ extensions = [
         sources = ['./plant_growth/mesh.pyx'],
         extra_compile_args = _extra,
         define_macros=_macros,
-        language='c++'
+        # language='c++'
     )
 ]
 

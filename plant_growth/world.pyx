@@ -51,8 +51,8 @@ cdef class World:
         self.max_face_neighbors = 5000
         self.face_neighbors = <void **>self.mem.alloc(self.max_face_neighbors, sizeof(void *))
 
-    cpdef int add_plant(self, str obj_path, object network, double efficiency) except -1:
-        cdef Plant plant = Plant(self, obj_path, network, efficiency)
+    cpdef int add_plant(self, str obj_path, object network) except -1:
+        cdef Plant plant = Plant(self, obj_path, network)
         self.plants.append(plant)
         plant.update_attributes()
         # self.add_plant_to_hash(plant)

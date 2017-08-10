@@ -10,7 +10,7 @@ cdef struct Cell:
     double light
     double curvature
     double strain
-    int ctype
+    unsigned int ctype
     int alive
 
 cdef class Plant:
@@ -21,7 +21,7 @@ cdef class Plant:
     cdef public double efficiency, energy, energy_usage, gametes, volume, light, max_age, \
                         cell_growth_energy_usage, cell_min_energy, growth_scalar
     cdef public bint alive
-    cdef public int age, n_cells, max_cells
+    cdef public int age, n_cells, max_cells, cell_types
 
     cdef Cell *cells
     cdef World world

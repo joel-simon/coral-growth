@@ -8,7 +8,7 @@ from plant_growth.viewer import AnimationViewer
 
 import MultiNEAT as NEAT
 
-obj_path = '/Users/joelsimon/Dropbox/plant_growth/data/triangulated_sphere_0.obj'
+obj_path = '/Users/joelsimon/Dropbox/plant_growth/data/triangulated_sphere_2.obj'
 # obj_path = '/home/simonlab/Dropbox/plant_growth/data/triangulated_sphere_0.obj'
 
 world_params = {
@@ -26,7 +26,7 @@ def simulate_single(network, display=False):
         world_params['verbose'] = False
 
     world = World(world_params)
-    world.add_plant(obj_path, network, constants.PLANT_EFFICIENCY)
+    world.add_plant(obj_path, network)
 
     animation = [ [ world.plants[0].export() ] ]
 

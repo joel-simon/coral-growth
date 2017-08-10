@@ -1,20 +1,23 @@
 from math import pi
+
+USE_TIME_CYCLE = True
+TIME_CYCLE = 100 #todo evovle
+NUM_CELL_TYPES = 2
+
 #Genome
-NUM_INPUTS = 2
-NUM_OUTPUTS = 1
+# 2 in for light and curvature
+# 1 out for growth
+NUM_INPUTS = 2 + NUM_CELL_TYPES
+NUM_OUTPUTS = 1 + NUM_CELL_TYPES
 
 MAX_CELLS = 12000
 NUM_GENERATIONS = 50
 SIMULATION_STEPS = 40
 
-WORLD_WIDTH = 1200
-WORLD_HEIGHT = 800
+
+
 SOIL_HEIGHT = 50
-
 WORLD_SIZE = 100
-
-USE_TIME_CYCLE = True
-TIME_CYCLE = 100 #todo evovle
 
 
 PLANT_EFFICIENCY = 2.5#(2*__starting_volume)/__starting_production # A starting seed is at 50% energy usage.

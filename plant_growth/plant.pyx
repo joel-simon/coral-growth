@@ -20,13 +20,15 @@ from plant_growth.exceptions import MaxCellsException
 from plant_growth.vector3D cimport vadd, vmultf
 
 cdef class Plant:
-    def __init__(self, world, obj_path, network, efficiency):
+    def __init__(self, world, obj_path, network):
         self.mem = Pool()
         self.world = world
         self.mesh = Mesh.from_obj(obj_path)
         self.mesh0 = Mesh.from_obj(obj_path)
         self.network = network
-        self.efficiency = efficiency
+
+        self.efficiency = constants.PLANT_EFFICIENCY #params['efficiency']
+        self.cell_types = constants.NUM_CELL_TYPES #params['cell_types']
 
         self.volume = 0
         self.alive = True
@@ -61,6 +63,7 @@ cdef class Plant:
             double energy_demand, energy_supply, energy_spent, growth, new_x, new_y
             double next_area, area_change, growth_scalar, energy_usage
             bint verbose = False
+            unsigned int ctype_mask
             double[:] growth_amounts = np.zeros(self.max_cells)
             Cell *cell
 
@@ -74,20 +77,21 @@ cdef class Plant:
             output = self.cell_output(cell)
 
             """ Act on outputs """
+            out_i = 0
             # Move in nomral direction by growth amount.
-            growth = output[0] * self.growth_scalar
+            growth = output[out_i] * self.growth_scalar
+            out_i += 1
 
             """ next_p = p + (norm * growth) """
             vmultf(cell.next_p, cell.vert.normal, growth)
             vadd(cell.next_p, cell.next_p, cell.vert.p)
 
-            # Check cell type changes.
-            # if output[2] > output[3]:
-            #     if output[2] > .5:
-            #         cell.ctype = 1
-            # else:
-            #     if output[3] > .5:
-            #         cell.ctype = 2
+            ctype_mask = 1
+            for _ in range(self.cell_types):
+                if output[out_i] > 0.5:
+                    cell.ctype |= ctype_mask
+                ctype_mask = ctype_mask << 1
+                out_i += 1
 
         """ Calculate area of growth to see how much energy is needed.
             Scale overall growth down depending on available energy.
@@ -207,14 +211,21 @@ cdef class Plant:
 
     cdef list cell_output(self, Cell *cell):
         """ Map cell stats to nerual input in [-1, 1] range. """
+        cdef unsigned int i = 2
+        cdef unsigned int ctype_mask = 1
+
         self.cell_inputs[0] = (cell.light * 2) - 1
         self.cell_inputs[1] = (cell.curvature * 2) - 1
+
         # self.cell_inputs[2] = (self.energy_usage*2) - 1
         # self.cell_inputs[3] = (cell.strain*2) - 1
-        # self.cell_inputs[2] = cell.ctype & 1 # last bit
-        # self.cell_inputs[3] = cell.ctype & 3 # second to last bit
-        self.cell_inputs[2] = 1 # The last input is always used as bias.
 
+        for _ in range(self.cell_types):
+            self.cell_inputs[i] = (cell.ctype & ctype_mask) != 0
+            ctype_mask = ctype_mask << 1
+            i += 1
+
+        self.cell_inputs[i] = 1 # The last input is always used as bias.
         self.network.Flush()
         self.network.Input(self.cell_inputs)
         self.network.ActivateFast()

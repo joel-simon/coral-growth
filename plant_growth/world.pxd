@@ -25,7 +25,7 @@ cdef class World:
     cdef public TriHash2D th2d
     cdef public bint verbose
 
-    cpdef int add_plant(self, str obj_path, object network, double efficiency) except -1
+    cpdef int add_plant(self, str obj_path, object network) except -1
     cpdef void simulation_step(self) except *
 
     cdef void add_plant_to_hash(self, Plant plant) except *

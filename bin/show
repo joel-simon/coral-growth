@@ -1,26 +1,11 @@
 #!/usr/bin/env python3
 import sys, os
 sys.path.append(os.path.abspath('..'))
-
-from plant_growth import constants
-from plant_growth.pygameDraw import PygameDraw
-from plant_growth.plot import plot
 from plant_growth.evaluate import evaluate_genome
 import MultiNEAT as NEAT
-import time
-
-view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
-
-def display_func(world):
-    plot(view, world)
 
 if __name__ == '__main__':
-
     assert(len(sys.argv) == 2)
-    file_path = sys.argv[1]
-    assert(os.path.exists(file_path))
-    genome = NEAT.Genome(file_path)
-    t1 = time.time()
-    evaluate_genome(genome, display=display_func)
-    print('done in ', time.time() - t1)
-    view.hold()
+    assert(os.path.exists(sys.argv[1]))
+    genome = NEAT.Genome(sys.argv[1])
+    evaluate_genome(genome, display=True)

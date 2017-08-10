@@ -3,289 +3,290 @@
 # cython: initializedcheck=False
 # cython: nonecheck=False
 # cython: cdivision=True
-from libc.math cimport cos, sin, round, M_PI
-from math import isnan
+from __future__ import print_function, division
+from libc.stdint cimport uintptr_t
+from libc.math cimport M_PI
+# from math import isnan
 
-import heapq
 import numpy as np
 cimport numpy as np
 
-from plant_growth.plant cimport Plant
-from plant_growth import constants
-from plant_growth cimport geometry
-from plant_growth.spatial_hash cimport SpatialHash
-from plant_growth.physics import compute_deformation
+from cymem.cymem cimport Pool
 
+from plant_growth.plant cimport Plant, Cell
+from plant_growth import constants
+from plant_growth.mesh cimport Mesh, Face, Node, Vert
+
+from plant_growth.tri_hash_3d import TriHash3D
+from plant_growth.tri_hash_2d import TriHash2D
+
+from plant_growth.vector3D cimport vset, vangle
+
+from plant_growth.tri_intersection cimport tri_tri_intersection
+
+cdef double sign(double p1[2], double p2[2], double p3[2]):
+    return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1])
+
+cdef bint PointInTriangle(double pt[2], double v1[2], double v2[2], double v3[2]):
+    cdef bint b1, b2, b3;
+    b1 = sign(pt, v1, v2) < 0.0
+    b2 = sign(pt, v2, v3) < 0.0
+    b3 = sign(pt, v3, v1) < 0.0
+    return ((b1 == b2) and (b2 == b3))
 
 cdef class World:
     def __init__(self, object params):
-        self.width  = params['width']
-        self.height = params['height']
         self.max_plants  = params['max_plants']
         self.use_physics = params['use_physics']
-        self.max_cells = self.max_plants * constants.MAX_CELLS
+        self.verbose = params['verbose']
+
+        self.mem = Pool()
         self.plants = []
-        self.sh = SpatialHash(cell_size=constants.CELL_SIZE)
+        self.th3d = TriHash3D(cell_size=constants.HASH_CELL_SIZE,
+                              world_size=constants.WORLD_SIZE)
+        self.th2d = TriHash2D(cell_size=constants.HASH_CELL_SIZE,
+                              world_size=constants.WORLD_SIZE)
+        self.step = 0
 
-        # self.plant_x = np.zeros((self.max_plants, constants.MAX_CELLS))
-        # self.plant_y = np.zeros((self.max_plants, constants.MAX_CELLS))
+        self.max_face_neighbors = 5000
+        self.face_neighbors = <void **>self.mem.alloc(self.max_face_neighbors, sizeof(void *))
 
-    cpdef int add_plant(self, list seed_poly, object network, double efficiency) except -1:
-        cdef:
-            int id1, id2
-            Plant plant = Plant(self, seed_poly, network, efficiency)
-
+    cpdef int add_plant(self, str obj_path, object network, double efficiency) except -1:
+        cdef Plant plant = Plant(self, obj_path, network, efficiency)
         self.plants.append(plant)
-        # plant.order_cells()
-        # plant.update_attributes()
+        plant.update_attributes()
+        # self.add_plant_to_hash(plant)
+        return 1 # To eventually become plant id.
 
-        for id1 in plant.cell_order[:plant.n_cells]:
-            id2 = plant.cell_next[id1]
-            self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
+    cdef void add_plant_to_hash(self, Plant plant) except *:
+        cdef Face *face
+        cdef (Vert *) v1, v2, v3
+        cdef Node *fnode = plant.mesh.faces
+        cdef double a[2], b[2], c[2]
 
-        return 0 # To eventually become plant id.
+        a[2] = 0
+        b[2] = 0
+        c[2] = 0
+
+        """ Add every mesh face to spatial hash. """
+        while fnode != NULL:
+            face = <Face *> fnode.data
+            plant.mesh.face_verts(face, &v1, &v2, &v3)
+            self.th3d.add_tri(face, v1.p, v2.p, v3.p)
+
+            # Take only xz component.
+            a[0] = v1.p[0]
+            a[1] = v1.p[2]
+            b[0] = v2.p[0]
+            b[1] = v2.p[2]
+            c[0] = v3.p[0]
+            c[1] = v3.p[2]
+            self.th2d.add_tri(face, a, b, c)
+
+            fnode = fnode.next
 
     cpdef void simulation_step(self) except *:
         """ The main function called from outside.
             We assume the plant attributes begin up to date.
         """
         cdef Plant plant
-        cdef double max_d
+
+        self.th3d.initialize()
+
+        if self.verbose:
+            print('Step: ', self.step)
+
+        for plant in self.plants:
+            if self.verbose:
+                print('\talive: ', plant.alive)
+                print('\tncells: ', str(plant.n_cells))
+
+            if plant.alive:
+                self.add_plant_to_hash(plant)
 
         for plant in self.plants:
             if plant.alive:
                 plant.grow()
-                if self.use_physics and self.step % constants.PHYSICS_INTERVAL == 0:
-                    max_d = compute_deformation(plant)
-                    if max_d == 1:
-                        plant.alive = False
 
-
-        self.__update_positions()
+        self.restrict_growth()
 
         for plant in self.plants:
             if plant.alive:
-                new_cids = plant.update_mesh()
-                self.__insert_new(plant, new_cids)
-                plant.order_cells()
+                plant.cell_division()
                 plant.update_attributes()
 
-                if plant.n_cells >= plant.max_cells:
-                    plant.alive = False
+            if plant.n_cells >= constants.MAX_CELLS:
+                plant.alive = False
 
         self.step += 1
+        if self.verbose: print()
 
-    cdef void __insert_new(self, Plant plant, list ids) except *:
-        """ Remove segments that were split and add new.
-            List if ids of newly created cells.
-        """
-        cdef int id0, id1, id2
-        # id1 has been inserted betwwen 0 and 2 {id0 - id1 - id2}
-        for id1 in ids:
-            id0 = plant.cell_prev[id1]
-            id2 = plant.cell_next[id1]
-            self.sh.move_object(id0,
-                                    plant.cell_x[id0], plant.cell_y[id0],
-                                    plant.cell_x[id2], plant.cell_y[id2],
-                                    plant.cell_x[id0], plant.cell_y[id0],
-                                    plant.cell_x[id1], plant.cell_y[id1])
-
-            self.sh.add_object(id1, plant.cell_x[id1], plant.cell_y[id1],
-                                    plant.cell_x[id2], plant.cell_y[id2])
-
-    cdef void __update_positions(self) except *:
-        cdef Plant plant
-        cdef int id0, id1, id2, i
-        cdef double old_x, old_y, new_x, new_y
+    cdef void restrict_growth(self) except *:
+        cdef:
+            Plant plant
+            Face *face
+            Cell *cell
+            (Node *) fnode
+            (Vert *) v, v1, v2, v3
+            double old_p[3]
+            size_t i
+            # int key
 
         for plant in self.plants:
             if not plant.alive:
                 continue
 
+            """ Check all vertex growth, in arbitrary order, for intersection.
+            """
             for i in range(plant.n_cells):
-                id1 = plant.cell_order[i]
+                cell = &plant.cells[i]
 
-                if not plant.cell_alive[id1]:
-                    continue
+                """ Store the old position, we reset to this if we intersect.
+                """
+                vset(old_p, cell.vert.p)
+                vset(cell.vert.p, cell.next_p)
 
-                id0 = plant.cell_prev[id1]
-                id2 = plant.cell_next[id1]
+                """ Loop through the adjacent faces.
+                """
+                fnode = plant.mesh.vert_faces(cell.vert)
+                while True:
+                    face = <Face *>fnode.data
+                    if not self.valid_face_position(plant, face):
+                        vset(cell.vert.p, old_p)
+                        break
+                    elif fnode.next == NULL:
+                        break
+                    else:
+                        fnode = fnode.next
+                # print()
+                # # key = int(<uintptr_t>face)
+                # plant.mesh.face_verts(face, &v1, &v2, &v3)
+                    # bb_from = bb_from_tri(&v1.p, &v2.p, &v3.p)
+                    # bb_to = bb_from_tri(&v1.next_p, &v2.next_p, &v3.next_p)
+                    # self.sh.remove_object(key)
+                    # self.sh.add_object(key, bb_to)
+                    # vset(&v1.p, &v1.next_p)
+                    # vset(&v2.p, &v2.next_p)
+                    # vset(&v3.p, &v3.next_p)
+                # else:
+                #     print('blocked')
 
-                old_x = plant.cell_x[id1]
-                old_y = plant.cell_y[id1]
+            # fnode = plant.mesh.faces
+            # while True:
+            #     face = <Face *>fnode.data
+            #     assert self.valid_face_position(plant, face)
 
-                new_x = plant.cell_next_x[id1]
-                new_y = plant.cell_next_y[id1]
+            #     if fnode.next == NULL:
+            #         break
+            #     else:
+            #         fnode = fnode.next
 
-                if new_x < 0:
-                    new_x = 0
-                elif new_x >= self.width:
-                    new_x = self.width - 1
+    cdef int valid_face_position(self, Plant plant, Face *face) except -1:
+        cdef:
+            (Vert *) v1, v2, v3, v4, v5, v6
+            Node *node
+            Face *face2
 
-                if new_y < 0:
-                    new_y = 0
-                elif new_y >= self.height:
-                    new_y = self.height - 1
+        plant.mesh.face_verts(face, &v1, &v2, &v3)
 
-                assert (not isnan(new_x))
-                assert (not isnan(new_y))
+        cdef uint m = self.max_face_neighbors
+        cdef uint n = self.th3d.neighbors(v1.p, v2.p, v3.p, m, self.face_neighbors)
 
-                # if self.__valid_move(plant, id1, new_x, new_y):
-                #     plant.cell_x[id1] = new_x
-                #     plant.cell_y[id1] = new_y
-                #     self.sh.move_object(id0, plant.cell_x[id0], plant.cell_y[id0], old_x, old_y, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
-                #     self.sh.move_object(id1, old_x, old_y, plant.cell_x[id2], plant.cell_y[id2], plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
-
-                plant.cell_x[id1] = new_x
-                plant.cell_y[id1] = new_y
-                if self.__segment_has_intersection(id1, plant) or \
-                   self.__segment_has_intersection(id0, plant):
-                    # Undo movement.
-                    plant.cell_x[id1] = old_x
-                    plant.cell_y[id1] = old_y
-                else:
-                    self.sh.move_object(id0, plant.cell_x[id0], plant.cell_y[id0], old_x, old_y, plant.cell_x[id0], plant.cell_y[id0], plant.cell_x[id1], plant.cell_y[id1])
-                    self.sh.move_object(id1, old_x, old_y, plant.cell_x[id2], plant.cell_y[id2], plant.cell_x[id1], plant.cell_y[id1], plant.cell_x[id2], plant.cell_y[id2])
-
-    cdef bint __valid_move(self, Plant plant, int cid, double x, double y):
-        cdef int cid_prev, cid_next, cid2, cid3
-        cdef double x0, y0, x1, y1, x2, y2, x3, y3, min_x, min_y, max_x, max_y
-
-        cid_prev = plant.cell_prev[cid]
-        cid_next = plant.cell_next[cid]
-
-        x_prev = plant.cell_x[cid_prev]
-        y_prev = plant.cell_y[cid_prev]
-        x_next = plant.cell_x[cid_next]
-        y_next = plant.cell_y[cid_next]
-
-        min_x = min(x, x_prev, x_next)
-        max_x = max(x, x_prev, x_next)
-        min_y = min(y, y_prev, y_next)
-        max_y = max(y, y_prev, y_next)
-
-        cdef set collisions = self.sh.potential_collisions(min_x, min_y, max_x, max_y)
-        for cid2 in collisions:
-            cid3 = plant.cell_next[cid2]
-
-            if cid2 == cid or cid2 == cid_prev or cid2 == cid_next:
-                continue
-
-            if cid3 == cid_prev:
-                continue
-
-            x2 = plant.cell_x[cid2]
-            y2 = plant.cell_y[cid2]
-            x3 = plant.cell_x[cid3]
-            y3 = plant.cell_y[cid3]
-
-            if geometry.intersect(x, y, x_prev, y_prev, x2, y2, x3, y3):
-                return 0
-
-            if geometry.intersect(x, y, x_next, y_next, x2, y2, x3, y3):
-                return 0
-
-        return 1
-
-    cdef inline bint __segment_has_intersection(self, int id0, Plant plant):
-        cdef int id1, id2, id3, c
-        cdef double x0, y0, x1, y1, x2, y2, x3, y3
-        id1 = plant.cell_next[id0]
-        x0 = plant.cell_x[id0]
-        y0 = plant.cell_y[id0]
-        x1 = plant.cell_x[id1]
-        y1 = plant.cell_y[id1]
-
-        cdef int n = self.sh.__cells_for_rect(x0, y0, x1, y1)
-        cdef dict d = self.sh.d
-        cdef set bucket
+        if n == m:
+            print('self.max_face_neighbors too small!')
 
         for i in range(n):
-            c = self.sh.bid_buffer[i]
-            try:
-                bucket = d[c]
-                for id2 in bucket:
-                    id3 = plant.cell_next[id2]
-                    if id2 != id1 and id3 != id0:
-                        x2 = plant.cell_x[id2]
-                        y2 = plant.cell_y[id2]
-                        x3 = plant.cell_x[id3]
-                        y3 = plant.cell_y[id3]
-                        if geometry.intersect(x0, y0, x1, y1, x2, y2, x3, y3):
-                            return True
-            except KeyError:
-                pass
+            face2 = <Face *>self.face_neighbors[i]
 
-        return False
+            plant.mesh.face_verts(face2, &v4, &v5, &v6)
 
+            # Face cannot collide with self or neighbors.
+            if face.id == face2.id:
+                continue
+
+            elif v1 == v4 or v1 == v5 or v1 == v6:
+                continue
+
+            elif v2 == v4 or v2 == v5 or v2 == v6:
+                continue
+
+            elif v3 == v4 or v3 == v5 or v3 == v6:
+                continue
+
+            elif tri_tri_intersection(v1.p, v2.p, v3.p, v4.p, v5.p, v6.p):
+                return False
+
+        # print('valid_face_position 2')
+        return True
 
     cdef void calculate_light(self, Plant plant) except *:
-        """
-        A sweep line algorithm that maintains a heap of tallest open segments.
-        For every new segment, if the open segment is above it, there is no light.
-        We assume there are no segment intersections.
-        """
-        cdef int i, cid, cid_prev, cid_next, cid_left, cid_right
-        cdef double x0, y0, x1, y1, x2, y2, slope
-        cdef bint is_lit
-        cdef long[:] cells_indexes_ordered
-        cdef list minheap = []
+        cdef:
+            uint m, n
+            (Vert *) v1, v2, v3#, v4, v5, v6
+            Node *fnode = plant.mesh.faces
+            Face *face
+            double p[2], a[2], b[2], c[2]
+            double light[3]
+            double total_light = 0
+            cdef size_t i, j
+            cdef bint below
+            cdef double angle_to_light
 
-        # TODO: compare with merge sort and insertion sort for speed.
-        # cdef void ins_sort(double[:] k):
-        #     cdef n = len(k)
-        #     for i in range(1, n):    #since we want to swap an item with previous one, we start from 1
-        #         j = i                    #bcoz reducing i directly will mess our for loop, so we reduce its copy j instead
-        #         while j > 0 and k[j] < k[j-1]: #j>0 bcoz no point going till k[0] since there is no value to its left to be swapped
-        #             k[j], k[j-1] = k[j-1], k[j] #syntactic sugar: swap the items, if right one is smaller.
-        #             j = j - 1 #take k[j] all the way left to the place where it has a smaller/no value to its left.
-        #     # return k
-
-        cells_indexes_ordered = np.asarray(plant.cell_x[:plant.n_cells]).argsort()
-
+        light[:] = [0, 1.0, 0]
 
         for i in range(plant.n_cells):
-            cid = plant.cell_order[i]
-            plant.cell_light[i] = 0
+            cell = &plant.cells[i]
 
-        # Iterate across all points from left to right.
-        for i in range(plant.n_cells):
-            cid = cells_indexes_ordered[i]
+            # Below ground
+            if cell.vert.p[1] < 0:
+                continue
 
-            is_lit = False
-            x0 = plant.cell_x[cid]
-            y0 = plant.cell_y[cid]
+            p[0] = cell.vert.p[0]
+            p[1] = cell.vert.p[2]
 
-            cid_prev = plant.cell_prev[cid]
-            cid_next = plant.cell_next[cid]
+            # print(i, n)
+            angle_to_light = vangle(light, cell.vert.normal) / M_PI
 
-            # At a new point, remove any closing segments.
-            if plant.cell_x[cid_prev] < x0:
-                minheap.remove((-plant.cell_y[cid_prev], (cid_prev, cid)))
+            if angle_to_light > .5:
+                continue
 
-            if plant.cell_x[cid_next] < x0:
-                minheap.remove((-plant.cell_y[cid_next], (cid_next, cid)))
+            m = self.max_face_neighbors
+            n = self.th2d.neighbors(p, m, self.face_neighbors)
+            cell.lite = 1
+            # fnode = plant.mesh.faces
 
-            if len(minheap) == 0:
-                is_lit = True
+            # while fnode != NULL:
+            for j in range(n):
+                face = <Face *>self.face_neighbors[j]
+
+                # face = <Face *>fnode.data
+                # fnode = fnode.next
+
+                plant.mesh.face_verts(face, &v1, &v2, &v3)
+
+                # If face is below vert, it does not block.
+                if (v1.p[1] + v2.p[1] + v3.p[1])/3.0 < cell.vert.p[1]:
+                    continue
+
+                a[0] = v1.p[0]
+                a[1] = v1.p[2]
+
+                b[0] = v2.p[0]
+                b[1] = v2.p[2]
+
+                c[0] = v3.p[0]
+                c[1] = v3.p[2]
+
+                # assert(PointInTriangle(p, a, b, c) == pnt_in_tri(p, a, b, c))
+
+                if PointInTriangle(p, a, b, c):
+                    cell.lite = 0
+                    break
+
+            if cell.lite:
+                cell.light = 1 - angle_to_light
+                total_light += cell.light
             else:
-                y1, (cid_left, cid_right) = minheap[0]
-                y1 *= -1
-                x1 = plant.cell_x[cid_left]
-                x2 = plant.cell_x[cid_right]
-                y2 = plant.cell_y[cid_right]
-                # See if point is above segment.
-                slope = (y2 - y1) / (x2 - x1)
-                is_lit = (y0 >= slope * (x0 - x1) + y1)
+                cell.light = 0
 
-            # Open any new segments.
-            if plant.cell_x[cid_prev] > x0:
-                heapq.heappush(minheap, (-y0 , (cid, cid_prev)))
-
-            if plant.cell_x[cid_next] > x0:
-                heapq.heappush(minheap, (-y0 , (cid, cid_next)))
-
-            if is_lit and plant.cell_alive[cid]:
-                plant.cell_light[cid] = 1
-
-        assert len(minheap) == 0
+        plant.light = total_light

@@ -1,4 +1,8 @@
 from __future__ import division, print_function
+
+
+from plant_growth.vector3D cimport cross, dot, vadd, vsub, vdivf, vdist, inormalized, vmultf
+
 from libc.math cimport sqrt
 from libc.stdint cimport uintptr_t
 import numpy as np
@@ -25,6 +29,7 @@ cdef class Mesh:
 
         self.vert_neighbor_buffer = <Vert **>self.mem.alloc(24, sizeof(Vert *))
         self.edge_neighbor_buffer = <Edge **>self.mem.alloc(24, sizeof(Edge *))
+        self.vert_faces_buffer = <Face **>self.mem.alloc(64, sizeof(Face *))
 
         # objects for construction.
         cdef int nv = len(raw_points)
@@ -41,7 +46,7 @@ cdef class Mesh:
         """
         # Create Vert objects.
         for i, p in enumerate(raw_points):
-            verts[i] = self.__vert(p[0], p[1])
+            verts[i] = self.__vert(p[0], p[1], p[2], he=NULL)
 
         # Create Face objects.
         for poly in raw_polygons:
@@ -93,11 +98,33 @@ cdef class Mesh:
             he.next = halfs[he_boundary[end][0]]
             # self.boundary_start = he
 
+    @classmethod
+    def from_obj(cls, filename):
+        points = []
+        faces = []
+
+        for line in open(filename, 'r'):
+            if line.startswith('#'):
+                continue
+            values = line.split()
+            if not values:continue
+            if values[0] == 'v':
+                # points.append(list(map(float, values[1:4])))
+                points.append([float(v) for v in values[1:4]])
+            elif values[0] == 'f':
+                face = []
+                for v in values[1:]:
+                    w = v.split('/')
+                    face.append(int(w[0]) - 1) # .obj uses 1 based indexing.
+                faces.append(face)
+
+        return cls(points, faces)
+
     cdef void append_data(self, void *data, Node **list_start, Node **list_end):
         cdef Node *node = <Node *>self.mem.alloc(1, sizeof(Node))
         node.data = data
-        # node.next = list_start[0]
-        # list_start[0] = node
+        node.next = NULL
+
         if list_start[0] == NULL:
             list_start[0] = node
             list_end[0] = node
@@ -106,13 +133,15 @@ cdef class Mesh:
             list_end[0] = node
 
     # Constructor functions.
-    cdef Vert* __vert(self, double x, double y, HalfEdge* he=HNULL) except NULL:
+    cdef Vert* __vert(self, double x, double y, double z, HalfEdge* he=HNULL) except NULL:
         cdef Vert *vert = <Vert *>self.mem.alloc(1, sizeof(Vert))
         self.append_data(vert, &self.verts, &self.verts_end)
 
         vert.id = self.n_verts
-        vert.x = x
-        vert.y = y
+
+        vert.p[0] = x
+        vert.p[1] = y
+        vert.p[2] = z
         vert.he = he
 
         self.n_verts += 1
@@ -135,6 +164,9 @@ cdef class Mesh:
         face.id = self.n_faces
         face.he = he
         self.n_faces += 1
+        face.normal[0] = 0
+        face.normal[1] = 0
+        face.normal[2] = 0
         if he:
             he.face = face
         return face
@@ -161,7 +193,7 @@ cdef class Mesh:
             face.he = he
         return he
 
-    # Meh modifying
+    # Mesh modifying
     cpdef int split_edges(self, double max_edge_length) except -1:
         cdef int i, n
         n = 0
@@ -186,7 +218,7 @@ cdef class Mesh:
             Node *node
             Edge *edge
             int i, n_i, n_neighbors
-            double n
+            # double n, x, y, z
 
         node = self.edges
         for i in range(self.n_edges):
@@ -199,25 +231,144 @@ cdef class Mesh:
             v = <Vert *>node.data
             node = node.next
 
-            if self.is_boundary_vert(v) == 0:
-                v.x0 = 0
-                v.y0 = 0
+            if not self.is_boundary_vert(v):
+                v.p0.x = 0
+                v.p0.y = 0
+                v.p0.z = 0
                 n_neighbors = self.vert_neighbors(v)
 
                 for n_i in range(n_neighbors):
-                    v.x0 += self.vert_neighbor_buffer[n_i].x
-                    v.y0 += self.vert_neighbor_buffer[n_i].y
+                    v.p0.x += self.vert_neighbor_buffer[n_i].p.x
+                    v.p0.y += self.vert_neighbor_buffer[n_i].p.y
+                    v.p0.z += self.vert_neighbor_buffer[n_i].p.y
 
-                v.y0 /= n_neighbors
-                v.x0 /= n_neighbors
+                vdivf(v.p0, v.p0, n_neighbors)
 
         node = self.verts
         for i in range(self.n_verts):
             v = <Vert *>node.data
             node = node.next
-            if self.is_boundary_vert(v) == 0:
-                v.x = v.x0
-                v.y = v.y0
+            if not self.is_boundary_vert(v):
+                v.p.x = v.p0.x
+                v.p.y = v.p0.y
+
+    # Mesh calculation
+    cpdef void calculate_normals(self):
+        cdef:
+            Node *node
+            Face *face
+            (Vert *) va, vb, vc
+            double vab[3]
+            double vbc[3]
+
+        """ Calculate face normals. """
+        node = self.faces
+        for i in range(self.n_faces):
+            face = <Face *>node.data
+            node = node.next
+
+            self.face_verts(face, &va, &vb, &vc)
+            vsub(vab, vb.p, va.p)
+            vsub(vbc, vc.p, vb.p)
+            cross(face.normal, vab, vbc)
+            inormalized(face.normal)
+
+        """ Initialize vert norm values. """
+        node = self.verts
+        for _ in range(self.n_verts):
+            va = <Vert *> node.data
+            node = node.next
+            vmultf(va.normal, va.normal, 0)
+
+        """ Add face normal to all adjacent verts. """
+        node = self.faces
+        for _ in range(self.n_faces):
+            face = <Face *>node.data
+            node = node.next
+
+            self.face_verts(face, &va, &vb, &vc)
+            vadd(va.normal, va.normal, face.normal)
+            vadd(vb.normal, vb.normal, face.normal)
+            vadd(vc.normal, vc.normal, face.normal)
+
+        """ Normalize normals. """
+        node = self.verts
+        for i in range(self.n_verts):
+            va = <Vert *> node.data
+            inormalized(va.normal)
+            node = node.next
+
+        # node = self.faces
+        # for i in range(self.n_faces):
+        #     face = <Face *> node.data
+        #     inormalized(&face.normal)
+        #     node = node.next
+
+    cpdef void calculate_curvature(self):
+        # https://computergraphics.stackexchange.com/questions/1718/what-is-the-simplest-way-to-compute-principal-curvature-for-a-mesh-triangle
+        cdef:
+            Node *vnode = self.verts
+            Node *enode = self.edges
+            Edge *e
+            (Face *) f1, f2
+            (Vert *) v1, v2
+            (HalfEdge *) h, start, h_twin
+            int i = 0
+            double a[3], b[3]
+            double total_curvature, d
+
+        while vnode != NULL:
+            v1 = <Vert *>vnode.data
+            i = 0
+            total_curvature = 0
+
+            h = v1.he
+            start = h
+
+            while True:
+                h_twin = h.twin
+
+                ###################
+                # Curvature logic.
+                e = h.edge
+                f1 = h.face
+                f2 = h_twin.face
+
+                vsub(a, h.vert.normal, h.twin.vert.normal)
+                vsub(b, h.vert.p, h.twin.vert.p)
+                d = vdist(h.vert.p, h_twin.vert.p)
+
+                if d != 0:
+                    total_curvature += dot(a, b) / d
+                    i += 1
+
+                ####################
+                i += 1
+                h = h_twin.next
+
+                if h == start:
+                    break
+
+            if i != 0:
+                v1.curvature = total_curvature / i
+
+            vnode = vnode.next
+
+    cpdef double volume(self):
+        # https://stackoverflow.com/a/1568551/2175411
+        cdef size_t i = 0
+        cdef double s = 0
+        cdef (Vert *) v1, v2, v3
+        cdef Node *node = self.faces
+        cdef Face *face
+
+        for i in range(self.n_faces):
+            face = <Face *> node.data
+            self.face_verts(face, &v1, &v2, &v3)
+            s += signed_triangle_volume(v1.p, v2.p, v3.p)
+            node = node.next
+
+        return abs(s)
 
     # Edge operations
     cdef void edge_flip(self, Edge* e):
@@ -273,7 +424,7 @@ cdef class Mesh:
         cdef (HalfEdge *) h_ad, h_db, h_dn, h_nd
         cdef (Edge *) e_an, e_nb, e_cn, e_nd
         cdef (Vert *) v_a, v_b, v_c, v_n
-        cdef double x, y
+        cdef double x, y, z
 
         if e.he.face is FNULL:
             e.he = e.he.twin
@@ -292,9 +443,10 @@ cdef class Mesh:
         v_c = h_ca.vert
 
         # New vertex.
-        x = (v_a.x + v_b.x) / 2.0
-        y = (v_a.y + v_b.y) / 2.0
-        v_n = self.__vert(x, y)
+        x = (v_a.p[0] + v_b.p[0]) / 2.0
+        y = (v_a.p[1] + v_b.p[1]) / 2.0
+        z = (v_a.p[2] + v_b.p[2]) / 2.0
+        v_n = self.__vert(x, y, z)
 
         # Create new face.
         f_nbc = self.__face()
@@ -360,62 +512,77 @@ cdef class Mesh:
 
         v1 = e.he.next.next.vert
         v2 = e.he.twin.next.next.vert
-        d = sqrt((v1.x-v2.x)**2 + (v1.y-v2.y)**2)
+        d = vdist(v1.p, v2.p)
 
         if self.edge_length(e) - d > epsilon:
             self.edge_flip(e)
 
     # Query
-    def py_data(self):
+    def export(self):
         """ Return mesh as numpy arrays.
         """
-        verts = np.zeros((self.n_verts, 2))
+        cdef:
+            (Vert*) v1, v2, v3
+            Node *node
+            Edge *edge
+            Face *face
+            dict vid_to_idx = {}
+
+        self.calculate_normals()
+        self.calculate_curvature()
+
+        verts = np.zeros((self.n_verts, 3))
+        vert_normals = np.zeros((self.n_verts, 3))
+        curvature = np.zeros(self.n_verts)
+
         edges = np.zeros((self.n_edges, 2), dtype='i')
-        cdef (Vert*) v1, v2
-        cdef Node *node
-        cdef dict vid_to_idx = {}
+        faces = np.zeros((self.n_faces, 3), dtype='i')
+        face_normals = np.zeros((self.n_faces, 3))
 
         node = self.verts
         for i in range(self.n_verts):
             v = <Vert *>node.data
-            node = node.next
-            verts[i, 0] = v.x
-            verts[i, 1] = v.y
+            verts[i, 0] = v.p[0]
+            verts[i, 1] = v.p[1]
+            verts[i, 2] = v.p[2]
             vid_to_idx[v.id] = i
+            vert_normals[i] = v.normal#[v.normal.x, v.normal.y, v.normal.z]
+            curvature[i] = v.curvature
+            node = node.next
 
         node = self.edges
         for i in range(self.n_edges):
             edge = <Edge *>node.data
-            node = node.next
             self.edge_verts(edge, &v1, &v2)
             edges[i, 0] = vid_to_idx[v1.id]
             edges[i, 1] = vid_to_idx[v2.id]
+            node = node.next
 
-        return {'vertices': verts, 'edges':edges}
+        node = self.faces
+        for i in range(self.n_faces):
+            face = <Face *>node.data
+            self.face_verts(face, &v1, &v2, &v3)
+            faces[i, 0] = vid_to_idx[v1.id]
+            faces[i, 1] = vid_to_idx[v2.id]
+            faces[i, 2] = vid_to_idx[v3.id]
+            face_normals[i] = face.normal#[face.normal.x, face.normal.y, face.normal.z]
+            node = node.next
 
-    cdef void face_verts(self, Face* face, Vert* va, Vert* vb, Vert* vc):
+        return {'vertices': verts, 'edges':edges, 'faces':faces,
+                'vertice_normals': vert_normals, 'face_normals':face_normals,
+                'curvature': curvature}
+
+    cdef void face_verts(self, Face* face, Vert** va, Vert** vb, Vert** vc):
         cdef HalfEdge *he = face.he
-        va = he.vert
-        vb = he.next.vert
-        vc = he.next.next.vert
+        va[0] = he.vert
+        vb[0] = he.next.vert
+        vc[0] = he.next.next.vert
 
     cdef void face_halfs(self, Face* face, HalfEdge* ha, HalfEdge* hb, HalfEdge* hc):
         cdef HalfEdge *he = face.he
         ha = he
         hb = he.next
         hc = he.next.next
-
-    cdef Edge* edge_between(self, Vert *v1, Vert *v2) except *:
-        cdef Edge *e
-        cdef int n_e = self.edge_neighbors(v1)
-        cdef int i
-
-        for i in range(n_e):
-            e = self.edge_neighbor_buffer[i]
-            if e.he.vert == v2 or e.he.twin.vert == v2:
-                return e
-
-        return NULL
 
     cdef inline bint is_boundary_edge(self, Edge* e):
         return e.he.face == NULL or e.he.twin.face == NULL
@@ -432,6 +599,36 @@ cdef class Mesh:
         #         return True
         # return False
 
+    cdef Node* vert_faces(self, Vert* v) except *:
+        cdef:
+            (HalfEdge *) h, start, h_twin
+            (Node *) start_node, last_node, node
+
+        h = v.he
+        start = h
+
+        start_node = NULL
+
+        while True:
+            node = <Node *>self.mem.alloc(1, sizeof(Node))
+            node.data = <void *>h.face
+            if start_node == NULL: # First iteration.
+                start_node = node
+
+            else:
+                last_node.next = node
+
+            last_node = node
+
+            h_twin = h.twin
+            h = h_twin.next
+
+            if h == start:
+                break
+
+        node.next = NULL
+        return start_node
+
     cdef int vert_neighbors(self, Vert* v):
         cdef:
             (HalfEdge *) h, start, h_twin
@@ -440,42 +637,15 @@ cdef class Mesh:
         h = v.he
         start = h
 
-        h_twin = h.twin
-        v = h_twin.vert
-        self.vert_neighbor_buffer[i] = v
-        i += 1
-        h = h_twin.next
-
-        while h != start:
+        while True:
             h_twin = h.twin
             v = h_twin.vert
             self.vert_neighbor_buffer[i] = v
             i += 1
             h = h_twin.next
 
-        return i
-
-    cdef int edge_neighbors(self, Vert* v) nogil:
-        cdef:
-            (HalfEdge *) h, start, h_twin
-            Edge *e,
-            int i = 0
-
-        h = v.he
-        start = h
-
-        h_twin = h.twin
-        e = h_twin.edge
-        self.edge_neighbor_buffer[i] = e
-        i += 1
-        h = h_twin.next
-
-        while h != start:
-            h_twin = h.twin
-            e = h_twin.edge
-            self.edge_neighbor_buffer[i] = e
-            i += 1
-            h = h_twin.next
+            if h == start:
+                break
 
         return i
 
@@ -484,8 +654,8 @@ cdef class Mesh:
         vb[0] = e.he.twin.vert
 
     cdef inline double edge_length(self, Edge* e):
-        cdef Vert *p1 = e.he.vert
-        cdef Vert *p2 = e.he.next.vert
-        cdef double dx = p1.x-p2.x
-        cdef double dy = p1.y-p2.y
-        return sqrt(dx*dx + dy*dy)
+        cdef Vert *v1 = e.he.vert
+        cdef Vert *v2 = e.he.next.vert
+        # cdef double dx = p1.x-p2.x
+        # cdef double dy = p1.y-p2.y
+        return vdist(v1.p, v2.p)

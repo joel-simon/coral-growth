@@ -10,8 +10,9 @@ import string
 from datetime import datetime
 
 from plant_growth import constants, neat_params
-from plant_growth.pygameDraw import PygameDraw
-from plant_growth.plot import plot
+# from plant_growth.viewer import Viewer
+
+# from plant_growth.display import display
 from plant_growth.evaluate import evaluate_genome
 from subprocess import call
 
@@ -38,22 +39,17 @@ pop = NEAT.Population(
 )
 
 def run(out_dir):
-    view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
-
-    def display_func(world):
-        plot(view, world)
-
     last_fitness = 0.0
     t = time.time()
 
     for generation in range(constants.NUM_GENERATIONS):
         print('Starting generation', generation)
-
         genome_list = NEAT.GetGenomeList(pop)
 
         for genome in genome_list:
             plant = evaluate_genome(genome)
-            fitness = plant.gametes
+            fitness = plant.volume
+            # fitness = plant.gametes
             genome.SetFitness(fitness)
             print('.', end='', flush=True)
 
@@ -71,9 +67,9 @@ def run(out_dir):
 
         if maxf != last_fitness:
             best = pop.GetBestGenome()
-            best.Save(out_dir+'/best_%i' % generation)
-            evaluate_genome(best, display=display_func)
-            view.save(out_dir+'/best_%i.png' % generation)
+            # best.Save(out_dir+'/best_%i' % generation)
+            evaluate_genome(best, display=True)
+            # view.save(out_dir+'/best_%i.png' % generation)
             last_fitness = maxf
 
         pop.Epoch()
@@ -82,11 +78,11 @@ def run(out_dir):
     print('Run Complete.')
 
 if __name__ == '__main__':
-    # print(os.path.abspath('..'))
-    uid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
-    print('Run ID =', uid)
-    out_dir = "out_{:%B_%d_%Y_%H-%M}_".format(datetime.now())+uid
-    os.makedirs(out_dir)
-    shutil.copy(os.path.abspath('..')+'/plant_growth/constants.py', os.path.join(out_dir, 'constants.py'))
-    run(out_dir)
+    run(None)
+    # uid = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
+    # print('Run ID =', uid)
+    # out_dir = "out_{:%B_%d_%Y_%H-%M}_".format(datetime.now())+uid
+    # os.makedirs(out_dir)
+    # shutil.copy(os.path.abspath('..')+'/plant_growth/constants.py', os.path.join(out_dir, 'constants.py'))
+    # run(out_dir)
     # call('./render_all '+out_dir, shell=True)

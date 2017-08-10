@@ -1,14 +1,14 @@
 import MultiNEAT as NEAT
 
 params = NEAT.Parameters()
-params.PopulationSize = 50
+params.PopulationSize = 60
 params.DynamicCompatibility = True
 params.WeightDiffCoeff = 4.0
 params.CompatTreshold = 2.0
 params.YoungAgeTreshold = 5
 params.SpeciesMaxStagnation = 12
 params.OldAgeTreshold = 6
-params.MinSpecies = 1
+params.MinSpecies = 2
 params.MaxSpecies = 5
 params.RouletteWheelSelection = False
 params.RecurrentProb = 0.0

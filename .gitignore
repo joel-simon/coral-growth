@@ -9,3 +9,4 @@ buid/
 *.so
 *.html
 *.cpp
+*dSYM/

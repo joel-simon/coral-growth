@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import division, print_function
-import math, random, os, time, sys
+import math, random, os, sys
 sys.path.append(os.path.abspath('..'))
 from plant_growth import constants, neat_params
-from plant_growth.pygameDraw import PygameDraw
-from plant_growth.plot import plot
+
 from plant_growth.evaluate import simulate_single
 import MultiNEAT as NEAT
 
@@ -14,48 +13,37 @@ genome = NEAT.Genome(
     0, # NUM_HIDDEN
     constants.NUM_OUTPUTS,
     False, # FS_NEAT
-    NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function
-    NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function..
+    NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
+    NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
     0, # Seed type, must be 1 to have hidden nodes.
     neat_params.params
 )
 
 pop = NEAT.Population(
     genome, # Seed genome.
-    neat_params.params,
+    neat_params.params, # Params.
     True, # Randomize weights.
     1.0, # Random Range.
     14 # Random number generator seed.
 )
 
-constants.cell_growth_energy_usage = .01
-view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
-
-def display_func(world):
-    # pass
-    plot(view, world)
+constants.PLANT_EFFICIENCY = 10
 
 class NetworkDummy(object):
     def Input(self, ls):
-        # print(ls[0])
         self.ls = ls
+
     def ActivateFast(self):
         pass
+
     def Flush(self):
         pass
+
     def Output(self):
-        norm_x = (self.ls[4] +1)/2.0
-        # print(norm_x)
-        # f = (self.ls[0]+1)/2
-        # print(self.ls[0], f)
-        # return [random.random(), 0, 0]
-        out = [random.random()*3, 0, 0, 0]
+        # out = [0, 0, 0, 0]
+        out = [random.random()*.5, 0, 0, 0]
         assert len(out) == constants.NUM_OUTPUTS
         return out
 
-t1 = time.time()
-# genome = NEAT.GetGenomeList(pop)[0]
 net = NEAT.NeuralNetwork()
-simulate_single(NetworkDummy(), display=display_func, break_early=False)
-print('Finished in:', time.time() - t1)
-view.hold()
+simulate_single(NetworkDummy(), display=True)

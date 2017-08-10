@@ -21,12 +21,12 @@ _macros = None
 compiler_directives = {'linetrace': False, 'profile': False}
 
 extensions = [
-    Extension(
-        'plant_growth/geometry',
-        sources = ['./plant_growth/geometry.pyx'],
-        extra_compile_args = _extra,
-        define_macros=_macros
-    ),
+    # Extension(
+    #     'plant_growth/geometry',
+    #     sources = ['./plant_growth/geometry.pyx'],
+    #     extra_compile_args = _extra,
+    #     define_macros=_macros
+    # ),
     Extension(
         'plant_growth/plant',
         sources = ['./plant_growth/plant.pyx'],
@@ -40,23 +40,46 @@ extensions = [
         define_macros=_macros
     ),
     Extension(
-        'plant_growth/spatial_hash',
-        sources = ['./plant_growth/spatial_hash.pyx'],
+        'plant_growth/tri_hash_2d',
+        sources = ['./plant_growth/tri_hash_2d.pyx'],
         extra_compile_args = _extra,
         define_macros=_macros,
     ),
     Extension(
-        'plant_growth/spring_system',
-        sources = ['./plant_growth/spring_system.pyx'],
+        'plant_growth/tri_hash_3d',
+        sources = ['./plant_growth/tri_hash_3d.pyx'],
         extra_compile_args = _extra,
         define_macros=_macros,
     ),
+    Extension(
+        'plant_growth/tri_intersection',
+        sources = ['./plant_growth/tri_intersection.pyx'],
+        extra_compile_args = _extra,
+        define_macros=_macros,
+    ),
+    # Extension(
+    #     'plant_growth/spatial_hash',
+    #     sources = ['./plant_growth/spatial_hash.pyx'],
+    #     extra_compile_args = _extra,
+    #     define_macros=_macros,
+    # ),
+    Extension(
+        'plant_growth/vector3D',
+        sources = ['./plant_growth/vector3D.pyx'],
+        extra_compile_args = _extra,
+        define_macros=_macros,
+    ),
+    # Extension(
+    #     'plant_growth/spring_system',
+    #     sources = ['./plant_growth/spring_system.pyx'],
+    #     extra_compile_args = _extra,
+    #     define_macros=_macros,
+    # ),
     Extension(
         'plant_growth/mesh',
         sources = ['./plant_growth/mesh.pyx'],
         extra_compile_args = _extra,
         define_macros=_macros,
-        # language='c++'
     )
 ]
 

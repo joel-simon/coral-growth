@@ -8,12 +8,18 @@ ctypedef unsigned int uint
 
 cdef inline bint pnt_in_tri(double p[2], double p0[2], double p1[2], double p2[2]):
     # https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
-    # http://jsfiddle.net/PerroAZUL/zdaY8/1/
-    cdef double A = 1/2 * (-p1[1] * p2[0] + p0[1] * (-p1[0] + p2[0]) + p0[0] * (p1[1] - p2[1]) + p1[0] * p2[1])
-    cdef int sign = -1 if A < 0 else 1
-    cdef double s = (p0[1] * p2[0] - p0[0] * p2[1] + (p2[1] - p0[1]) * p[0] + (p0[0] - p2[0]) * p[1]) * sign
-    cdef double t = (p0[0] * p1[1] - p0[1] * p1[0] + (p0[1] - p1[1]) * p[0] + (p1[0] - p0[0]) * p[1]) * sign
-    return s > 0 and t > 0 and (s + t) < 2 * A * sign
+    cdef double s = p0[1] * p2[0] - p0[0] * p2[1] + (p2[1] - p0[1]) * p[0] + (p0[0] - p2[0]) * p[1]
+    cdef double t = p0[0] * p1[1] - p0[1] * p1[0] + (p0[1] - p1[1]) * p[0] + (p1[0] - p0[0]) * p[1]
+
+    if (s < 0) != (t < 0):
+        return False
+
+    cdef double A = -p1[1] * p2[0] + p0[1] * (p2[0] - p1[0]) + p0[0] * (p1[1] - p2[1]) + p1[0] * p2[1]
+    if A < 0.0:
+        s = -s
+        t = -t
+        A = -A
+    return s > 0 and t > 0 and (s + t) <= A
 
 cdef class World:
     cdef Pool mem

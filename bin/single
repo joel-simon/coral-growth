@@ -63,6 +63,7 @@ def run(out_dir):
         print('Max fitness:', maxf, 'Mean fitness:', mean)
 
         if maxf != last_fitness:
+            print('New best fitness.')
             best = pop.GetBestGenome()
             best.Save(out_dir+'/best_%i' % generation)
             evaluate_genome(best, display=False)
@@ -80,8 +81,11 @@ def rand_id(n):
     return ''.join(random.choice( options ) for _ in range(n))
 
 if __name__ == '__main__':
-    root = '/Users/joelsimon/Documents/plant_out_3d'
-    dir_name = "out_{:%B_%d_%Y_%H-%M}_".format(datetime.now())+rand_id(4)
+    root = '.'
+    # root = '/Users/joelsimon/Documents/plant_out_3d'
+    run_id = rand_id(4)
+    print('Run ID: ', run_id)
+    dir_name = "out_{:%B_%d_%Y_%H-%M}_".format(datetime.now())+run_id
     dir_path = os.path.join(root, dir_name)
     os.makedirs(dir_path)
     shutil.copy(os.path.abspath('..')+'/plant_growth/constants.py', os.path.join(dir_path, 'constants.py'))

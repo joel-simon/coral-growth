@@ -16,8 +16,8 @@ _extra = [
     '-Wno-unused-function',
 ]
 
-_macros = [('CYTHON_TRACE', '1')]
-_macros = None
+# _macros = [('CYTHON_TRACE', '1')]
+_macros = False
 compiler_directives = {'linetrace': False, 'profile': False}
 
 extensions = [

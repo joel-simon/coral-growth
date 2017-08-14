@@ -2,7 +2,7 @@ from math import pi
 
 USE_TIME_CYCLE = True
 TIME_CYCLE = 100 #todo evovle
-NUM_CELL_TYPES = 2
+NUM_CELL_TYPES = 4
 
 #Genome
 # 2 in for light and curvature
@@ -11,8 +11,8 @@ NUM_INPUTS = 2 + NUM_CELL_TYPES
 NUM_OUTPUTS = 1 + NUM_CELL_TYPES
 
 MAX_CELLS = 12000
-NUM_GENERATIONS = 50
-SIMULATION_STEPS = 40
+NUM_GENERATIONS = 100
+SIMULATION_STEPS = 80
 
 
 

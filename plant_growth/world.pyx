@@ -1,12 +1,12 @@
-# cython: boundscheck=True
+# cython: boundscheck=False
 # cython: wraparound=False
 # cython: initializedcheck=False
 # cython: nonecheck=False
 # cython: cdivision=True
+
 from __future__ import print_function, division
 from libc.stdint cimport uintptr_t
 from libc.math cimport M_PI
-# from math import isnan
 
 import numpy as np
 cimport numpy as np
@@ -23,16 +23,6 @@ from plant_growth.tri_hash_2d import TriHash2D
 from plant_growth.vector3D cimport vset, vangle
 
 from plant_growth.tri_intersection cimport tri_tri_intersection
-
-cdef double sign(double p1[2], double p2[2], double p3[2]):
-    return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1])
-
-cdef bint PointInTriangle(double pt[2], double v1[2], double v2[2], double v3[2]):
-    cdef bint b1, b2, b3;
-    b1 = sign(pt, v1, v2) < 0.0
-    b2 = sign(pt, v2, v3) < 0.0
-    b3 = sign(pt, v3, v1) < 0.0
-    return ((b1 == b2) and (b2 == b3))
 
 cdef class World:
     def __init__(self, object params):
@@ -92,6 +82,7 @@ cdef class World:
         cdef Plant plant
 
         self.th3d.initialize()
+        self.th2d.initialize()
 
         if self.verbose:
             print('Step: ', self.step)
@@ -216,7 +207,6 @@ cdef class World:
             elif tri_tri_intersection(v1.p, v2.p, v3.p, v4.p, v5.p, v6.p):
                 return False
 
-        # print('valid_face_position 2')
         return True
 
     cdef void calculate_light(self, Plant plant) except *:
@@ -244,49 +234,46 @@ cdef class World:
             p[0] = cell.vert.p[0]
             p[1] = cell.vert.p[2]
 
-            # print(i, n)
             angle_to_light = vangle(light, cell.vert.normal) / M_PI
 
             if angle_to_light > .5:
+                cell.light = 0
                 continue
+
+            cell.light = 1
 
             m = self.max_face_neighbors
             n = self.th2d.neighbors(p, m, self.face_neighbors)
-            cell.lite = 1
-            # fnode = plant.mesh.faces
-
+#
             # while fnode != NULL:
+            #     face = <Face *>fnode.data
+            #     fnode = fnode.next
             for j in range(n):
                 face = <Face *>self.face_neighbors[j]
-
-                # face = <Face *>fnode.data
-                # fnode = fnode.next
-
                 plant.mesh.face_verts(face, &v1, &v2, &v3)
 
+                if v1 == cell.vert or v2 == cell.vert or v3 == cell.vert:
+                    continue
+
                 # If face is below vert, it does not block.
-                if (v1.p[1] + v2.p[1] + v3.p[1])/3.0 < cell.vert.p[1]:
+                if (v1.p[1] + v2.p[1] + v3.p[1]) / 3.0 < cell.vert.p[1]:
                     continue
 
                 a[0] = v1.p[0]
                 a[1] = v1.p[2]
-
                 b[0] = v2.p[0]
                 b[1] = v2.p[2]
-
                 c[0] = v3.p[0]
                 c[1] = v3.p[2]
 
-                # assert(PointInTriangle(p, a, b, c) == pnt_in_tri(p, a, b, c))
-
-                if PointInTriangle(p, a, b, c):
-                    cell.lite = 0
+                if pnt_in_tri(p, a, b, c):
+                    cell.light = 0
                     break
 
-            if cell.lite:
+            if cell.light > 0:
                 cell.light = 1 - angle_to_light
                 total_light += cell.light
-            else:
-                cell.light = 0
+
+            total_light += cell.light
 
         plant.light = total_light

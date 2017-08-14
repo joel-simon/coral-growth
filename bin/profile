@@ -1,23 +1,15 @@
 #!/usr/bin/env python3
-import sys, os, time
+import sys, os
 sys.path.append(os.path.abspath('..'))
-
-from plant_growth import constants
-from plant_growth.evaluate import evaluate_genome
-
 import MultiNEAT as NEAT
-# import line_profiler
-
-def display_func(world):
-    pass
-
+import cProfile
+from plant_growth.evaluate import evaluate_genome
+import time
 if __name__ == '__main__':
     assert(len(sys.argv) == 2)
-    file_path = sys.argv[1]
-    assert(os.path.exists(file_path))
-    genome = NEAT.Genome(file_path)
-    t1 = time.time()
-    n = 1
-    for _ in range(n):
-        evaluate_genome(genome, display=display_func)
-    print('average time ', (time.time() - t1)/n)
+    assert(os.path.exists(sys.argv[1]))
+    genome = NEAT.Genome(sys.argv[1])
+    start = time.time()
+    evaluate_genome(genome)
+    # cProfile.run('evaluate_genome(genome)', 'single.prof')
+    print('Done in', time.time() - start)

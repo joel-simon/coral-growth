@@ -46,6 +46,9 @@ class Viewer(object):
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_SMOOTH)
 
+        # glCullFace(GL_BACK)
+        glDisable( GL_CULL_FACE )
+
         # glPolygonMode ( GL_FRONT_AND_BACK, GL_LINE )
 
         # Transparancy?
@@ -89,12 +92,9 @@ class Viewer(object):
         other argument) and 'color' (the color the triangle should be)."""
 
         # first flatten out the arrays:
-
         vertices = mesh['vertices'].flatten()
         normals = mesh['vertice_normals'].flatten()
         indices = mesh['faces'].astype('uint32').flatten()
-        # colors = [1] * (3 * len(mesh['vertices']))
-
         colors = mesh['vert_colors'].flatten()
 
         # then convert to OpenGL / ctypes arrays:
@@ -102,7 +102,7 @@ class Viewer(object):
         normals = (GLfloat * len(normals))(*normals)
         indices = (GLuint * len(indices))(*indices)
         colors = (GLfloat * len(colors))(*colors)
-
+        # colors = [1] * len(colors)
         # finally, build the list:
         # list = glGenLists(1)
         # glNewList(list, GL_COMPILE)
@@ -115,8 +115,8 @@ class Viewer(object):
         glNormalPointer(GL_FLOAT, 0, normals)
         glColorPointer(3, GL_FLOAT, 0, colors)
         glDrawElements(GL_TRIANGLES, len(indices), GL_UNSIGNED_INT, indices)
+        # glDrawElements(GL_TRIANGLES, len(indices), GL_UNSIGNED_INT, indices)
         glPopClientAttrib()
-
         # glEndList()
         # return list
 
@@ -221,8 +221,7 @@ class Viewer(object):
         i = 0
 
         while self.on:
-
-            self.clock.tick(30)
+            self.clock.tick(15)
             self.step(i)
 
             for e in pygame.event.get():
@@ -293,6 +292,10 @@ class AnimationViewer(Viewer):
                 self.animation_playing = not self.animation_playing
 
     def step(self, i):
+        if self.animation_playing:
+            self.rx += 1
+            self.zpos += .25
+
         if self.animation_playing and self.frame < len(self.frame_lists) - 1:
             self.frame += 1
             self.gl_lists = [self.frame_lists[self.frame]]

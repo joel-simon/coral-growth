@@ -24,7 +24,7 @@ cdef class TriHash3D:
         for i in range(self.size):
             self.bins[i] = NULL
 
-    cdef uint tri_bucket(self, double a[3], double b[3], double c[3]) except *:
+    cdef uint tri_bucket(self, double a[3], double b[3], double c[3]):
         # Find cell coords off center of tri.
         cdef double ws2 = self.world_size / 2
         cdef int x = <int>((((a[0] + b[0] + c[0])/3) + ws2) / self.cell_size)
@@ -83,9 +83,6 @@ cdef class TriHash3D:
         cdef uint i = 0
         cdef Entry* entry
 
-        assert n > 0
-        assert results != NULL
-
         cdef double ws2 = self.world_size / 2
         cdef int cx = <int>((((a[0] + b[0] + c[0])/3) + ws2) / self.cell_size)
         cdef int cy = <int>((((a[1] + b[1] + c[1])/3) + ws2) / self.cell_size)
@@ -95,7 +92,6 @@ cdef class TriHash3D:
             for y in range(max(0, cy-1), min(cy+2, self.dim_size-1)):
                 for z in range(max(0, cz-1), min(cz+2, self.dim_size-1)):
                     h = x + y*self.dim_size + z*self.dim_size2
-                    # h = max(0, min(h, self.size - 1))
                     entry = self.bins[h]
 
                     while entry != NULL:

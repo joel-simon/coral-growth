@@ -4,11 +4,11 @@ cdef struct Vert:
     int id
     double p[3]
     double p0[3] # Used to hold temporary values when smoothing.
-    # double next_p[3]
     HalfEdge *he
     double normal[3]
     double curvature
     bint is_boundary
+    void *data
 
 cdef struct Edge:
     int id

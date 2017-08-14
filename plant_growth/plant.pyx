@@ -49,9 +49,32 @@ cdef class Plant:
         cdef Vert *vert
         for i in range(self.mesh.n_verts):
             vert = <Vert *>node.data
-            self.create_cell(vert)
+            self.create_cell(vert, NULL, NULL)
             node = node.next
         self.update_attributes()
+
+
+    cdef list cell_output(self, Cell *cell):
+        """ Map cell stats to nerual input in [-1, 1] range. """
+        cdef unsigned int i = 2
+        cdef unsigned int ctype_mask = 1
+
+        self.cell_inputs[0] = (cell.light * 2) - 1
+        self.cell_inputs[1] = (cell.curvature * 2) - 1
+        # self.cell_inputs[2] = 1 if cell.flower else -1
+
+        for _ in range(self.cell_types):
+            self.cell_inputs[i] = (cell.ctype & ctype_mask) != 0
+            ctype_mask = ctype_mask << 1
+            i += 1
+
+        self.cell_inputs[i] = 1 # The last input is always used as bias.
+        self.network.Flush()
+        self.network.Input(self.cell_inputs)
+        self.network.ActivateFast()
+        output = self.network.Output()
+
+        return output
 
     cdef void grow(self) except *:
         """ Calculate the changes to plant by neural network.
@@ -78,13 +101,17 @@ cdef class Plant:
 
             """ Act on outputs """
             out_i = 0
+
             # Move in nomral direction by growth amount.
             growth = output[out_i] * self.growth_scalar
             out_i += 1
-
-            """ next_p = p + (norm * growth) """
+            # next_p = p + (norm * growth)
             vmultf(cell.next_p, cell.vert.normal, growth)
             vadd(cell.next_p, cell.next_p, cell.vert.p)
+
+            # flower = output[out_i] > 0
+            # out_i += 1
+
 
             ctype_mask = 1
             for _ in range(self.cell_types):
@@ -151,8 +178,6 @@ cdef class Plant:
         if self.volume > self.efficiency * self.energy:
             self.alive = False
 
-
-
     cdef double _calculate_energy_transfer(self) except *:
         pass
         # """
@@ -193,7 +218,7 @@ cdef class Plant:
 
         # return plant_spare_energy
 
-    cdef int create_cell(self, Vert *vert) except -1:
+    cdef int create_cell(self, Vert *vert, Cell *p1, Cell *p2) except -1:
         if self.n_cells == constants.MAX_CELLS:
             raise MaxCellsException()
         cdef Cell *cell
@@ -203,37 +228,20 @@ cdef class Plant:
         self.n_cells += 1
         cell.light = 0
         cell.curvature = 0
-        cell.strain = 0
-        cell.ctype = 0
+        cell.flower = 0
         cell.alive = 1
+
+        vert.data = <void *>cell
+
+        if p1 != NULL and p2 != NULL:
+            # Inherit all types parents have in common.
+            cell.ctype = p1.ctype & p2.ctype
+        else:
+            cell.ctype = 0
 
         return cell.id
 
-    cdef list cell_output(self, Cell *cell):
-        """ Map cell stats to nerual input in [-1, 1] range. """
-        cdef unsigned int i = 2
-        cdef unsigned int ctype_mask = 1
-
-        self.cell_inputs[0] = (cell.light * 2) - 1
-        self.cell_inputs[1] = (cell.curvature * 2) - 1
-
-        # self.cell_inputs[2] = (self.energy_usage*2) - 1
-        # self.cell_inputs[3] = (cell.strain*2) - 1
-
-        for _ in range(self.cell_types):
-            self.cell_inputs[i] = (cell.ctype & ctype_mask) != 0
-            ctype_mask = ctype_mask << 1
-            i += 1
-
-        self.cell_inputs[i] = 1 # The last input is always used as bias.
-        self.network.Flush()
-        self.network.Input(self.cell_inputs)
-        self.network.ActivateFast()
-        output = self.network.Output()
-
-        return output
-
-    cdef list cell_division(self):
+    cdef void cell_division(self):
         """ Update the mesh and create new cells.
             This is called after growth has occured.
             Return new cell ids
@@ -243,7 +251,6 @@ cdef class Plant:
             (Vert *) vert, v1, v2
             Node *node = self.mesh.edges
             Edge *edge
-            # list new_cells = []
 
         for i in range(self.mesh.n_edges):
             edge = <Edge *>node.data
@@ -251,43 +258,104 @@ cdef class Plant:
 
             if self.mesh.edge_length(edge) > constants.MAX_EDGE_LENGTH:
                 vert = self.mesh.edge_split(edge)
+                self.mesh.edge_verts(edge, &v1, &v2)
                 try:
-                    id = self.create_cell(vert)
-                    # new_cells.append(id)
+                    id = self.create_cell(vert, <Cell *>v1.data, <Cell *>v2.data)
 
                 except MaxCellsException:
                     break
 
-        # self.mesh.smooth()
-
-        # return new_cells
-        return []
+        # return []
 
     cdef void _calculate_light(self) except *:
         pass
 
     def export(self):
-        cdef Node *vnode = self.mesh.verts
-        cdef Vert *vert
+        cdef Node *node = self.mesh.verts
+        # cdef Vert *vert
         cdef int i = 0
         cdef int j = 0
         cdef Cell *cell
+        cdef int indx
 
         vert_colors = np.zeros((self.n_cells, 3))
+        mesh_data = self.mesh.export()
 
         id_to_indx = {}
-        while vnode != NULL:
-            vert = <Vert *> vnode.data
+
+        # Map cells to mesh vertices.
+        while node != NULL:
+            vert = <Vert *> node.data
             id_to_indx[vert.id] = i
-            vnode = vnode.next
+            node = node.next
             i += 1
 
         for j in range(self.n_cells):
             cell = &self.cells[j]
+            indx = id_to_indx[cell.vert.id]
             color = colorsys.hsv_to_rgb(100.0/360, .70, .3 + .7*cell.light)
-            vert_colors[id_to_indx[cell.vert.id]] = list(color)
+            vert_colors[indx] = list(color)
 
-        mesh_data = self.mesh.export()
         mesh_data['vert_colors'] = vert_colors
         return mesh_data
-        # cells [{ 'id': c.id, 'light': light }]
+
+    # def export(self, filename):
+    #     """ Export the plant to a .plant file
+    #         a .plant file is a comaptable superset of the .obj protocol
+    #         In addition to the content of a .obj file a .plant file has
+
+    #         A second header row that begins with '#plant' and lists cell attributes
+    #         A line that begins with 'c' for each vert that contains values for
+    #         cell for each attribute. Ordered the same as the vertices.
+    #     """
+    #     cdef Node *node = self.mesh.verts
+    #     # cdef Vert *vert
+    #     cdef int i = 0
+    #     cdef int j = 0
+    #     cdef Cell *cell
+
+    #     out = open(filename, 'w+')
+    #     out.write('#Exported from plant_growth\n')
+    #     header = ['light', 'alive', 'ctype', 'flower']
+    #     out.write('#plant ' + ' '.join(header) + '\n')
+
+    #     # vert_colors = np.zeros((self.n_cells, 3))
+    #     mesh_data = self.mesh.export()
+
+    #     id_to_indx = mesh_data['_mapping']
+
+    #     # for vert
+    #     # for i, vert in enumerate(mesh_data['vertices']):
+    #     #     out.write('v %f %f %f\n' % (tuple(vert)))
+    #     # # Map cells to mesh vertices.
+    #     #
+    #     while node != NULL:
+    #         vert = <Vert *> node.data
+    #         out.write('v %f %f %f\n' % (tuple(vert.p)))
+    #         id_to_indx[vert.id] = i
+    #         node = node.next
+    #         i += 1
+
+    #     out.write('\n')
+
+    #     for vn in mesh_data['vertice_normals']:
+    #         out.write('vn %f %f %f\n' % tuple(vn))
+
+    #     cell_attributes = [None] * self.n_cells
+    #     for j in range(self.n_cells):
+    #         cell = &self.cells[j]
+    #         indx = id_to_indx[cell.vert.id]
+    #         cell_attributes[indx] = [cell.light, cell.alive, cell.ctype, cell.flower]
+
+    #     for attributes in cell_attributes:
+    #         out.write('c ' + ' '.join(map(str, attributes)) + '\n')
+    #         # color = colorsys.hsv_to_rgb(100.0/360, .70, .3 + .7*cell.light)
+    #         # vert_colors[] = list(color)
+
+    #     for face in mesh_data['faces']:
+    #         out.write('f %i %i %i\n' % tuple(face+1))
+
+
+    #     # mesh_data =
+    #     # mesh_data['vert_colors'] = vert_colors
+    #     # return mesh_data

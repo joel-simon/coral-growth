@@ -9,7 +9,7 @@ from plant_growth.viewer import AnimationViewer
 import MultiNEAT as NEAT
 
 obj_path = '/Users/joelsimon/Dropbox/plant_growth/data/triangulated_sphere_2.obj'
-# obj_path = '/home/simonlab/Dropbox/plant_growth/data/triangulated_sphere_0.obj'
+# obj_path = '/home/simonlab/Dropbox/plant_growth/data/triangulated_sphere_2.obj'
 
 world_params = {
     'max_plants': 1,
@@ -28,15 +28,20 @@ def simulate_single(network, display=False):
     world = World(world_params)
     world.add_plant(obj_path, network)
 
-    animation = [ [ world.plants[0].export() ] ]
+    if display:
+        animation = [ [ world.plants[0].export() ] ]
+
 
     for s in range(constants.SIMULATION_STEPS):
 
         world.simulation_step()
 
-        animation.append([ world.plants[0].export() ])
+        if display:
+            animation.append([ world.plants[0].export() ])
 
         if world.plants[0].alive == False:
+            if display:
+                print('Plant dead, ending simulation.')
             break
 
     if display:

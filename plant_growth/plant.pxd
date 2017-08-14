@@ -6,10 +6,11 @@ cdef struct Cell:
     int id
     Vert *vert
     double next_p[3]
-    bint lite
+    # bint lite
+    bint flower
     double light
     double curvature
-    double strain
+    # double strain
     unsigned int ctype
     int alive
 
@@ -30,8 +31,8 @@ cdef class Plant:
     cdef void update_attributes(self) except *
     cdef void grow(self) except *
 
-    cdef int create_cell(self, Vert *vert) except -1
+    cdef int create_cell(self, Vert *vert, Cell *p1, Cell *p2) except -1
     cdef list cell_output(self, Cell *cell)
-    cdef list cell_division(self)
+    cdef void cell_division(self)
     cdef double _calculate_energy_transfer(self) except *
     cdef void _calculate_light(self) except *

@@ -27,7 +27,8 @@ pop = NEAT.Population(
     14 # Random number generator seed.
 )
 
-constants.PLANT_EFFICIENCY = 10
+constants.PLANT_EFFICIENCY = 1000
+constants.SIMULATION_STEPS = 10
 
 class NetworkDummy(object):
     def Input(self, ls):
@@ -40,10 +41,11 @@ class NetworkDummy(object):
         pass
 
     def Output(self):
-        # out = [0, 0, 0, 0]
-        out = [random.random()*.5, 0, 0, 0]
-        assert len(out) == constants.NUM_OUTPUTS
+        out = [0] * constants.NUM_OUTPUTS
+        out[0] = random.random() * constants.CELL_GROWTH_SCALAR
+
         return out
 
 net = NEAT.NeuralNetwork()
-simulate_single(NetworkDummy(), display=True)
+plant = simulate_single(NetworkDummy(), display=True)
+# plant.export('foo.obj')

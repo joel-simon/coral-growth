@@ -8,7 +8,6 @@ from __future__ import print_function
 from libc.math cimport M_PI, M_PI_2, log, sqrt, acos, cos, sin, abs, atan2
 from math import isnan
 from random import random, shuffle
-import colorsys
 import numpy as np
 cimport numpy as np
 from cymem.cymem cimport Pool
@@ -270,92 +269,82 @@ cdef class Plant:
     cdef void _calculate_light(self) except *:
         pass
 
-    def export(self):
-        cdef Node *node = self.mesh.verts
-        # cdef Vert *vert
-        cdef int i = 0
-        cdef int j = 0
-        cdef Cell *cell
-        cdef int indx
-
-        vert_colors = np.zeros((self.n_cells, 3))
-        mesh_data = self.mesh.export()
-
-        id_to_indx = {}
-
-        # Map cells to mesh vertices.
-        while node != NULL:
-            vert = <Vert *> node.data
-            id_to_indx[vert.id] = i
-            node = node.next
-            i += 1
-
-        for j in range(self.n_cells):
-            cell = &self.cells[j]
-            indx = id_to_indx[cell.vert.id]
-            color = colorsys.hsv_to_rgb(100.0/360, .70, .3 + .7*cell.light)
-            vert_colors[indx] = list(color)
-
-        mesh_data['vert_colors'] = vert_colors
-        return mesh_data
-
-    # def export(self, filename):
-    #     """ Export the plant to a .plant file
-    #         a .plant file is a comaptable superset of the .obj protocol
-    #         In addition to the content of a .obj file a .plant file has
-
-    #         A second header row that begins with '#plant' and lists cell attributes
-    #         A line that begins with 'c' for each vert that contains values for
-    #         cell for each attribute. Ordered the same as the vertices.
-    #     """
+    # def export(self):
     #     cdef Node *node = self.mesh.verts
     #     # cdef Vert *vert
     #     cdef int i = 0
     #     cdef int j = 0
     #     cdef Cell *cell
+    #     cdef int indx
 
-    #     out = open(filename, 'w+')
-    #     out.write('#Exported from plant_growth\n')
-    #     header = ['light', 'alive', 'ctype', 'flower']
-    #     out.write('#plant ' + ' '.join(header) + '\n')
-
-    #     # vert_colors = np.zeros((self.n_cells, 3))
+    #     vert_colors = np.zeros((self.n_cells, 3))
     #     mesh_data = self.mesh.export()
 
-    #     id_to_indx = mesh_data['_mapping']
+    #     id_to_indx = {}
 
-    #     # for vert
-    #     # for i, vert in enumerate(mesh_data['vertices']):
-    #     #     out.write('v %f %f %f\n' % (tuple(vert)))
-    #     # # Map cells to mesh vertices.
-    #     #
+    #     # Map cells to mesh vertices.
     #     while node != NULL:
     #         vert = <Vert *> node.data
-    #         out.write('v %f %f %f\n' % (tuple(vert.p)))
     #         id_to_indx[vert.id] = i
     #         node = node.next
     #         i += 1
 
-    #     out.write('\n')
-
-    #     for vn in mesh_data['vertice_normals']:
-    #         out.write('vn %f %f %f\n' % tuple(vn))
-
-    #     cell_attributes = [None] * self.n_cells
     #     for j in range(self.n_cells):
     #         cell = &self.cells[j]
     #         indx = id_to_indx[cell.vert.id]
-    #         cell_attributes[indx] = [cell.light, cell.alive, cell.ctype, cell.flower]
+    #         color = colorsys.hsv_to_rgb(100.0/360, .70, .3 + .7*cell.light)
+    #         vert_colors[indx] = list(color)
 
-    #     for attributes in cell_attributes:
-    #         out.write('c ' + ' '.join(map(str, attributes)) + '\n')
-    #         # color = colorsys.hsv_to_rgb(100.0/360, .70, .3 + .7*cell.light)
-    #         # vert_colors[] = list(color)
+    #     mesh_data['vert_colors'] = vert_colors
+    #     return mesh_data
 
-    #     for face in mesh_data['faces']:
-    #         out.write('f %i %i %i\n' % tuple(face+1))
+    def export(self, out):
+        """ Export the plant to .plant.obj file
+            A .plant.obj file is a 3d mesh with cell specific information.
+            it is a compatable superset of the .obj file format.
+            In addition to the content of a .obj file a .plant file has:
 
+            1. A header row that begins with '#plant' that lists space
+                deiminated cell attributes
+            2. A line that begins with 'c' for each vert that contains values for
+                cell for each attribute. Ordered the same as the vertices.
+        """
+        cdef Node *node = self.mesh.verts
+        cdef int i = 0
+        cdef int j = 0
+        cdef Cell *cell
 
-    #     # mesh_data =
-    #     # mesh_data['vert_colors'] = vert_colors
-    #     # return mesh_data
+        out.write('#Exported from plant_growth\n')
+        header = ['light', 'alive', 'ctype', 'flower']
+        out.write('#plant: ' + ' '.join(header) + '\n')
+
+        mesh_data = self.mesh.export()
+
+        id_to_indx = dict()
+
+        while node != NULL:
+            vert = <Vert *> node.data
+            out.write('v %f %f %f\n' % (tuple(vert.p)))
+            id_to_indx[vert.id] = i
+            node = node.next
+            i += 1
+
+        out.write('\n\n')
+
+        for vn in mesh_data['vertice_normals']:
+            out.write('vn %f %f %f\n' % tuple(vn))
+
+        cell_attributes = [None] * self.n_cells
+        for j in range(self.n_cells):
+            cell = &self.cells[j]
+            indx = id_to_indx[cell.vert.id]
+            cell_attributes[indx] = [cell.light, int(cell.alive), cell.ctype,
+                                     int(cell.flower)]
+
+        for attributes in cell_attributes:
+            out.write('c ' + ' '.join(map(str, attributes)) + '\n')
+
+        out.write('\n')
+
+        for face in mesh_data['faces']:
+            out.write('f %i %i %i\n' % tuple(face+1))

@@ -66,7 +66,10 @@ def run(out_dir):
             print('New best fitness.')
             best = pop.GetBestGenome()
             best.Save(out_dir+'/best_%i' % generation)
-            evaluate_genome(best, display=False)
+
+
+            os.mkdir(os.path.join(out_dir, str(generation)))
+            evaluate_genome(best, export_folder=os.path.join(out_dir, str(generation)))
             last_fitness = maxf
 
         pop.Epoch()

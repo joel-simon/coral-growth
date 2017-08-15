@@ -2,10 +2,16 @@
 import sys, os
 sys.path.append(os.path.abspath('..'))
 from plant_growth.evaluate import evaluate_genome
-import MultiNEAT as NEAT
+# import MultiNEAT as NEAT
+
+from plant_growth.viewer import AnimationViewer
 
 if __name__ == '__main__':
     assert(len(sys.argv) == 2)
-    assert(os.path.exists(sys.argv[1]))
-    genome = NEAT.Genome(sys.argv[1])
-    evaluate_genome(genome, display=True)
+    # assert(os.path.exists(sys.argv[1]))
+    folder = sys.argv[1]
+    files = [f for f in os.listdir(folder) if '.plant.obj' in f]
+    files = sorted(files, key=lambda f: int(f.split('.')[0]))
+    files = [os.path.join(folder, f) for f in files]
+    view = AnimationViewer(files, (1000, 1000))
+    view.main_loop()

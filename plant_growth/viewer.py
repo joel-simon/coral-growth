@@ -15,8 +15,6 @@ from .primitive import make_plane, G_OBJ_PLANE, G_OBJ_SPHERE
 from OpenGL.arrays import vbo
 from OpenGL.raw.GL.ARB.vertex_array_object import glGenVertexArrays, \
                                                   glBindVertexArray
-
-
 class Viewer(object):
     def __init__(self, view_size=(800, 600)):
         # self.bounds = bounds
@@ -245,8 +243,12 @@ class Viewer(object):
             pygame.display.flip()
             i += 1
 
+from .mesh import Mesh
+import numpy as np
+import colorsys
+
 class AnimationViewer(Viewer):
-    def __init__(self, animation, view_size):
+    def __init__(self, files, view_size):
         super(AnimationViewer, self).__init__(view_size)
 
         self.frame = 0
@@ -255,13 +257,36 @@ class AnimationViewer(Viewer):
 
         print('Loading Animation')
 
-        for i, frame in enumerate(animation):
+        for i, file in enumerate(files):
+            mesh = Mesh.from_obj(file).export()
+
+            colors = np.zeros((mesh['vertices'].shape))
+            header = None
+            cell_data = []
+            # print(i)
+            ci = 0
+            for l in open(file, 'r').read().splitlines():
+                if l.startswith("#plant"):
+                    header = l.split(' ')[1:]
+                elif l.startswith('c'):
+                    d = l.split(' ')[1:]
+                    d[0] = float(d[0])
+                    d[1] = bool(d[1])
+                    d[2] = int(d[2])
+                    d[3] = bool(d[3])
+                    cell_data.append(d)
+
+                    # colors[ci] = colorsys.hsv_to_rgb(100.0/360, .70, .3 + .7*d[0])
+                    colors[ci] = colorsys.hsv_to_rgb(100.0/360, .70, .3 + .7*d[0])
+
+                    ci += 1
+
+            mesh['vert_colors'] = colors
             self.start_draw()
 
-            print(i, 'n_verts=', len(frame[0]['vertices']))
+            print(i, 'n_verts=', len(mesh['vertices']))
 
-            for mesh in frame:
-                self.build_compiled_gllist(mesh)
+            self.build_compiled_gllist(mesh)
 
             self.frame_lists.append(self.gl_list)
             glEndList()

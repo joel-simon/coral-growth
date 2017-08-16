@@ -45,8 +45,8 @@ def run(out_dir):
 
         for genome in genome_list:
             plant = evaluate_genome(genome)
-            fitness = plant.light
-            # fitness = plant.gametes
+            # fitness = plant.light
+            fitness = plant.seed_spread()#plant.flowers
             genome.SetFitness(fitness)
             print('.', end='', flush=True)
 
@@ -67,6 +67,8 @@ def run(out_dir):
             best = pop.GetBestGenome()
             best.Save(out_dir+'/best_%i' % generation)
 
+            with open(out_dir+'/scores.text', "a") as f:
+                f.write("%i\t%f\n"%(generation, maxf))
 
             os.mkdir(os.path.join(out_dir, str(generation)))
             evaluate_genome(best, export_folder=os.path.join(out_dir, str(generation)))
@@ -84,7 +86,7 @@ def rand_id(n):
     return ''.join(random.choice( options ) for _ in range(n))
 
 if __name__ == '__main__':
-    root = '.'
+    root = './flowers'
     # root = '/Users/joelsimon/Documents/plant_out_3d'
     run_id = rand_id(4)
     print('Run ID: ', run_id)

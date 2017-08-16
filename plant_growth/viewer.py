@@ -245,7 +245,7 @@ class Viewer(object):
 
 from .mesh import Mesh
 import numpy as np
-import colorsys
+from colorsys import hsv_to_rgb
 
 class AnimationViewer(Viewer):
     def __init__(self, files, view_size):
@@ -257,13 +257,16 @@ class AnimationViewer(Viewer):
 
         print('Loading Animation')
 
+        colors = [hsv_to_rgb((i/16.0), 1.0, 1.0) for i in range(16)]
+
         for i, file in enumerate(files):
             mesh = Mesh.from_obj(file).export()
 
-            colors = np.zeros((mesh['vertices'].shape))
-            header = None
+            mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
+            header = None # header = ['light', 'alive', 'ctype', 'flower']
+
             cell_data = []
-            # print(i)
+
             ci = 0
             for l in open(file, 'r').read().splitlines():
                 if l.startswith("#plant"):
@@ -271,17 +274,23 @@ class AnimationViewer(Viewer):
                 elif l.startswith('c'):
                     d = l.split(' ')[1:]
                     d[0] = float(d[0])
-                    d[1] = bool(d[1])
+                    d[1] = bool(int(d[1]))
                     d[2] = int(d[2])
-                    d[3] = bool(d[3])
+                    d[3] = float(d[3])
                     cell_data.append(d)
+                    # print(d[3])
 
-                    # colors[ci] = colorsys.hsv_to_rgb(100.0/360, .70, .3 + .7*d[0])
-                    colors[ci] = colorsys.hsv_to_rgb(100.0/360, .70, .3 + .7*d[0])
+                    mesh['vert_colors'][ci] = hsv_to_rgb((100+190*d[3])/360, .70, .6 + .4*d[0])
+                    # mesh['vert_colors'][ci] = colors[d[2]]
+
+                    # if d[3]:
+                    #     mesh['vert_colors'][ci] = hsv_to_rgb(290.0/360, .70, .6 + .4*d[0])
+                    # else:
+                    #     mesh['vert_colors'][ci] = hsv_to_rgb(100.0/360, .70, .3 + .7*d[0])
 
                     ci += 1
 
-            mesh['vert_colors'] = colors
+             # = colors
             self.start_draw()
 
             print(i, 'n_verts=', len(mesh['vertices']))

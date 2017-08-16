@@ -7,8 +7,9 @@ cdef struct Cell:
     Vert *vert
     double next_p[3]
     # bint lite
-    bint flower
+    double flower
     double light
+    bint water
     double curvature
     # double strain
     unsigned int ctype
@@ -19,8 +20,10 @@ cdef class Plant:
     cdef public Mesh mesh
     cdef Mesh mesh0
     cdef public object network
-    cdef public double efficiency, energy, energy_usage, gametes, volume, light, max_age, \
-                        cell_growth_energy_usage, cell_min_energy, growth_scalar
+    cdef public double efficiency, energy, volume, light, flowers, water
+    cdef double growth_scalar
+
+    # , energy_usage, gametes,, max_age, cell_growth_energy_usage, cell_min_energy, growth_scalar
     cdef public bint alive
     cdef public int age, n_cells, max_cells, cell_types
 
@@ -30,6 +33,12 @@ cdef class Plant:
 
     cdef void update_attributes(self) except *
     cdef void grow(self) except *
+
+    cdef void calculate_energy(self)
+    cpdef double seed_spread(self)
+
+    # cpdef int num_flowers(self)
+    # cpdef int num_active_flowers(self)
 
     cdef int create_cell(self, Vert *vert, Cell *p1, Cell *p2) except -1
     cdef list cell_output(self, Cell *cell)

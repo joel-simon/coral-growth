@@ -274,6 +274,4 @@ cdef class World:
                 cell.light = 1 - angle_to_light
                 total_light += cell.light
 
-            total_light += cell.light
-
         plant.light = total_light

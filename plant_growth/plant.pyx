@@ -31,16 +31,17 @@ cdef class Plant:
 
         self.volume = 0
         self.alive = True
-        self.gametes = 0
+        # self.gametes = 0
         self.age = 0
         self.n_cells = 0
         self.max_cells = constants.MAX_CELLS
         self.energy = 0
+        self.flowers
 
         self.cells = <Cell *>self.mem.alloc(self.max_cells, sizeof(Cell))
         # Constants
-        self.cell_min_energy  = constants.cell_min_energy
-        self.cell_growth_energy_usage = constants.cell_growth_energy_usage
+        # self.cell_min_energy  = constants.cell_min_energy
+        # self.cell_growth_energy_usage = constants.cell_growth_energy_usage
         self.growth_scalar = constants.CELL_GROWTH_SCALAR
 
         self.cell_inputs = [0 for _ in range(constants.NUM_INPUTS+1)]
@@ -55,17 +56,21 @@ cdef class Plant:
 
     cdef list cell_output(self, Cell *cell):
         """ Map cell stats to nerual input in [-1, 1] range. """
-        cdef unsigned int i = 2
+        cdef unsigned int i = 4
         cdef unsigned int ctype_mask = 1
 
         self.cell_inputs[0] = (cell.light * 2) - 1
         self.cell_inputs[1] = (cell.curvature * 2) - 1
-        # self.cell_inputs[2] = 1 if cell.flower else -1
+        self.cell_inputs[2] = 1 if cell.flower else -1
+        self.cell_inputs[3] = 1 if cell.water else -1
 
         for _ in range(self.cell_types):
             self.cell_inputs[i] = (cell.ctype & ctype_mask) != 0
             ctype_mask = ctype_mask << 1
             i += 1
+
+        if constants.USE_AGE:
+            self.cell_inputs[i] = -1 + 2*float(self.age) / constants.SIMULATION_STEPS
 
         self.cell_inputs[i] = 1 # The last input is always used as bias.
         self.network.Flush()
@@ -104,14 +109,17 @@ cdef class Plant:
             # Move in nomral direction by growth amount.
             growth = output[out_i] * self.growth_scalar
             out_i += 1
+
             # next_p = p + (norm * growth)
             vmultf(cell.next_p, cell.vert.normal, growth)
             vadd(cell.next_p, cell.next_p, cell.vert.p)
 
-            # flower = output[out_i] > 0
-            # out_i += 1
+            # Decide to flower.
+            if output[out_i] > 0.5:
+                cell.flower = 1
+                out_i += 1
 
-
+            # Change cell type (differentiation).
             ctype_mask = 1
             for _ in range(self.cell_types):
                 if output[out_i] > 0.5:
@@ -122,6 +130,7 @@ cdef class Plant:
         """ Calculate area of growth to see how much energy is needed.
             Scale overall growth down depending on available energy.
         """
+    # cdef derp
         # cdef list next_polygon = []
         # for i in range(self.n_cells):
         #     cid = self.cell_order[i]
@@ -171,11 +180,63 @@ cdef class Plant:
         self.mesh.calculate_normals()
         self.mesh.calculate_curvature()
         self.world.calculate_light(self)
-        self.energy = self.light
+        self.calculate_energy()
+
+        self.energy -= self.flowers * constants.FLOWER_COST
+
+        if self.energy <= 0:
+            self.flowers = 0
+
         self.age += 1
 
         if self.volume > self.efficiency * self.energy:
             self.alive = False
+
+    cdef void calculate_energy(self):
+        cdef size_t i = 0
+        cdef Cell *cell
+        # cdef int num_active_flowers = 0
+        # cdef double total_light
+        cdef double num_flowers = 0
+
+        # self.light = 0
+        self.energy = 0
+        self.flowers = 0
+        self.water = 0
+
+        for i in range(self.n_cells):
+            cell = &self.cells[i]
+
+            if cell.vert.p[1] < 0:
+                cell.water = 1
+                self.water -= cell.vert.p[1]
+            else:
+                self.flowers += cell.flower
+
+        self.water *= constants.WATER_PER_CELL
+        self.energy = min(self.water, self.light)
+
+    cpdef double seed_spread(self):
+        cdef double n = 0
+        cdef size_t i = 0
+        cdef Cell *cell
+
+        for i in range(self.n_cells):
+            cell = &self.cells[i]
+            if cell.flower and cell.vert.p[1] > 0:
+                n += cell.vert.p[1] * cell.vert.p[1]
+        return n
+
+    # cpdef int num_active_flowers(self):
+    #     cdef int n = 0
+    #     cdef size_t i = 0
+    #     cdef Cell *cell
+
+    #     for i in range(self.n_cells):
+    #         cell = &self.cells[i]
+    #         if cell.flower and cell.light >= .5:
+    #             n += 1
+    #     return n
 
     cdef double _calculate_energy_transfer(self) except *:
         pass
@@ -229,7 +290,7 @@ cdef class Plant:
         cell.curvature = 0
         cell.flower = 0
         cell.alive = 1
-
+        cell.water = 1 if vert.p[1] < 0 else 0
         vert.data = <void *>cell
 
         if p1 != NULL and p2 != NULL:
@@ -315,7 +376,9 @@ cdef class Plant:
         cdef Cell *cell
 
         out.write('#Exported from plant_growth\n')
-        header = ['light', 'alive', 'ctype', 'flower']
+        header = ['light', 'alive', 'ctype', 'flower', 'water']
+        out.write("#water=%f, light=%f, %f > %f\n" % \
+                    (self.water, self.light, self.volume, self.efficiency * self.energy))
         out.write('#plant: ' + ' '.join(header) + '\n')
 
         mesh_data = self.mesh.export()
@@ -339,7 +402,7 @@ cdef class Plant:
             cell = &self.cells[j]
             indx = id_to_indx[cell.vert.id]
             cell_attributes[indx] = [cell.light, int(cell.alive), cell.ctype,
-                                     int(cell.flower)]
+                                     cell.flower, cell.water]
 
         for attributes in cell_attributes:
             out.write('c ' + ' '.join(map(str, attributes)) + '\n')

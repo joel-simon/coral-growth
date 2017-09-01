@@ -8,8 +8,8 @@ params.PopulationSize = 100
 # params.YoungAgeTreshold = 5
 params.OldAgeTreshold = 6
 params.SpeciesMaxStagnation = 10
-# params.MinSpecies = 3
-# params.MaxSpecies = 8
+params.MinSpecies = 2
+params.MaxSpecies = 8
 # params.RouletteWheelSelection = False
 
 # params.RecurrentProb = 0.0

@@ -305,7 +305,7 @@ cdef class Plant:
 
         # return plant_spare_energy
 
-    cdef int create_cell(self, Vert *vert, Cell *p1, Cell *p2) except -1:
+    cdef Cell* create_cell(self, Vert *vert, Cell *p1, Cell *p2) except *:
         if self.n_cells == constants.MAX_CELLS:
             raise MaxCellsException()
         cdef Cell *cell
@@ -323,36 +323,37 @@ cdef class Plant:
         if p1 != NULL and p2 != NULL:
             # Inherit all types parents have in common.
             cell.ctype = p1.ctype & p2.ctype
+            cell.flower = p1.flower and p2.flower
         else:
             cell.ctype = 0
 
-        return cell.id
+        return cell
 
-    cdef void cell_division(self):
+    cdef void cell_division(self) except *:
         """ Update the mesh and create new cells.
             This is called after growth has occured.
             Return new cell ids
         """
         cdef:
-            int i, id
+            int i
             (Vert *) vert, v1, v2
             Node *node = self.mesh.edges
             Edge *edge
+            (Cell *) c, c1, c2
 
         for i in range(self.mesh.n_edges):
             edge = <Edge *>node.data
             node = node.next
 
             if self.mesh.edge_length(edge) > constants.MAX_EDGE_LENGTH:
-                vert = self.mesh.edge_split(edge)
                 self.mesh.edge_verts(edge, &v1, &v2)
+                vert = self.mesh.edge_split(edge)
                 try:
-                    id = self.create_cell(vert, <Cell *>v1.data, <Cell *>v2.data)
-
+                    c1 = <Cell *>v1.data
+                    c2 = <Cell *>v2.data
+                    c = self.create_cell(vert, c1, c2)
                 except MaxCellsException:
                     break
-
-        # return []
 
     cdef void _calculate_light(self) except *:
         pass

@@ -35,8 +35,8 @@ cdef class Plant:
     cdef void calculate_energy(self)
     cpdef double seed_spread(self)  except -1
 
-    cdef int create_cell(self, Vert *vert, Cell *p1, Cell *p2) except -1
+    cdef Cell* create_cell(self, Vert *vert, Cell *p1, Cell *p2) except *
     cdef list cell_output(self, Cell *cell)
-    cdef void cell_division(self)
+    cdef void cell_division(self) except *
     cdef double _calculate_energy_transfer(self) except *
     cdef void _calculate_light(self) except *

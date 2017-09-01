@@ -2,8 +2,6 @@
 import sys, os
 sys.path.append(os.path.abspath('..'))
 from plant_growth.simulate import simulate_genome
-# import MultiNEAT as NEAT
-
 from plant_growth.viewer import AnimationViewer
 
 if __name__ == '__main__':

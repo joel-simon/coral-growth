@@ -2,39 +2,17 @@
 from __future__ import division, print_function
 import math, random, os, sys
 sys.path.append(os.path.abspath('..'))
-from plant_growth import constants, neat_params
+from plant_growth import constants
 
 from plant_growth.simulate import simulate_network
 import MultiNEAT as NEAT
 from tempfile import TemporaryDirectory
 from plant_growth.viewer import AnimationViewer
 
-genome = NEAT.Genome(
-    0, # ID
-    constants.NUM_INPUTS,
-    0, # NUM_HIDDEN
-    constants.NUM_OUTPUTS,
-    False, # FS_NEAT
-    NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
-    NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
-    0, # Seed type, must be 1 to have hidden nodes.
-    neat_params.params
-)
-
-pop = NEAT.Population(
-    genome, # Seed genome.
-    neat_params.params, # Params.
-    True, # Randomize weights.
-    1.0, # Random Range.
-    14 # Random number generator seed.
-)
-
 world_configs = [{
     'light_angle': math.radians(0),
     'verbose': True
 }]
-
-print(world_configs)
 
 constants.PLANT_EFFICIENCY = 10000
 constants.SIMULATION_STEPS = 20
@@ -61,7 +39,6 @@ with TemporaryDirectory() as tmp_dir:
     exported = os.path.join(tmp_dir, '0')
 
     files = [f for f in os.listdir(exported) if '.plant.obj' in f]
-    # print(files)
     files = sorted(files, key=lambda f: int(f.split('.')[0]))
     files = [os.path.join(exported, f) for f in files]
     view = AnimationViewer(files, (1000, 1000))

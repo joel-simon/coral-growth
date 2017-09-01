@@ -10,7 +10,7 @@ import string
 from datetime import datetime
 
 from plant_growth import constants, neat_params
-from plant_growth.evaluate import evaluate_genome
+from plant_growth.simulate import simulate_genome
 from subprocess import call
 
 import MultiNEAT as NEAT
@@ -35,7 +35,23 @@ pop = NEAT.Population(
     int(time.time()) # Random number generator seed.
 )
 
-def run(out_dir, run_id):
+world_configs = [
+    {
+        'light_angle': math.radians(0)
+    },
+    {
+        'light_angle': math.radians(24)
+    },
+    {
+        'light_angle': math.radians(48)
+    }
+]
+
+def avg_seed_spread(plants):
+    s = sum(p.seed_spread() + p.volume/10 for p in plants)
+    return s / float(len(plants))
+
+def evolve(out_dir, run_id):
     last_fitness = 0.0
     t = time.time()
 
@@ -46,14 +62,14 @@ def run(out_dir, run_id):
         genome_list = NEAT.GetGenomeList(pop)
 
         for genome in genome_list:
-            plant = evaluate_genome(genome)
-            fitness = plant.seed_spread() + plant.volume/100
+            plants = simulate_genome(genome, world_configs)
+            fitness = avg_seed_spread(plants)
             genome.SetFitness(fitness)
             print('.', end='', flush=True)
 
         print()
 
-        fitnesses = [g.Fitness for g in genome_list]
+        fitnesses = [ g.Fitness for g in genome_list ]
         mean = sum(fitnesses) / float(len(fitnesses))
         maxf = max(fitnesses)
 
@@ -72,7 +88,7 @@ def run(out_dir, run_id):
                 f.write("%i\t%f\n"%(generation, maxf))
 
             os.mkdir(os.path.join(out_dir, str(generation)))
-            evaluate_genome(best, export_folder=os.path.join(out_dir, str(generation)))
+            simulate_genome(best, world_configs, export_folder=os.path.join(out_dir, str(generation)))
             last_fitness = maxf
 
         pop.Epoch()
@@ -80,7 +96,7 @@ def run(out_dir, run_id):
 
     print('Run Complete.')
     # best = pop.GetBestGenome()
-    # evaluate_genome(best, display=True)
+    # simulate_genome(best, display=True)
 
 def rand_id(n):
     options = string.ascii_uppercase + string.digits
@@ -97,5 +113,5 @@ if __name__ == '__main__':
     shutil.copy(os.path.abspath('..')+'/plant_growth/constants.py', os.path.join(dir_path, 'constants.py'))
     shutil.copy(os.path.abspath('..')+'/plant_growth/neat_params.py', os.path.join(dir_path, 'neat_params.py'))
 
-    run(dir_path, run_id)
+    evolve(dir_path, run_id)
     # call('./render_all '+out_dir, shell=True)

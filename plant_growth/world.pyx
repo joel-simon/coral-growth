@@ -6,7 +6,7 @@
 
 from __future__ import print_function, division
 from libc.stdint cimport uintptr_t
-from libc.math cimport M_PI
+from libc.math cimport M_PI, sin, cos
 
 import numpy as np
 cimport numpy as np
@@ -26,9 +26,15 @@ from plant_growth.tri_intersection cimport tri_tri_intersection
 
 cdef class World:
     def __init__(self, object params):
-        self.max_plants  = params['max_plants']
-        self.use_physics = params['use_physics']
-        self.verbose = params['verbose']
+        self.light_angle = params['light_angle']
+        self.verbose = 'verbose' in params and params['verbose']
+
+        self.li_cos = cos(self.light_angle)
+        self.li_sin = sin(self.light_angle)
+        self.light_vector[:] = [self.li_sin, self.li_cos, 0]
+
+        # self.obstacle_grid = params['obstacle_grid']
+        # self.obstacle_grid_size = params['obstacle_grid_size']
 
         self.mem = Pool()
         self.plants = []
@@ -44,34 +50,29 @@ cdef class World:
     cpdef int add_plant(self, str obj_path, object network) except -1:
         cdef Plant plant = Plant(self, obj_path, network)
         self.plants.append(plant)
+        self.add_plant_to_hash(plant, 1)
+        self.add_plant_to_hash(plant, 0)
         plant.update_attributes()
-        # self.add_plant_to_hash(plant)
         return 1 # To eventually become plant id.
 
-    cdef void add_plant_to_hash(self, Plant plant) except *:
+    cdef void add_plant_to_hash(self, Plant plant, int d) except *:
         cdef Face *face
         cdef (Vert *) v1, v2, v3
         cdef Node *fnode = plant.mesh.faces
         cdef double a[2], b[2], c[2]
 
-        a[2] = 0
-        b[2] = 0
-        c[2] = 0
-
         """ Add every mesh face to spatial hash. """
         while fnode != NULL:
             face = <Face *> fnode.data
             plant.mesh.face_verts(face, &v1, &v2, &v3)
-            self.th3d.add_tri(face, v1.p, v2.p, v3.p)
 
-            # Take only xz component.
-            a[0] = v1.p[0]
-            a[1] = v1.p[2]
-            b[0] = v2.p[0]
-            b[1] = v2.p[2]
-            c[0] = v3.p[0]
-            c[1] = v3.p[2]
-            self.th2d.add_tri(face, a, b, c)
+            if d == 1:
+                self.th3d.add_tri(face, v1.p, v2.p, v3.p)
+            else:
+                self.project_light(a, v1.p)
+                self.project_light(b, v2.p)
+                self.project_light(c, v3.p)
+                self.th2d.add_tri(face, a, b, c)
 
             fnode = fnode.next
 
@@ -80,20 +81,11 @@ cdef class World:
             We assume the plant attributes begin up to date.
         """
         cdef Plant plant
-
         self.th3d.initialize()
         self.th2d.initialize()
 
-        if self.verbose:
-            print('Step: ', self.step)
-
         for plant in self.plants:
-            if self.verbose:
-                print('\talive: ', plant.alive)
-                print('\tncells: ', str(plant.n_cells))
-
-            if plant.alive:
-                self.add_plant_to_hash(plant)
+            self.add_plant_to_hash(plant, 1)
 
         for plant in self.plants:
             if plant.alive:
@@ -104,13 +96,25 @@ cdef class World:
         for plant in self.plants:
             if plant.alive:
                 plant.cell_division()
+            self.add_plant_to_hash(plant, 0)
+
+        for plant in self.plants:
+            if plant.alive:
                 plant.update_attributes()
 
             if plant.n_cells >= constants.MAX_CELLS:
                 plant.alive = False
 
+
+        if self.verbose:
+            print('Step: ', self.step)
+            print('\talive: ', plant.alive)
+            print('\tlight: ', plant.light)
+            print('\twater: ', plant.water)
+            print('\tncells: ', str(plant.n_cells))
+            print()
+
         self.step += 1
-        if self.verbose: print()
 
     cdef void restrict_growth(self) except *:
         cdef:
@@ -120,6 +124,7 @@ cdef class World:
             (Node *) fnode
             (Vert *) v, v1, v2, v3
             double old_p[3]
+            uint grid_x, grid_y, grid_z
             size_t i
             # int key
 
@@ -127,18 +132,20 @@ cdef class World:
             if not plant.alive:
                 continue
 
-            """ Check all vertex growth, in arbitrary order, for intersection.
-            """
+            # Check all vertex growth, in arbitrary order, for intersection.
             for i in range(plant.n_cells):
                 cell = &plant.cells[i]
 
-                """ Store the old position, we reset to this if we intersect.
-                """
+                # Store the old position, we reset to this if we intersect.
                 vset(old_p, cell.vert.p)
                 vset(cell.vert.p, cell.next_p)
 
-                """ Loop through the adjacent faces.
-                """
+                # Check obstacle grid first.
+                # grid_x = <int>cell.vert.p[0] / self.obstacle_grid_size
+                # grid_y = <int>cell.vert.p[1] / self.obstacle_grid_size
+                # grid_z = <int>cell.vert.p[2] / self.obstacle_grid_size
+
+                # Loop through the adjacent faces.
                 fnode = plant.mesh.vert_faces(cell.vert)
                 while True:
                     face = <Face *>fnode.data
@@ -149,18 +156,6 @@ cdef class World:
                         break
                     else:
                         fnode = fnode.next
-                # print()
-                # # key = int(<uintptr_t>face)
-                # plant.mesh.face_verts(face, &v1, &v2, &v3)
-                    # bb_from = bb_from_tri(&v1.p, &v2.p, &v3.p)
-                    # bb_to = bb_from_tri(&v1.next_p, &v2.next_p, &v3.next_p)
-                    # self.sh.remove_object(key)
-                    # self.sh.add_object(key, bb_to)
-                    # vset(&v1.p, &v1.next_p)
-                    # vset(&v2.p, &v2.next_p)
-                    # vset(&v3.p, &v3.next_p)
-                # else:
-                #     print('blocked')
 
             # fnode = plant.mesh.faces
             # while True:
@@ -209,45 +204,43 @@ cdef class World:
 
         return True
 
+    cdef void project_light(self, double src[2], double p[3]):
+        # Rotate around z axis and then only take x,z components.
+        # https://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/3drota.htm
+        src[0] = p[0] * self.li_cos - p[1] * self.li_sin
+        src[1] = p[2]
+
     cdef void calculate_light(self, Plant plant) except *:
         cdef:
             uint m, n
-            (Vert *) v1, v2, v3#, v4, v5, v6
+            (Vert *) v1, v2, v3
             Node *fnode = plant.mesh.faces
             Face *face
             double p[2], a[2], b[2], c[2]
-            double light[3]
             double total_light = 0
-            cdef size_t i, j
-            cdef bint below
-            cdef double angle_to_light
-
-        light[:] = [0, 1.0, 0]
+            size_t i, j
+            double angle_to_light, cell_height, ah, bh, ch
 
         for i in range(plant.n_cells):
             cell = &plant.cells[i]
+            cell.light = 1
+            cell_height = cell.vert.p[0]*self.li_sin + cell.vert.p[1]*self.li_cos
 
             # Below ground
             if cell.vert.p[1] < 0:
+                cell.light = 0
                 continue
 
-            p[0] = cell.vert.p[0]
-            p[1] = cell.vert.p[2]
-
-            angle_to_light = vangle(light, cell.vert.normal) / M_PI
+            self.project_light(p, cell.vert.p)
+            angle_to_light = vangle(self.light_vector, cell.vert.normal) / M_PI
 
             if angle_to_light > .5:
                 cell.light = 0
                 continue
 
-            cell.light = 1
-
             m = self.max_face_neighbors
             n = self.th2d.neighbors(p, m, self.face_neighbors)
-#
-            # while fnode != NULL:
-            #     face = <Face *>fnode.data
-            #     fnode = fnode.next
+
             for j in range(n):
                 face = <Face *>self.face_neighbors[j]
                 plant.mesh.face_verts(face, &v1, &v2, &v3)
@@ -256,15 +249,16 @@ cdef class World:
                     continue
 
                 # If face is below vert, it does not block.
-                if (v1.p[1] + v2.p[1] + v3.p[1]) / 3.0 < cell.vert.p[1]:
+                ah = v1.p[0]*self.li_sin + v1.p[1]*self.li_cos
+                bh = v2.p[0]*self.li_sin + v2.p[1]*self.li_cos
+                ch = v3.p[0]*self.li_sin + v3.p[1]*self.li_cos
+
+                if (ah + bh + ch) / 3.0 < cell_height:
                     continue
 
-                a[0] = v1.p[0]
-                a[1] = v1.p[2]
-                b[0] = v2.p[0]
-                b[1] = v2.p[2]
-                c[0] = v3.p[0]
-                c[1] = v3.p[2]
+                self.project_light(a, v1.p)
+                self.project_light(b, v2.p)
+                self.project_light(c, v3.p)
 
                 if pnt_in_tri(p, a, b, c):
                     cell.light = 0

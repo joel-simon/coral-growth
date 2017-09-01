@@ -23,7 +23,11 @@ cdef inline bint pnt_in_tri(double p[2], double p0[2], double p1[2], double p2[2
 
 cdef class World:
     cdef Pool mem
-    cdef public int soil_height, max_plants, use_physics, step
+    cdef public double light_angle, obstacle_grid_size
+    cdef double li_cos, li_sin
+    cdef double light_vector[3]
+    cdef public int use_physics, step
+    cdef public int[::] obstacles
     cdef uint max_face_neighbors
     cdef public list plants
     cdef void **face_neighbors
@@ -33,8 +37,8 @@ cdef class World:
 
     cpdef int add_plant(self, str obj_path, object network) except -1
     cpdef void simulation_step(self) except *
-
-    cdef void add_plant_to_hash(self, Plant plant) except *
+    cdef void project_light(self, double src[2], double p[3])
+    cdef void add_plant_to_hash(self, Plant plant, int d) except *
     cdef void restrict_growth(self) except *
     cdef int valid_face_position(self, Plant plant, Face *faceid) except -1
     cdef void calculate_light(self, Plant plant) except *

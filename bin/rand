@@ -4,7 +4,7 @@ import math, random, os, sys
 sys.path.append(os.path.abspath('..'))
 from plant_growth import constants, neat_params
 
-from plant_growth.evaluate import simulate_single
+from plant_growth.simulate import simulate_network
 import MultiNEAT as NEAT
 from tempfile import TemporaryDirectory
 from plant_growth.viewer import AnimationViewer
@@ -29,8 +29,15 @@ pop = NEAT.Population(
     14 # Random number generator seed.
 )
 
-constants.PLANT_EFFICIENCY = 1000
-constants.SIMULATION_STEPS = 10
+world_configs = [{
+    'light_angle': math.radians(0),
+    'verbose': True
+}]
+
+print(world_configs)
+
+constants.PLANT_EFFICIENCY = 10000
+constants.SIMULATION_STEPS = 20
 
 class NetworkDummy(object):
     def Input(self, ls):
@@ -44,17 +51,19 @@ class NetworkDummy(object):
 
     def Output(self):
         out = [0] * constants.NUM_OUTPUTS
-        out[0] = 3* random.random() * constants.CELL_GROWTH_SCALAR
-
+        # out[0] = random.random() * constants.CELL_GROWTH_SCALAR
+        out[0] = 1*constants.CELL_GROWTH_SCALAR
         return out
 
 with TemporaryDirectory() as tmp_dir:
     net = NEAT.NeuralNetwork()
-    plant = simulate_single(NetworkDummy(), export_folder=tmp_dir)
+    plant = simulate_network(NetworkDummy(), world_configs, export_folder=tmp_dir)
+    exported = os.path.join(tmp_dir, '0')
 
-    files = [f for f in os.listdir(tmp_dir) if '.plant.obj' in f]
+    files = [f for f in os.listdir(exported) if '.plant.obj' in f]
+    # print(files)
     files = sorted(files, key=lambda f: int(f.split('.')[0]))
-    files = [os.path.join(tmp_dir, f) for f in files]
+    files = [os.path.join(exported, f) for f in files]
     view = AnimationViewer(files, (1000, 1000))
     view.main_loop()
 

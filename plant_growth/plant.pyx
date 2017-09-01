@@ -36,7 +36,8 @@ cdef class Plant:
         self.n_cells = 0
         self.max_cells = constants.MAX_CELLS
         self.energy = 0
-        self.flowers
+        self.flowers = 0
+        self.light = 0
 
         self.cells = <Cell *>self.mem.alloc(self.max_cells, sizeof(Cell))
         # Constants
@@ -51,8 +52,13 @@ cdef class Plant:
             vert = <Vert *>node.data
             self.create_cell(vert, NULL, NULL)
             node = node.next
-        self.update_attributes()
 
+        # self.update_attributes()
+
+    def __str__(self):
+        s = 'Plant: {alive=%i, ncells:%i, light:%f, water:%f, volume:%f, energy:%f}'%\
+            (self.alive, self.n_cells, self.light, self.water, self.volume, self.energy)
+        return s
 
     cdef list cell_output(self, Cell *cell):
         """ Map cell stats to nerual input in [-1, 1] range. """
@@ -171,6 +177,7 @@ cdef class Plant:
         # self.energy -= energy_usage
         # assert self.energy >= 0
         # self.gametes += self.energy
+
 
     cdef void update_attributes(self) except *:
         """ In each simulation step, grow is called on all plants then

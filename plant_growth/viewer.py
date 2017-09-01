@@ -92,32 +92,35 @@ class Viewer(object):
 
         # first flatten out the arrays:
         vertices = mesh['vertices'].flatten()
-        normals = mesh['vertice_normals'].flatten()
-        indices = mesh['faces'].astype('uint32').flatten()
-        colors = mesh['vert_colors'].flatten()
+        normals  = mesh['vertice_normals'].flatten()
+        findices = mesh['faces'].astype('uint32').flatten()
+        eindices = mesh['edges'].astype('uint32').flatten()
+
+        fcolors = mesh['vert_colors'].flatten()
+        ecolors = np.zeros_like(mesh['vert_colors']).flatten()
 
         # then convert to OpenGL / ctypes arrays:
-        vertices = (GLfloat * len(vertices))(*vertices)
+        fvertices = (GLfloat * len(vertices))(*vertices)
+        evertices = (GLfloat * len(vertices))(*vertices*1.001)
         normals = (GLfloat * len(normals))(*normals)
-        indices = (GLuint * len(indices))(*indices)
-        colors = (GLfloat * len(colors))(*colors)
-        # colors = [1] * len(colors)
-        # finally, build the list:
-        # list = glGenLists(1)
-        # glNewList(list, GL_COMPILE)
+        findices = (GLuint * len(findices))(*findices)
+        eindices = (GLuint * len(eindices))(*eindices)
+        fcolors = (GLfloat * len(fcolors))(*fcolors)
+        ecolors = (GLfloat * len(ecolors))(*ecolors)
 
         glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT)
         glEnableClientState(GL_VERTEX_ARRAY)
         glEnableClientState(GL_NORMAL_ARRAY)
         glEnableClientState(GL_COLOR_ARRAY)
-        glVertexPointer(3, GL_FLOAT, 0, vertices)
+        glVertexPointer(3, GL_FLOAT, 0, fvertices)
         glNormalPointer(GL_FLOAT, 0, normals)
-        glColorPointer(3, GL_FLOAT, 0, colors)
-        glDrawElements(GL_TRIANGLES, len(indices), GL_UNSIGNED_INT, indices)
-        # glDrawElements(GL_TRIANGLES, len(indices), GL_UNSIGNED_INT, indices)
+        glColorPointer(3, GL_FLOAT, 0, fcolors)
+        glDrawElements(GL_TRIANGLES, len(findices), GL_UNSIGNED_INT, findices)
+
+        glColorPointer(3, GL_FLOAT, 0, ecolors)
+        glVertexPointer(3, GL_FLOAT, 0, evertices)
+        glDrawElements(GL_LINES, len(eindices), GL_UNSIGNED_INT, eindices)
         glPopClientAttrib()
-        # glEndList()
-        # return list
 
     def draw_mesh(self, mesh):
         verts = mesh['vertices']

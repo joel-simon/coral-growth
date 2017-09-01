@@ -5,15 +5,14 @@ from plant_growth.mesh cimport Mesh, Node, Vert, Face, Edge
 cdef struct Cell:
     int id
     Vert *vert
+    bint alive
     double next_p[3]
-    # bint lite
+    double rotated[3]
     double flower
     double light
     bint water
     double curvature
-    # double strain
     unsigned int ctype
-    int alive
 
 cdef class Plant:
     cdef Pool mem
@@ -23,7 +22,6 @@ cdef class Plant:
     cdef public double efficiency, energy, volume, light, flowers, water
     cdef double growth_scalar
 
-    # , energy_usage, gametes,, max_age, cell_growth_energy_usage, cell_min_energy, growth_scalar
     cdef public bint alive
     cdef public int age, n_cells, max_cells, cell_types
 
@@ -36,9 +34,6 @@ cdef class Plant:
 
     cdef void calculate_energy(self)
     cpdef double seed_spread(self)  except -1
-
-    # cpdef int num_flowers(self)
-    # cpdef int num_active_flowers(self)
 
     cdef int create_cell(self, Vert *vert, Cell *p1, Cell *p2) except -1
     cdef list cell_output(self, Cell *cell)

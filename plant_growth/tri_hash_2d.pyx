@@ -15,9 +15,7 @@ cdef class TriHash2D:
         self.dim_size = int(world_size / cell_size)
         self.size = self.dim_size**2
         self.bins = <Entry **>self.mem.alloc(self.size, sizeof(Entry *))
-        # print('n bins', self.size)
 
-    cdef void initialize(self):
         cdef size_t i
         for i in range(self.size):
             self.bins[i] = NULL
@@ -33,7 +31,7 @@ cdef class TriHash2D:
 
         return bi
 
-    cdef void add_tri(self, void *key, double a[2], double b[2], double c[2]) except *:
+    cdef void add_tri(self, int key, double a[2], double b[2], double c[2]) except *:
         cdef uint bi = self.tri_bucket(a, b, c)
         cdef Entry *entry = <Entry *>self.mem.alloc(1, sizeof(Entry))
 
@@ -41,24 +39,25 @@ cdef class TriHash2D:
         entry.next = self.bins[bi]
         self.bins[bi] = entry
 
-    def py_add_tr(self, object key, list la, list lb, list lc):
-        cdef double a[2], b[2], c[2]
-        a[:] = la
-        b[:] = lb
-        c[:] = lc
-        self.add_tri(<void *>key, a, b, c)
+    # def py_add_tr(self, int key, list la, list lb, list lc):
+    #     cdef double a[2], b[2], c[2]
+    #     a[:] = la
+    #     b[:] = lb
+    #     c[:] = lc
+    #     self.add_tri(key, a, b, c)
 
-    cdef uint neighbors(self, double a[2], uint n, void **results) except *:
+    cdef int neighbors(self, double a[2], int[:] results) except *:
         cdef int h, x, y, z
-        cdef uint i = 0
+        cdef int i = 0
+        cdef int n = results.shape[0]
         cdef Entry* entry
 
         cdef double ws2 = self.world_size / 2
         cdef int cx = <int>((a[0] + ws2) / self.cell_size)
         cdef int cy = <int>((a[1] + ws2) / self.cell_size)
 
-        for x in range(max(0, cx-1), min(cx+2, self.dim_size-1)):
-            for y in range(max(0, cy-1), min(cy+2, self.dim_size-1)):
+        for x in range(max(0, cx-1), min(cx+1, self.dim_size-1)):
+            for y in range(max(0, cy-1), min(cy+1, self.dim_size-1)):
                 h = x + y*self.dim_size
                 entry = self.bins[h]
 
@@ -72,22 +71,22 @@ cdef class TriHash2D:
                         entry = entry.next
         return i
 
-    def py_neighbors(self, a):
-        cdef int h, x, y, z
-        cdef Entry* entry
+    # def py_neighbors(self, a):
+    #     cdef int h, x, y, z
+    #     cdef Entry* entry
 
-        cdef double ws2 = self.world_size / 2
-        cdef int cx = <int>((a[0] + ws2) / self.cell_size)
-        cdef int cy = <int>((a[1] + ws2) / self.cell_size)
+    #     cdef double ws2 = self.world_size / 2
+    #     cdef int cx = <int>((a[0] + ws2) / self.cell_size)
+    #     cdef int cy = <int>((a[1] + ws2) / self.cell_size)
 
-        cdef list results = []
+    #     cdef list results = []
 
-        for x in range(max(0, cx-1), min(cx+2, self.dim_size-1)):
-            for y in range(max(0, cy-1), min(cy+2, self.dim_size-1)):
-                h = x + y*self.dim_size
-                entry = self.bins[h]
+    #     for x in range(max(0, cx-1), min(cx+2, self.dim_size-1)):
+    #         for y in range(max(0, cy-1), min(cy+2, self.dim_size-1)):
+    #             h = x + y*self.dim_size
+    #             entry = self.bins[h]
 
-                while entry != NULL:
-                    results.append(<object>entry.key)
-                    entry = entry.next
-        return results
+    #             while entry != NULL:
+    #                 results.append(entry.key)
+    #                 entry = entry.next
+    #     return results

@@ -1,100 +1,33 @@
-#!/usr/bin/python3
-
-try:
-    from setuptools import setup
-    from setuptools.extension import Extension
-except Exception:
-    from distutils.core import setup
-    from distutils.extension import Extension
-
-from Cython.Build import cythonize
-from Cython.Distutils import build_ext
+#!/usr/bin/env python
+import os
 import numpy
+from setuptools import setup, find_packages
+from Cython.Build import cythonize
 
-_extra = [
-    '-ffast-math',
-    '-Wno-unused-function',
-]
-
-# _macros = [('CYTHON_TRACE', '1')]
-_macros = False
-compiler_directives = {'linetrace': False, 'profile': False}
-
-extensions = [
-    # Extension(
-    #     'plant_growth/geometry',
-    #     sources = ['./plant_growth/geometry.pyx'],
-    #     extra_compile_args = _extra,
-    #     define_macros=_macros
-    # ),
-    Extension(
-        'plant_growth/plant',
-        sources = ['./plant_growth/plant.pyx'],
-        extra_compile_args = _extra,
-        define_macros=_macros
-    ),
-    Extension(
-        'plant_growth/world',
-        sources = ['./plant_growth/world.pyx'],
-        extra_compile_args = _extra,
-        define_macros=_macros
-    ),
-    Extension(
-        'plant_growth/tri_hash_2d',
-        sources = ['./plant_growth/tri_hash_2d.pyx'],
-        extra_compile_args = _extra,
-        define_macros=_macros,
-    ),
-    Extension(
-        'plant_growth/tri_hash_3d',
-        sources = ['./plant_growth/tri_hash_3d.pyx'],
-        extra_compile_args = _extra,
-        define_macros=_macros,
-    ),
-    Extension(
-        'plant_growth/tri_intersection',
-        sources = ['./plant_growth/tri_intersection.pyx'],
-        extra_compile_args = _extra,
-        define_macros=_macros,
-    ),
-    # Extension(
-    #     'plant_growth/spatial_hash',
-    #     sources = ['./plant_growth/spatial_hash.pyx'],
-    #     extra_compile_args = _extra,
-    #     define_macros=_macros,
-    # ),
-    Extension(
-        'plant_growth/vector3D',
-        sources = ['./plant_growth/vector3D.pyx'],
-        extra_compile_args = _extra,
-        define_macros=_macros,
-    ),
-    # Extension(
-    #     'plant_growth/spring_system',
-    #     sources = ['./plant_growth/spring_system.pyx'],
-    #     extra_compile_args = _extra,
-    #     define_macros=_macros,
-    # ),
-    Extension(
-        'plant_growth/mesh',
-        sources = ['./plant_growth/mesh.pyx'],
-        extra_compile_args = _extra,
-        define_macros=_macros,
-    )
-]
+def find_pyx(path='.'):
+    pyx_files = []
+    for root, dirs, filenames in os.walk(path):
+        for fname in filenames:
+            if fname.endswith('.pyx'):
+                pyx_files.append(os.path.join(root, fname))
+    return pyx_files
 
 setup(
     name = "plant-growth",
     version = '0.1.0',
     author = 'joelsimon.net',
+    author_email='joelsimon6@gmail.com',
     install_requires = ['numpy', 'cython'],
     license = 'MIT',
-    cmdclass={'build_ext' : build_ext},
     include_dirs = [numpy.get_include()],
 
+    packages = find_packages(),
     ext_modules = cythonize(
-        extensions,
+        find_pyx(),
         include_path = [numpy.get_include()],
-        compiler_directives=compiler_directives
-    )
+    ),
+    include_package_data = True,
+    package_data = {
+        'cymesh': ['*.pxd'],
+    },
 )

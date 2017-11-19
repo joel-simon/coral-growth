@@ -10,7 +10,7 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 
-from .primitive import make_plane, G_OBJ_PLANE, G_OBJ_SPHERE
+# from .primitive import make_plane, G_OBJ_PLANE, G_OBJ_SPHERE
 
 from OpenGL.arrays import vbo
 from OpenGL.raw.GL.ARB.vertex_array_object import glGenVertexArrays, \
@@ -65,7 +65,7 @@ class Viewer(object):
         glEnable(GL_BLEND)
 
         glTranslated(-15, -15, -15)
-        make_plane(5)
+        # make_plane(5)
 
         self.rx, self.ry = (0,0)
         self.tx, self.ty = (0,0)
@@ -247,7 +247,7 @@ class Viewer(object):
             pygame.display.flip()
             i += 1
 
-from .mesh import Mesh
+from cymesh.mesh import Mesh
 import numpy as np
 from colorsys import hsv_to_rgb
 
@@ -282,10 +282,10 @@ class AnimationViewer(Viewer):
                     header = l.split(' ')[1:]
                 elif l.startswith('c'):
                     d = l.split(' ')[1:]
-                    d[0] = float(d[0])
-                    d[1] = bool(int(d[1]))
-                    d[2] = int(d[2])
-                    d[3] = float(d[3])
+                    d[0] = float(d[0]) # light
+                    d[1] = float(d[1]) # flow
+                    d[2] = int(d[2]) # ctype
+                    # d[3] = float(d[3])
                     cell_data.append(d)
                     ci += 1
 
@@ -294,10 +294,12 @@ class AnimationViewer(Viewer):
                 glNewList(gl_list, GL_COMPILE)
 
                 for i, data in enumerate(cell_data):
-                    if v == 0: # PLANT and Flower
-                        color = hsv_to_rgb((100+190*data[3])/360, .70, .6 + .4*data[0])
+                    d = .2 + .8*data[0]
+                    if v == 0:
+                        color = (d, d, d)
+                        # color = hsv_to_rgb((100+190*data[3])/360, .70, .6 + .4*data[0])
                     elif v == 1:
-                        color = (data[0], data[0], data[0])
+                        color = (d, d, d)
                     elif v == 2:
                         color = colors[data[2]]
 
@@ -364,7 +366,7 @@ class AnimationViewer(Viewer):
     def step(self, i):
         if self.animation_playing:
             self.rx += 1
-            self.zpos += .25
+            # self.zpos += .25
 
         if self.animation_playing and self.frame < self.n_frames - 1:
             self.frame += 1

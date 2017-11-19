@@ -9,17 +9,18 @@ import random
 import string
 from datetime import datetime
 
-from plant_growth import constants, neat_params
+from plant_growth import neat_params
 from plant_growth.simulate import simulate_genome
+from plant_growth.plant import Plant
 from subprocess import call
 
 import MultiNEAT as NEAT
 
 genome = NEAT.Genome(
     0, # ID
-    constants.NUM_INPUTS,
+    Plant.num_inputs,
     0, # NUM_HIDDEN
-    constants.NUM_OUTPUTS,
+    Plant.num_outputs,
     False, # FS_NEAT
     NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function
     NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function..
@@ -35,35 +36,30 @@ pop = NEAT.Population(
     int(time.time()) # Random number generator seed.
 )
 
+time_steps = 50
+
 world_configs = [
     {
-        'light_angle': math.radians(0)
-    },
-    {
-        'light_angle': math.radians(24)
-    },
-    {
-        'light_angle': math.radians(48)
+        'max_cells': 5000,
+        'growth_scalar': .25,
+        'max_angle': .98 * 2 * 3.14159,
+        'max_face_growth': 2.0,
     }
 ]
 
-def avg_seed_spread(plants):
-    s = sum(p.seed_spread() + p.volume/10 for p in plants)
-    return s / float(len(plants))
-
-def evolve(out_dir, run_id):
+def evolve(generations, out_dir, run_id):
     last_fitness = 0.0
     t = time.time()
 
-    for generation in range(constants.NUM_GENERATIONS):
+    for generation in range(generations):
         print(run_id)
         print('Starting generation', generation)
 
         genome_list = NEAT.GetGenomeList(pop)
 
         for genome in genome_list:
-            plants = simulate_genome(genome, world_configs)
-            fitness = avg_seed_spread(plants)
+            plants = simulate_genome(time_steps, genome, world_configs)
+            fitness = plants[0].total_gametes
             genome.SetFitness(fitness)
             print('.', end='', flush=True)
 
@@ -88,30 +84,32 @@ def evolve(out_dir, run_id):
                 f.write("%i\t%f\n"%(generation, maxf))
 
             os.mkdir(os.path.join(out_dir, str(generation)))
-            simulate_genome(best, world_configs, export_folder=os.path.join(out_dir, str(generation)))
+
+
+            simulate_genome(time_steps, best, world_configs, \
+                            export_folder=os.path.join(out_dir, str(generation)))
             last_fitness = maxf
 
         pop.Epoch()
         print()
 
     print('Run Complete.')
-    # best = pop.GetBestGenome()
-    # simulate_genome(best, display=True)
 
 def rand_id(n):
     options = string.ascii_uppercase + string.digits
     return ''.join(random.choice( options ) for _ in range(n))
 
 if __name__ == '__main__':
-    root = './flowers'
-    # root = '/Users/joelsimon/Documents/plant_out_3d'
-    run_id = rand_id(4)
-    print('Run ID: ', run_id)
-    dir_name = "out_{:%B_%d_%Y_%H-%M}_".format(datetime.now())+run_id
+    root = '../output'
+    generations = 100
+    rid = rand_id(4)
+    print('Run ID: ', rid)
+
+    dir_name = "out_{:%B_%d_%Y_%H_%M}_".format(datetime.now())+rid
     dir_path = os.path.join(root, dir_name)
     os.makedirs(dir_path)
-    shutil.copy(os.path.abspath('..')+'/plant_growth/constants.py', os.path.join(dir_path, 'constants.py'))
+    # shutil.copy(os.path.abspath('..')+'/plant_growth/constants.py', os.path.join(dir_path, 'constants.py'))
     shutil.copy(os.path.abspath('..')+'/plant_growth/neat_params.py', os.path.join(dir_path, 'neat_params.py'))
 
-    evolve(dir_path, run_id)
+    evolve(generations, dir_path, rid)
     # call('./render_all '+out_dir, shell=True)

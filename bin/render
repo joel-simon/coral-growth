@@ -1,84 +1,84 @@
-#!/usr/bin/env python3
-import os, sys, re
-import shutil
-sys.path.append(os.path.abspath('..'))
+# #!/usr/bin/env python3
+# import os, sys, re
+# import shutil
+# sys.path.append(os.path.abspath('..'))
 
-from plant_growth import constants
-from plant_growth.pygameDraw import PygameDraw
-from plant_growth.plot import plot
-from plant_growth.evaluate import evaluate_genome
+# # from plant_growth import constants
+# from plant_growth.pygameDraw import PygameDraw
+# from plant_growth.plot import plot
+# from plant_growth.evaluate import evaluate_genome
 
-import MultiNEAT as NEAT
-from subprocess import call
-from tempfile import TemporaryDirectory
+# import MultiNEAT as NEAT
+# from subprocess import call
+# from tempfile import TemporaryDirectory
 
-frame_Padding = 40 # Amount to hold after growth finished.
+# frame_Padding = 40 # Amount to hold after growth finished.
 
-if __name__ == '__main__':
-    assert(len(sys.argv) == 2)
-    path = sys.argv[1]
+# if __name__ == '__main__':
+#     assert(len(sys.argv) == 2)
+#     path = sys.argv[1]
 
-    if os.path.isdir(path):
-        file_names = os.listdir(path)
-        dirname = path
-        out_name = 'evolution.mp4'
-        print("Network Directory Found")
-    elif os.path.isfile(path):
-        file_names = [ path ]
-        dirname = os.path.dirname(path)
-        out_name = os.path.basename(path)+'.mp4'
-        print("Single Network Found")
-    else:
-        raise ValueError('Not directory or file: '+str(sys.argv[1]))
+#     if os.path.isdir(path):
+#         file_names = os.listdir(path)
+#         dirname = path
+#         out_name = 'evolution.mp4'
+#         print("Network Directory Found")
+#     elif os.path.isfile(path):
+#         file_names = [ path ]
+#         dirname = os.path.dirname(path)
+#         out_name = os.path.basename(path)+'.mp4'
+#         print("Single Network Found")
+#     else:
+#         raise ValueError('Not directory or file: '+str(sys.argv[1]))
 
-    view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
+#     view = PygameDraw(constants.WORLD_WIDTH, constants.WORLD_HEIGHT)
 
-    frame = 0
+#     frame = 0
 
-    networks_re = re.compile('best_(\d*)$')
+#     networks_re = re.compile('best_(\d*)$')
 
-    networks = []
+#     networks = []
 
-    for name in file_names:
-        match = networks_re.search(name)
-        if match:
-            gen = int(match.groups()[0])
-            networks.append((gen, os.path.join(dirname, name)))
+#     for name in file_names:
+#         match = networks_re.search(name)
+#         if match:
+#             gen = int(match.groups()[0])
+#             networks.append((gen, os.path.join(dirname, name)))
 
-    if len(networks) == 0:
-        raise ValueError('No networks found.')
+#     if len(networks) == 0:
+#         raise ValueError('No networks found.')
 
-    # Sort in-place in increasing order
-    networks.sort()
+#     # Sort in-place in increasing order
+#     networks.sort()
 
-    with TemporaryDirectory() as  temp_dir:
-        print('Created temp directory.')
+#     with TemporaryDirectory() as  temp_dir:
+#         print('Created temp directory.')
 
-        for gen, file_path in networks:
+#         for gen, file_path in networks:
 
-            # Display_func is only passed world object so pass rest with closure.
-            def display_func(world):
-                global frame
-                frame_path = os.path.join(temp_dir, '{:05d}.png'.format(frame))
-                plot(view, world, title='Generation %i'%gen)
-                view.save(frame_path)
-                frame += 1
+#             # Display_func is only passed world object so pass rest with closure.
+#             def display_func(world):
+#                 global frame
+#                 frame_path = os.path.join(temp_dir, '{:05d}.png'.format(frame))
+#                 plot(view, world, title='Generation %i'%gen)
+#                 view.save(frame_path)
+#                 frame += 1
 
-            def copy_frames(n):
-                global frame
-                src = os.path.join(temp_dir, '{:05d}.png'.format(frame-1))
-                for _ in range(n):
-                    dst = os.path.join(temp_dir, '{:05d}.png'.format(frame))
-                    frame += 1
-                    shutil.copy(src, dst)
+#             def copy_frames(n):
+#                 global frame
+#                 src = os.path.join(temp_dir, '{:05d}.png'.format(frame-1))
+#                 for _ in range(n):
+#                     dst = os.path.join(temp_dir, '{:05d}.png'.format(frame))
+#                     frame += 1
+#                     shutil.copy(src, dst)
 
-            genome = NEAT.Genome(file_path)
-            print('Loaded', file_path)
-            print('Generating images...')
-            evaluate_genome(genome, display=display_func)
-            copy_frames(frame_Padding)
+#             genome = NEAT.Genome(file_path)
+#             print('Loaded', file_path)
+#             print('Generating images...')
+#             evaluate_genome(genome, display=display_func)
+#             copy_frames(frame_Padding)
 
-        print('Finished generating images.')
-        print('Generating movie...')
-        call("ffmpeg -r 30 -pix_fmt yuv420p -i "+temp_dir+"/%05d.png "+dirname+"/"+out_name, shell=True)
-        print('Finished generating movie.')
+#         print('Finished generating images.')
+#         print('Generating movie...')
+#         call("ffmpeg -r 30 -pix_fmt yuv420p -i "+temp_dir+"/%05d.png "+dirname+"/"+out_name, shell=True)
+#         print('Finished generating movie.')

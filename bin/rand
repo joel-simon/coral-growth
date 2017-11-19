@@ -2,24 +2,19 @@
 from __future__ import division, print_function
 import math, random, os, sys
 sys.path.append(os.path.abspath('..'))
-from plant_growth import constants
 
-from plant_growth.simulate import simulate_network
 import MultiNEAT as NEAT
 from tempfile import TemporaryDirectory
+
+from plant_growth.plant import Plant
+from plant_growth.simulate import simulate_network
 from plant_growth.viewer import AnimationViewer
 
-world_configs = [{
-    'light_angle': math.radians(0),
-    'verbose': True
-}]
-
-constants.PLANT_EFFICIENCY = 10000
-constants.SIMULATION_STEPS = 20
+time_steps = 20
 
 class NetworkDummy(object):
-    def Input(self, ls):
-        self.ls = ls
+    def Input(self, input):
+        self.input = input
 
     def ActivateFast(self):
         pass
@@ -28,14 +23,25 @@ class NetworkDummy(object):
         pass
 
     def Output(self):
-        out = [0] * constants.NUM_OUTPUTS
-        # out[0] = random.random() * constants.CELL_GROWTH_SCALAR
-        out[0] = 1*constants.CELL_GROWTH_SCALAR
+        out = [0] * Plant.num_outputs
+        out[0] = random.random()
+        # out[0] = (self.input[0]+1) * .5
+        # out[0] = 1
         return out
+
+world_configs = [
+    {
+        'max_cells': 5000,
+        'growth_scalar': .25,
+        'max_angle': .98 * 2 * 3.14159,
+        'max_face_growth': 2.0,
+    }
+]
 
 with TemporaryDirectory() as tmp_dir:
     net = NEAT.NeuralNetwork()
-    plant = simulate_network(NetworkDummy(), world_configs, export_folder=tmp_dir)
+    simulate_network(time_steps, NetworkDummy(), world_configs,
+                     export_folder=tmp_dir, verbose=True)
     exported = os.path.join(tmp_dir, '0')
 
     files = [f for f in os.listdir(exported) if '.plant.obj' in f]

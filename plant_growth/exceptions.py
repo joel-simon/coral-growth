@@ -1,3 +1,0 @@
-
-class MaxCellsException(Exception):
-    pass

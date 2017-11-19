@@ -1,15 +1,43 @@
 #!/usr/bin/env python3
-import sys, os
-sys.path.append(os.path.abspath('..'))
-import MultiNEAT as NEAT
-import cProfile
-from plant_growth.evaluate import evaluate_genome
+from __future__ import division, print_function
+
 import time
-if __name__ == '__main__':
-    assert(len(sys.argv) == 2)
-    assert(os.path.exists(sys.argv[1]))
-    genome = NEAT.Genome(sys.argv[1])
-    start = time.time()
-    evaluate_genome(genome)
-    # cProfile.run('evaluate_genome(genome)', 'single.prof')
-    print('Done in', time.time() - start)
+import random
+import os, sys
+
+sys.path.append(os.path.abspath('..'))
+random.seed(123)
+import MultiNEAT as NEAT
+from plant_growth.plant import Plant
+from plant_growth.simulate import simulate_network
+
+time_steps = 20
+
+class NetworkDummy(object):
+    def Input(self, input):
+        self.input = input
+
+    def ActivateFast(self):
+        pass
+
+    def Flush(self):
+        pass
+
+    def Output(self):
+        out = [0] * Plant.num_outputs
+        out[0] = random.random()
+        return out
+
+world_configs = [
+    {
+        'max_cells': 5000,
+        'growth_scalar': .25,
+        'max_angle': .98 * 2 * 3.14159,
+        'max_face_growth': 2.0,
+    }
+]
+
+start = time.time()
+net = NEAT.NeuralNetwork()
+simulate_network(time_steps, NetworkDummy(), world_configs)
+print('finished in', time.time() - start)

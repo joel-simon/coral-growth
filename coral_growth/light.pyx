@@ -12,7 +12,7 @@ from cymesh.mesh cimport Mesh
 from cymesh.structures cimport Vert, Face, Edge
 from cymesh.vector3D cimport vangle
 
-from plant_growth.tri_hash_2d cimport TriHash2D
+from coral_growth.tri_hash_2d cimport TriHash2D
 
 cdef bint pnt_in_tri(double[:] p, double[:] p0, double[:] p1, double[:] p2):
     # https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
@@ -34,8 +34,8 @@ cdef bint pnt_in_tri(double[:] p, double[:] p0, double[:] p1, double[:] p2):
 
     return s > 0 and t > 0 and (s + t) <= A
 
-cpdef void calculate_light(plant) except *:
-    """ Calculate the light on each polyp of a plant.
+cpdef void calculate_light(coral) except *:
+    """ Calculate the light on each polyp of a coral.
     """
     cdef:
         Vert v1, v2, v3, vert
@@ -53,25 +53,25 @@ cpdef void calculate_light(plant) except *:
         int i, j, n, v1_id, v2_id, v3_id, face_id
 
     # Memeoryviews of coral.
-    cdef double[:] polyp_light = plant.polyp_light
-    cdef double[:,:] polyp_pos = plant.polyp_pos
-    cdef double[:,:] polyp_normal = plant.polyp_normal
+    cdef double[:] polyp_light = coral.polyp_light
+    cdef double[:,:] polyp_pos = coral.polyp_pos
+    cdef double[:,:] polyp_normal = coral.polyp_normal
 
-    cdef double[:] boundingBox = plant.mesh.boundingBox()
+    cdef double[:] boundingBox = coral.mesh.boundingBox()
     cdef double world_size = max(boundingBox[1]- boundingBox[0], boundingBox[3]- boundingBox[2])
 
 
     cdef double max_e = 0
-    for e in plant.mesh.edges:
+    for e in coral.mesh.edges:
         max_e = fmax(max_e, e.length())
 
     cdef int[:] face_buffer = np.zeros(1000, dtype='int32')
     cdef double[:] light = np.array([0, 1.0, 0], dtype='float64')
     cdef TriHash2D th2d = TriHash2D(cell_size=max_e, world_size=world_size)
 
-    cdef int[:,:] faces = np.zeros((len(plant.mesh.faces), 3), dtype='i')
+    cdef int[:,:] faces = np.zeros((len(coral.mesh.faces), 3), dtype='i')
 
-    for i, face in enumerate(plant.mesh.faces):
+    for i, face in enumerate(coral.mesh.faces):
         v1 = face.he.vert
         v2 = face.he.next.vert
         v3 = face.he.next.next.vert
@@ -91,7 +91,7 @@ cpdef void calculate_light(plant) except *:
 
         th2d.add_tri(i, a, b, c)
 
-    for i in range(plant.n_cells):
+    for i in range(coral.n_polyps):
         angle_to_light = vangle(light, polyp_normal[i]) / M_PI
 
         if angle_to_light > .5:
@@ -137,4 +137,4 @@ cpdef void calculate_light(plant) except *:
                 polyp_light[i] = 0
                 break
 
-        # assert (not isnan(plant.polyp_light[i]))
+        # assert (not isnan(coral.polyp_light[i]))

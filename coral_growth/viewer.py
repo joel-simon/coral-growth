@@ -274,11 +274,11 @@ class AnimationViewer(Viewer):
             mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
             header = None # header = ['light', 'alive', 'ctype', 'flower']
 
-            cell_data = []
+            polyp_data = []
 
             ci = 0
             for l in open(file, 'r').read().splitlines():
-                if l.startswith("#plant"):
+                if l.startswith("#coral"):
                     header = l.split(' ')[1:]
                 elif l.startswith('c'):
                     d = l.split(' ')[1:]
@@ -286,14 +286,14 @@ class AnimationViewer(Viewer):
                     d[1] = float(d[1]) # flow
                     # d[2] = int(d[2]) # ctype
                     # d[3] = float(d[3])
-                    cell_data.append(d)
+                    polyp_data.append(d)
                     ci += 1
 
             for v in range(self.n_views):
                 gl_list = glGenLists(1)
                 glNewList(gl_list, GL_COMPILE)
 
-                for i, data in enumerate(cell_data):
+                for i, data in enumerate(polyp_data):
                     d = .2 + .8*data[0]
                     if v == 0:
                         color = (d, d, d)

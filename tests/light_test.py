@@ -1,9 +1,9 @@
 # import math
 
-# from plant_growth import constants, neat_params
-# from plant_growth.world import World
-# from plant_growth.pygameDraw import PygameDraw
-# from plant_growth.plot import plot
+# from coral_growth import constants, neat_params
+# from coral_growth.world import World
+# from coral_growth.pygameDraw import PygameDraw
+# from coral_growth.plot import plot
 
 # import MultiNEAT as NEAT
 
@@ -28,12 +28,12 @@
 #     'width': constants.WORLD_WIDTH,
 #     'height': constants.WORLD_HEIGHT,
 #     'soil_height': constants.SOIL_HEIGHT,
-#     'max_plants': 1,
+#     'max_corals': 1,
 # }
 
 # world = World(world_params)
 
-# world.add_plant(300, 300, 100, net, 1)
+# world.add_coral(300, 300, 100, net, 1)
 
 # view = PygameDraw(600, 600)
 # for _ in range(1):

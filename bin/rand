@@ -6,9 +6,9 @@ sys.path.append(os.path.abspath('..'))
 import MultiNEAT as NEAT
 from tempfile import TemporaryDirectory
 
-from plant_growth.plant import Plant
-from plant_growth.simulate import simulate_network
-from plant_growth.viewer import AnimationViewer
+from coral_growth.coral import Coral
+from coral_growth.simulate import simulate_network
+from coral_growth.viewer import AnimationViewer
 
 time_steps = 12
 
@@ -23,7 +23,7 @@ class NetworkDummy(object):
         pass
 
     def Output(self):
-        out = [0] * Plant.num_outputs
+        out = [0] * Coral.num_outputs
         # out[0] = random.random()
         out[0] = (self.input[0]+1) * .5
         # out[0] = 1
@@ -31,7 +31,7 @@ class NetworkDummy(object):
 
 world_configs = [
     {
-        'max_cells': 5000,
+        'max_polyps': 5000,
         'growth_scalar': .25,
         'max_angle': .98 * 2 * 3.14159,
         'max_face_growth': 2.0,
@@ -44,7 +44,7 @@ with TemporaryDirectory() as tmp_dir:
                      export_folder=tmp_dir, verbose=True)
     exported = os.path.join(tmp_dir, '0')
 
-    files = [f for f in os.listdir(exported) if '.plant.obj' in f]
+    files = [f for f in os.listdir(exported) if '.coral.obj' in f]
     files = sorted(files, key=lambda f: int(f.split('.')[0]))
     files = [os.path.join(exported, f) for f in files]
     view = AnimationViewer(files, (1000, 1000))

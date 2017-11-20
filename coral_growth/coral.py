@@ -13,9 +13,9 @@ from cymesh.collisions.findCollisions import findCollisions
 from cymesh.subdivision.sqrt3 import divide_adaptive
 from cymesh.operators.relax import relax_mesh
 
-from plant_growth.light import calculate_light
+from coral_growth.light import calculate_light
 
-class Plant(object):
+class Coral(object):
     num_inputs = 2
     num_outputs = 1
 
@@ -27,23 +27,23 @@ class Plant(object):
         self.total_gametes = 0
 
         self.growth_scalar = config['growth_scalar']
-        self.max_cells = config['max_cells']
+        self.max_polyps = config['max_polyps']
 
         mean_face = np.mean([f.area() for f in self.mesh.faces])
         self.max_face = mean_face * config['max_face_growth']
 
-        self.n_cells = 0
-        # self.cells = []
-        self.cell_inputs = [0 for _ in range(Plant.num_inputs+1)]
-        self.cell_inputs[Plant.num_inputs] = 1 # The last input is always used as bias.
+        self.n_polyps = 0
+        # self.polyps = []
+        self.polyp_inputs = [0 for _ in range(Coral.num_inputs+1)]
+        self.polyp_inputs[Coral.num_inputs] = 1 # The last input is always used as bias.
 
-        self.polyp_verts = [None] * self.max_cells
-        self.polyp_light = np.zeros(self.max_cells)
-        self.polyp_flow = np.zeros(self.max_cells)
-        self.polyp_pos = np.zeros((self.max_cells, 3))
-        self.polyp_normal = np.zeros((self.max_cells, 3))
-        self.polyp_last_pos = np.zeros((self.max_cells, 3))
-        self.poly_collided = np.zeros((self.max_cells, 3), dtype='uint8')
+        self.polyp_verts = [None] * self.max_polyps
+        self.polyp_light = np.zeros(self.max_polyps)
+        self.polyp_flow = np.zeros(self.max_polyps)
+        self.polyp_pos = np.zeros((self.max_polyps, 3))
+        self.polyp_normal = np.zeros((self.max_polyps, 3))
+        self.polyp_last_pos = np.zeros((self.max_polyps, 3))
+        self.poly_collided = np.zeros((self.max_polyps, 3), dtype='uint8')
 
         for vert in self.mesh.verts:
             self.createPolyp(vert)
@@ -53,7 +53,7 @@ class Plant(object):
 
 
     def __str__(self):
-        s = 'Plant: {ncells:%i, volume:%f}' % (len(self.n_cells), self.volume)
+        s = 'Coral: {npolyps:%i, volume:%f}' % (len(self.n_polyps), self.volume)
         return s
 
     def step(self):
@@ -64,16 +64,16 @@ class Plant(object):
         self.age += 1
 
     def polypsGrow(self):
-        """ Calculate the changes to plant by neural network.
+        """ Calculate the changes to coral by neural network.
         """
         self.total_gametes = 0
 
         self.polyp_last_pos[:, :] = self.polyp_pos
 
-        for i in range(self.n_cells):
+        for i in range(self.n_polyps):
             self.createPolypInputs(i)
             self.network.Flush() # Compute feed-forward network results.
-            self.network.Input(self.cell_inputs)
+            self.network.Input(self.polyp_inputs)
             self.network.ActivateFast()
             output =  self.network.Output()
 
@@ -86,10 +86,10 @@ class Plant(object):
         self.handleCollisions()
 
     def createPolypInputs(self, i):
-        """ Map cell stats to nerual input in [-1, 1] range. """
+        """ Map polyp stats to nerual input in [-1, 1] range. """
         assert self.polyp_verts[i]
-        self.cell_inputs[0] = (self.polyp_light[i] * 2) - 1
-        self.cell_inputs[1] = (self.polyp_verts[i].curvature * 2) - 1
+        self.polyp_inputs[0] = (self.polyp_light[i] * 2) - 1
+        self.polyp_inputs[1] = (self.polyp_verts[i].curvature * 2) - 1
 
     def handleCollisions(self):
         collisions = findCollisions(self.mesh)
@@ -101,7 +101,7 @@ class Plant(object):
                 self.poly_collided[vi] = 1
 
     def updateAttributes(self):
-        """ In each simulation step, grow is called on all plants then
+        """ In each simulation step, grow is called on all corals then
             updateAttributes. Grow has used up all spare energy.
         """
         # self.volume = self.mesh.volume()
@@ -113,40 +113,40 @@ class Plant(object):
         # self.diffuseEnergy() # TODO
 
     def createPolyp(self, vert):
-        if self.n_cells == self.max_cells:
+        if self.n_polyps == self.max_polyps:
             return
-        i = self.n_cells
-        self.n_cells += 1
-        vert.data['cell'] = i
+        i = self.n_polyps
+        self.n_polyps += 1
+        vert.data['polyp'] = i
         self.polyp_pos[i, :] = vert.p
         vert.normal = self.polyp_normal[i]
         vert.p = self.polyp_pos[i]
         self.polyp_verts[i] = vert
 
     def polypDivision(self):
-        """ Update the mesh and create new cells.
+        """ Update the mesh and create new polyps.
         """
         divide_adaptive(self.mesh, self.max_face)
 
         for vert in self.mesh.verts:
-            if 'cell' not in vert.data:
+            if 'polyp' not in vert.data:
                 self.createPolyp(vert)
 
     def export(self, out):
-        """ Export the plant to .plant.obj file
-            A .plant.obj file is a 3d mesh with cell specific information.
+        """ Export the coral to .coral.obj file
+            A .coral.obj file is a 3d mesh with polyp specific information.
             it is a compatable superset of the .obj file format.
-            In addition to the content of a .obj file a .plant file has:
+            In addition to the content of a .obj file a .coral file has:
 
-            1. A header row that begins with '#plant' that lists space
-                deiminated cell attributes
+            1. A header row that begins with '#coral' that lists space
+                deiminated polyp attributes
             2. A line that begins with 'c' for each vert that contains values for
-                cell for each attribute. Ordered the same as the vertices.
+                polyp for each attribute. Ordered the same as the vertices.
         """
         header = [ 'light', 'flow', 'ctype' ]
 
-        out.write('#Exported from plant_growth\n')
-        out.write('#plant: ' + ' '.join(header) + '\n')
+        out.write('#Exported from coral_growth\n')
+        out.write('#coral: ' + ' '.join(header) + '\n')
 
         mesh_data = self.mesh.export()
 
@@ -161,14 +161,14 @@ class Plant(object):
         for vn in mesh_data['vertice_normals']:
             out.write('vn %f %f %f\n' % tuple(vn))
 
-        cell_attributes = [None] * self.n_cells
+        polyp_attributes = [None] * self.n_polyps
 
-        # for cell in self.cells:
-        for i in range(self.n_cells):
+        # for polyp in self.polyps:
+        for i in range(self.n_polyps):
             indx = id_to_indx[self.polyp_verts[i].id]
-            cell_attributes[indx] = [ self.polyp_light[i], self.polyp_flow[i] ]
+            polyp_attributes[indx] = [ self.polyp_light[i], self.polyp_flow[i] ]
 
-        for attributes in cell_attributes:
+        for attributes in polyp_attributes:
             out.write('c ' + ' '.join(map(str, attributes)) + '\n')
 
         out.write('\n')

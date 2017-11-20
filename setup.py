@@ -13,7 +13,7 @@ def find_pyx(path='.'):
     return pyx_files
 
 setup(
-    name = "plant-growth",
+    name = "coral-growth",
     version = '0.1.0',
     author = 'joelsimon.net',
     author_email='joelsimon6@gmail.com',

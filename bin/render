@@ -3,10 +3,10 @@
 # import shutil
 # sys.path.append(os.path.abspath('..'))
 
-# # from plant_growth import constants
-# from plant_growth.pygameDraw import PygameDraw
-# from plant_growth.plot import plot
-# from plant_growth.evaluate import evaluate_genome
+# # from coral_growth import constants
+# from coral_growth.pygameDraw import PygameDraw
+# from coral_growth.plot import plot
+# from coral_growth.evaluate import evaluate_genome
 
 # import MultiNEAT as NEAT
 # from subprocess import call

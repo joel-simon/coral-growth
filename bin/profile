@@ -8,8 +8,8 @@ import os, sys
 sys.path.append(os.path.abspath('..'))
 random.seed(123)
 import MultiNEAT as NEAT
-from plant_growth.plant import Plant
-from plant_growth.simulate import simulate_network
+from coral_growth.coral import Coral
+from coral_growth.simulate import simulate_network
 
 time_steps = 20
 
@@ -24,13 +24,13 @@ class NetworkDummy(object):
         pass
 
     def Output(self):
-        out = [0] * Plant.num_outputs
+        out = [0] * Coral.num_outputs
         out[0] = random.random()
         return out
 
 world_configs = [
     {
-        'max_cells': 5000,
+        'max_polyps': 5000,
         'growth_scalar': .25,
         'max_angle': .98 * 2 * 3.14159,
         'max_face_growth': 2.0,

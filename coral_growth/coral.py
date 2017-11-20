@@ -10,13 +10,15 @@ import numpy as np
 
 from cymesh.mesh import Mesh
 from cymesh.collisions.findCollisions import findCollisions
-from cymesh.subdivision.sqrt3 import divide_adaptive
+from cymesh.subdivision.sqrt3 import divide_adaptive, split
 from cymesh.operators.relax import relax_mesh
 
 from coral_growth.light import calculate_light
+from coral_growth.modules.gravity import calculate_gravity
+from coral_growth.modules.morphogens import Morphogens
 
 class Coral(object):
-    num_inputs = 2
+    num_inputs = 3
     num_outputs = 1
 
     def __init__(self, obj_path, network, config):
@@ -29,13 +31,15 @@ class Coral(object):
         self.growth_scalar = config['growth_scalar']
         self.max_polyps = config['max_polyps']
 
+        self.morphogens = Morphogens(self, config['morphogens'])
+
         mean_face = np.mean([f.area() for f in self.mesh.faces])
-        self.max_face = mean_face * config['max_face_growth']
+        self.max_face_area = mean_face * config['max_face_growth']
 
         self.n_polyps = 0
-        # self.polyps = []
-        self.polyp_inputs = [0 for _ in range(Coral.num_inputs+1)]
-        self.polyp_inputs[Coral.num_inputs] = 1 # The last input is always used as bias.
+        self.num_inputs = Coral.num_inputs + self.morphogens.n_morphogens
+        self.polyp_inputs = [0 for _ in range(self.num_inputs+1)]
+        self.polyp_inputs[self.num_inputs] = 1 # The last input is always used as bias.
 
         self.polyp_verts = [None] * self.max_polyps
         self.polyp_light = np.zeros(self.max_polyps)
@@ -43,6 +47,7 @@ class Coral(object):
         self.polyp_pos = np.zeros((self.max_polyps, 3))
         self.polyp_normal = np.zeros((self.max_polyps, 3))
         self.polyp_last_pos = np.zeros((self.max_polyps, 3))
+        self.polyp_gravity = np.zeros(self.max_polyps)
         self.poly_collided = np.zeros((self.max_polyps, 3), dtype='uint8')
 
         for vert in self.mesh.verts:
@@ -51,15 +56,12 @@ class Coral(object):
         self.updateAttributes()
         self.age = 0
 
-
     def __str__(self):
         s = 'Coral: {npolyps:%i, volume:%f}' % (len(self.n_polyps), self.volume)
         return s
 
     def step(self):
         self.polypsGrow()
-        self.polypDivision()
-        relax_mesh(self.mesh)
         self.updateAttributes()
         self.age += 1
 
@@ -75,7 +77,7 @@ class Coral(object):
             self.network.Flush() # Compute feed-forward network results.
             self.network.Input(self.polyp_inputs)
             self.network.ActivateFast()
-            output =  self.network.Output()
+            output = self.network.Output()
 
             growth_energy = output[0]
             self.total_gametes += 1 - growth_energy
@@ -83,13 +85,38 @@ class Coral(object):
             growth = growth_energy * self.growth_scalar
             self.polyp_pos[i] += self.polyp_normal[i] * growth
 
+            assert not isnan(self.polyp_pos[i, 0])
+            assert not isnan(self.polyp_pos[i, 1])
+            assert not isnan(self.polyp_pos[i, 2])
+
+            for mi in range(self.morphogens.n_morphogens):
+                v_mi = self.morphogens.V[mi, i]
+                self.morphogens.V[mi, i] =  max(v_mi, v_mi + output[mi + 1])
+
         self.handleCollisions()
+
+    def updateAttributes(self):
+        self.polypDivision() # Divide mesh and create new polyps.
+        relax_mesh(self.mesh) # Update mesh
+        self.mesh.calculateNormals()
+        self.mesh.calculateCurvature()
+
+        if self.n_polyps < self.max_polyps:
+            calculate_light(self) # Update the light
+            calculate_gravity(self)
+            self.morphogens.update(100) # Update the morphogens.
+        # self.calculate_flow() # TODO
+        # self.diffuseEnergy() # TODO
 
     def createPolypInputs(self, i):
         """ Map polyp stats to nerual input in [-1, 1] range. """
         assert self.polyp_verts[i]
         self.polyp_inputs[0] = (self.polyp_light[i] * 2) - 1
         self.polyp_inputs[1] = (self.polyp_verts[i].curvature * 2) - 1
+        self.polyp_inputs[2] = (self.polyp_gravity[i] * 2) - 1
+
+        for mi in range(self.morphogens.n_morphogens):
+            self.polyp_inputs[3+mi] = (self.morphogens.U[mi, i] * 2) - 1
 
     def handleCollisions(self):
         collisions = findCollisions(self.mesh)
@@ -99,18 +126,6 @@ class Coral(object):
                 vert = self.mesh.verts[vi]
                 vert.p[:] = self.polyp_last_pos[vi]
                 self.poly_collided[vi] = 1
-
-    def updateAttributes(self):
-        """ In each simulation step, grow is called on all corals then
-            updateAttributes. Grow has used up all spare energy.
-        """
-        # self.volume = self.mesh.volume()
-        self.mesh.calculateNormals()
-        self.mesh.calculateCurvature()
-        calculate_light(self) # Call the light module
-
-        # self.calculate_flow() # TODO
-        # self.diffuseEnergy() # TODO
 
     def createPolyp(self, vert):
         if self.n_polyps == self.max_polyps:
@@ -126,11 +141,23 @@ class Coral(object):
     def polypDivision(self):
         """ Update the mesh and create new polyps.
         """
-        divide_adaptive(self.mesh, self.max_face)
+        to_divide = []
+        for face in self.mesh.faces:
+            if face.area() > self.max_face_area:
+                to_divide.append(face)
 
+        for face in to_divide:
+            if len(self.mesh.verts) == self.max_polyps:
+                break
+            split(self.mesh, face)
+
+        # divide_adaptive(self.mesh, self.max_face_area)
         for vert in self.mesh.verts:
             if 'polyp' not in vert.data:
                 self.createPolyp(vert)
+
+        # assert self.n_polyps <= self.max_polyps
+        # assert len(self.mesh.verts) <= self.max_polyps
 
     def export(self, out):
         """ Export the coral to .coral.obj file
@@ -143,7 +170,7 @@ class Coral(object):
             2. A line that begins with 'c' for each vert that contains values for
                 polyp for each attribute. Ordered the same as the vertices.
         """
-        header = [ 'light', 'flow', 'ctype' ]
+        header = [ 'light', 'flow', 'u1' ]
 
         out.write('#Exported from coral_growth\n')
         out.write('#coral: ' + ' '.join(header) + '\n')
@@ -167,6 +194,7 @@ class Coral(object):
         for i in range(self.n_polyps):
             indx = id_to_indx[self.polyp_verts[i].id]
             polyp_attributes[indx] = [ self.polyp_light[i], self.polyp_flow[i] ]
+            polyp_attributes[indx].append(self.morphogens.U[0, i])
 
         for attributes in polyp_attributes:
             out.write('c ' + ' '.join(map(str, attributes)) + '\n')

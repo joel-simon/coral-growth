@@ -12,6 +12,14 @@ from coral_growth.viewer import AnimationViewer
 
 time_steps = 12
 
+world_configs = {
+    'max_polyps': 5000,
+    'growth_scalar': .25,
+    'max_angle': .98 * 2 * 3.14159,
+    'max_face_growth': 2.0,
+    'morphogens': [{ 'diffU': 0.01, 'diffV': 0.005, 'F': 0.02, 'K': 0.05 }]
+}
+
 class NetworkDummy(object):
     def Input(self, input):
         self.input = input
@@ -23,27 +31,21 @@ class NetworkDummy(object):
         pass
 
     def Output(self):
-        out = [0] * Coral.num_outputs
+        out = [0] * (Coral.num_outputs + len(world_configs['morphogens']))
         # out[0] = random.random()
         out[0] = (self.input[0]+1) * .5
-        # out[0] = 1
+        # out[0] = 0
+        out[1] = random.random() /10
+
+        # out[1] = .25
         return out
 
-world_configs = [
-    {
-        'max_polyps': 5000,
-        'growth_scalar': .25,
-        'max_angle': .98 * 2 * 3.14159,
-        'max_face_growth': 2.0,
-    }
-]
 
 with TemporaryDirectory() as tmp_dir:
     net = NEAT.NeuralNetwork()
-    simulate_network(time_steps, NetworkDummy(), world_configs,
-                     export_folder=tmp_dir, verbose=True)
+    simulate_network(time_steps, NetworkDummy(), [world_configs], \
+                                            export_folder=tmp_dir, verbose=True)
     exported = os.path.join(tmp_dir, '0')
-
     files = [f for f in os.listdir(exported) if '.coral.obj' in f]
     files = sorted(files, key=lambda f: int(f.split('.')[0]))
     files = [os.path.join(exported, f) for f in files]

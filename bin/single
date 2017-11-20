@@ -16,11 +16,21 @@ from subprocess import call
 
 import MultiNEAT as NEAT
 
+time_steps = 50
+
+world_configs = {
+    'max_polyps': 7500,
+    'growth_scalar': .5,
+    'max_angle': .98 * 2 * 3.14159,
+    'max_face_growth': 2.0,
+    'morphogens': [{ 'diffU': 0.01, 'diffV': 0.005, 'F': 0.02, 'K': 0.05 }]
+}
+
 genome = NEAT.Genome(
     0, # ID
-    Coral.num_inputs,
+    Coral.num_inputs + len(world_configs['morphogens']),
     0, # NUM_HIDDEN
-    Coral.num_outputs,
+    Coral.num_outputs + len(world_configs['morphogens']),
     False, # FS_NEAT
     NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function
     NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function..
@@ -36,17 +46,6 @@ pop = NEAT.Population(
     int(time.time()) # Random number generator seed.
 )
 
-time_steps = 50
-
-world_configs = [
-    {
-        'max_polyps': 5000,
-        'growth_scalar': .25,
-        'max_angle': .98 * 2 * 3.14159,
-        'max_face_growth': 2.0,
-    }
-]
-
 def evolve(generations, out_dir, run_id):
     last_fitness = 0.0
     t = time.time()
@@ -58,9 +57,14 @@ def evolve(generations, out_dir, run_id):
         genome_list = NEAT.GetGenomeList(pop)
 
         for genome in genome_list:
-            corals = simulate_genome(time_steps, genome, world_configs)
-            fitness = corals[0].total_gametes
-            genome.SetFitness(fitness)
+            try:
+                corals = simulate_genome(time_steps, genome, [world_configs])
+                fitness = corals[0].total_gametes
+                genome.SetFitness(fitness)
+            except Exception as e:
+                print('Exception', e)
+                genome.SetFitness(0)
+
             print('.', end='', flush=True)
 
         print()
@@ -85,8 +89,7 @@ def evolve(generations, out_dir, run_id):
 
             os.mkdir(os.path.join(out_dir, str(generation)))
 
-
-            simulate_genome(time_steps, best, world_configs, \
+            simulate_genome(time_steps, best, [world_configs], \
                             export_folder=os.path.join(out_dir, str(generation)))
             last_fitness = maxf
 

@@ -263,7 +263,7 @@ class AnimationViewer(Viewer):
 
         self.view = 0
 
-        self.n_views = 3
+        self.n_views = 2
         self.view_lists = [[] for _ in range(self.n_views)]
 
         colors = [hsv_to_rgb((i/16.0), 1.0, 1.0) for i in range(16)]
@@ -284,7 +284,7 @@ class AnimationViewer(Viewer):
                     d = l.split(' ')[1:]
                     d[0] = float(d[0]) # light
                     d[1] = float(d[1]) # flow
-                    d[2] = int(d[2]) # ctype
+                    # d[2] = int(d[2]) # ctype
                     # d[3] = float(d[3])
                     cell_data.append(d)
                     ci += 1
@@ -300,8 +300,8 @@ class AnimationViewer(Viewer):
                         # color = hsv_to_rgb((100+190*data[3])/360, .70, .6 + .4*data[0])
                     elif v == 1:
                         color = (d, d, d)
-                    elif v == 2:
-                        color = colors[data[2]]
+                    # elif v == 2:
+                    #     color = colors[data[2]]
 
                     mesh['vert_colors'][i] = color
 

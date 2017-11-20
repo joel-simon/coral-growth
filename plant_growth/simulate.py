@@ -28,9 +28,9 @@ def simulate_network(steps, network, params, export_folder=None, verbose=False):
 
             if verbose:
                 print('Finished step %i: (%i polyps) (%04f)' % \
-                    (s, len(plant.cells), time.time() - step_start))
+                    (s, plant.n_cells, time.time() - step_start))
 
-            if len(plant.cells) >= w_config['max_cells']:
+            if plant.n_cells >= w_config['max_cells']:
                 break
 
         plants.append(plant)

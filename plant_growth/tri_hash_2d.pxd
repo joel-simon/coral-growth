@@ -13,7 +13,7 @@ cdef class TriHash2D:
     cdef Entry **bins
 
     # cdef void initialize(self)
-    cdef uint tri_bucket(self, double a[2], double b[2], double c[2])
-    cdef void add_tri(self, int key, double a[2], double b[2], double c[2]) except *
-    cdef int neighbors(self, double a[2], int[:] results)  except *
+    cdef uint tri_bucket(self, double[:] a, double[:] b, double[:] c)
+    cdef void add_tri(self, int key, double[:] a, double[:] b, double[:] c) except *
+    cdef int neighbors(self, double[:] a, int[:] results)  except *
 

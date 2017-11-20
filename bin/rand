@@ -10,7 +10,7 @@ from plant_growth.plant import Plant
 from plant_growth.simulate import simulate_network
 from plant_growth.viewer import AnimationViewer
 
-time_steps = 20
+time_steps = 12
 
 class NetworkDummy(object):
     def Input(self, input):
@@ -24,8 +24,8 @@ class NetworkDummy(object):
 
     def Output(self):
         out = [0] * Plant.num_outputs
-        out[0] = random.random()
-        # out[0] = (self.input[0]+1) * .5
+        # out[0] = random.random()
+        out[0] = (self.input[0]+1) * .5
         # out[0] = 1
         return out
 

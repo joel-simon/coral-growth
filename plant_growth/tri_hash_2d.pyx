@@ -20,7 +20,7 @@ cdef class TriHash2D:
         for i in range(self.size):
             self.bins[i] = NULL
 
-    cdef uint tri_bucket(self, double a[2], double b[2], double c[2]):
+    cdef uint tri_bucket(self, double[:] a, double[:] b, double[:] c):
         # Find cell coords off center of tri.
         cdef double ws2 = self.world_size / 2
         cdef int x = <int>((((a[0] + b[0] + c[0])/3) + ws2) / self.cell_size)
@@ -31,7 +31,7 @@ cdef class TriHash2D:
 
         return bi
 
-    cdef void add_tri(self, int key, double a[2], double b[2], double c[2]) except *:
+    cdef void add_tri(self, int key, double[:] a, double[:] b, double[:] c) except *:
         cdef uint bi = self.tri_bucket(a, b, c)
         cdef Entry *entry = <Entry *>self.mem.alloc(1, sizeof(Entry))
 
@@ -46,7 +46,7 @@ cdef class TriHash2D:
     #     c[:] = lc
     #     self.add_tri(key, a, b, c)
 
-    cdef int neighbors(self, double a[2], int[:] results) except *:
+    cdef int neighbors(self, double[:] a, int[:] results) except *:
         cdef int h, x, y, z
         cdef int i = 0
         cdef int n = results.shape[0]

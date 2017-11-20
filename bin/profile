@@ -39,5 +39,5 @@ world_configs = [
 
 start = time.time()
 net = NEAT.NeuralNetwork()
-simulate_network(time_steps, NetworkDummy(), world_configs)
+simulate_network(time_steps, NetworkDummy(), world_configs, verbose=True)
 print('finished in', time.time() - start)

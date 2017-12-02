@@ -1,42 +1,31 @@
 import MultiNEAT as NEAT
 
 params = NEAT.Parameters()
-params.PopulationSize = 25
-# params.DynamicCompatibility = True
-# params.WeightDiffCoeff = 4.0
-# params.CompatTreshold = 2.0
-# params.YoungAgeTreshold = 5
+params.PopulationSize = 60
+
 params.OldAgeTreshold = 6
 params.SpeciesMaxStagnation = 10
-params.MinSpecies = 1
+params.MinSpecies = 2
 params.MaxSpecies = 5
-# params.RouletteWheelSelection = False
 
-# params.RecurrentProb = 0.0
-# params.OverallMutationRate = 0.8
+params.OverallMutationRate = 0.5
 
-# params.MutateWeightsProb = 0.90
-# params.WeightMutationMaxPower = 2.5
-# params.WeightReplacementMaxPower = 5.0
-# params.MutateWeightsSevereProb = 0.5
-# params.WeightMutationRate = 0.25
+params.MutateAddNeuronProb = 0.05
+params.MutateAddLinkProb = 0.05
 
-# params.MaxWeight = 8
+# TRAITS
 
-# params.MutateAddNeuronProb = 0.03
-# params.MutateAddLinkProb = 0.05
-# params.MutateRemLinkProb = 0.0
+n_morphogens = 2
+params.MutateGenomeTraitsProb = 0.3
 
-# params.MinActivationA = 4.9
-# params.MaxActivationA = 4.9
+for i in range(n_morphogens):
+    K = {'details': {'max': .08, 'min': .03, 'mut_power': .01, 'mut_replace_prob': 0.1},
+         'importance_coeff': 0.5, 'mutation_prob': 0.1, 'type': 'float'
+        }
 
-# params.ActivationFunction_SignedSigmoid_Prob = 0.0
-# params.ActivationFunction_UnsignedSigmoid_Prob = 1.0
-# params.ActivationFunction_Tanh_Prob = 0.0
-# params.ActivationFunction_SignedStep_Prob = 0.0
+    F = { 'details': {'max': .06, 'min': .01, 'mut_power': .01, 'mut_replace_prob': 0.1 },
+          'importance_coeff': 0.5, 'mutation_prob': 0.1, 'type': 'float'
+        }
 
-# params.CrossoverRate = 0.75  # mutate only 0.25
-# params.MultipointCrossoverRate = 0.4
-# params.SurvivalRate = 0.3
-
-# params.AllowLoops = False
+    params.SetGenomeTraitParameters('K%i' %i, K)
+    params.SetGenomeTraitParameters('F%i' %i, F)

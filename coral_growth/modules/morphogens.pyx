@@ -1,3 +1,9 @@
+# cython: boundscheck=False
+# cython: wraparound=True
+# cython: initializedcheck=False
+# cython: nonecheck=False
+# cython: cdivision=True
+
 cimport numpy as np
 import numpy as np
 
@@ -45,7 +51,8 @@ cdef class Morphogens:
 
     cpdef void gray_scott(self, int steps, int mi) except *:
         cdef int i = 0
-        cdef int nidx, nn,
+        cdef int n = self.coral.n_polyps
+        cdef int nidx, nn
         cdef double uvv, u, v, lapU, lapV
 
         cdef double[:] U = self.U[mi]
@@ -56,7 +63,7 @@ cdef class Morphogens:
         cdef double K = self.K[mi]
 
         for _ in range(steps):
-            for i in range(self.coral.n_polyps):
+            for i in range(n):
                 u = U[i]
                 v = V[i]
                 nn = self.n_neighbors[i]

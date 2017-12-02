@@ -5,11 +5,20 @@ from coral_growth.simulate import simulate_genome
 from coral_growth.viewer import AnimationViewer
 
 if __name__ == '__main__':
-    assert(len(sys.argv) == 2)
-    # assert(os.path.exists(sys.argv[1]))
-    folder = sys.argv[1]
-    files = [f for f in os.listdir(folder) if '.coral.obj' in f]
-    files = sorted(files, key=lambda f: int(f.split('.')[0]))
-    files = [os.path.join(folder, f) for f in files]
-    view = AnimationViewer(files, (800, 800))
+    assert(len(sys.argv) >= 2)
+    all_files = []
+    for folder in sys.argv[1:]:
+        folder += '/0'
+        files = [f for f in os.listdir(folder) if '.coral.obj' in f]
+        files = sorted(files, key=lambda f: int(f.split('.')[0]))
+        files = [os.path.join(folder, f) for f in files]
+        all_files.extend(files)
+
+        if len(sys.argv) > 2:
+            for _ in range(5):
+                all_files.append(all_files[-1])
+
+    view = AnimationViewer(all_files, (1400, 1050))
+    # view = AnimationViewer(all_files, (600, 1200))
+    # view = AnimationViewer(all_files, (600, 600), (1.0, 1.0, 1.0, 0.0))
     view.main_loop()

@@ -9,27 +9,34 @@ from pygame.constants import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
+import shutil
+from coral_growth.primitive import make_plane, G_OBJ_PLANE, G_OBJ_SPHERE
 
-# from .primitive import make_plane, G_OBJ_PLANE, G_OBJ_SPHERE
 
 from OpenGL.arrays import vbo
 from OpenGL.raw.GL.ARB.vertex_array_object import glGenVertexArrays, \
                                                   glBindVertexArray
+import string
+import random
+def rand_string(n):
+    opts = string.ascii_uppercase + string.digits
+    return ''.join(random.choice(opts) for _ in range(n))
+
 class Viewer(object):
-    def __init__(self, view_size=(800, 600)):
+    def __init__(self, view_size=(800, 600), background=(0.7, 0.7, 0.7, 0.0)):
         # self.bounds = bounds
         self.on = True
         self.animation = None
         self.animation_playing = False
-        self.draw_grid = False
+        self.draw_grid = True
 
         pygame.init()
         glutInit()
+        self.width = view_size[0]
+        self.height = view_size[1]
         viewport = view_size
 
-        hx = viewport[0]/2
-        hy = viewport[1]/2
-        srf = pygame.display.set_mode(viewport, OPENGL | DOUBLEBUF)
+        self.surface = pygame.display.set_mode(view_size, OPENGL | DOUBLEBUF|  GLUT_MULTISAMPLE )
 
         glLightfv(GL_LIGHT0, GL_POSITION,  (-40, 200, 100, 0.0))
         glLightfv(GL_LIGHT0, GL_AMBIENT, (0.2, 0.2, 0.2, 1.0))
@@ -38,25 +45,22 @@ class Viewer(object):
         glEnable(GL_LIGHTING)
         glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
         glEnable(GL_COLOR_MATERIAL)
-        # glClearColor(0.4, 0.4, 0.4, 0.0)
-        glClearColor(1.0, 1.0, 1.0, 0.0)
+        glEnable(GL_MULTISAMPLE)
+
+        glClearColor(*background)
 
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_SMOOTH)
 
         # glCullFace(GL_BACK)
         # glDisable( GL_CULL_FACE )
-
         # glPolygonMode ( GL_FRONT_AND_BACK, GL_LINE )
-
-
 
         self.clock = pygame.time.Clock()
 
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        width, height = viewport
-        gluPerspective(90.0, width/float(height), 1, 100.0)
+        gluPerspective(90.0, self.width/float(self.height), 1, 100.0)
         glEnable(GL_DEPTH_TEST)
         glMatrixMode(GL_MODELVIEW)
 
@@ -65,7 +69,6 @@ class Viewer(object):
         glEnable(GL_BLEND)
 
         glTranslated(-15, -15, -15)
-        # make_plane(5)
 
         self.rx, self.ry = (0,0)
         self.tx, self.ty = (0,0)
@@ -73,6 +76,7 @@ class Viewer(object):
 
         self.gl_lists = []
 
+        make_plane(5)
 
     def start_draw(self):
         self.gl_list = glGenLists(1)
@@ -83,25 +87,27 @@ class Viewer(object):
         self.gl_lists.append(self.gl_list)
         self.gl_list = None
 
-
-    def build_compiled_gllist(self, mesh):
+    def draw_mesh(self, mesh, offset_x=0, offset_y=0, offset_z=0):
         """this time, the vertices must be specified globally, and referenced by
         indices in order to use the list paradigm. vertices is a list of 3-vectors, and
         facets are dicts containing 'normal' (a 3-vector) 'vertices' (indices to the
         other argument) and 'color' (the color the triangle should be)."""
 
         # first flatten out the arrays:
+        mesh['vertices'] += [ offset_x, offset_y, offset_z ]
         vertices = mesh['vertices'].flatten()
         normals  = mesh['vertice_normals'].flatten()
         findices = mesh['faces'].astype('uint32').flatten()
         eindices = mesh['edges'].astype('uint32').flatten()
 
         fcolors = mesh['vert_colors'].flatten()
-        ecolors = np.zeros_like(mesh['vert_colors']).flatten()
+        # ecolors = np.zeros_like(mesh['vert_colors']).flatten() + .5
+        ecolors = fcolors - .1
+        ecolors[ecolors <= 0] = 0
 
         # then convert to OpenGL / ctypes arrays:
         fvertices = (GLfloat * len(vertices))(*vertices)
-        evertices = (GLfloat * len(vertices))(*vertices*1.001)
+        evertices = (GLfloat * len(vertices))(*(vertices + normals*.001))
         normals = (GLfloat * len(normals))(*normals)
         findices = (GLuint * len(findices))(*findices)
         eindices = (GLuint * len(eindices))(*eindices)
@@ -122,64 +128,54 @@ class Viewer(object):
         glDrawElements(GL_LINES, len(eindices), GL_UNSIGNED_INT, eindices)
         glPopClientAttrib()
 
-    def draw_mesh(self, mesh):
-        verts = mesh['vertices']
-        edges = mesh['edges']
-        faces = mesh['faces'].astype('uint32')
-        face_normals = mesh['face_normals']
-        vert_normals = mesh['vertice_normals']
-        curvature = mesh['curvature']
-        # print(curvature)
-        norm_length = .15
-        glColor(1, 1, 1)
+    def draw_lines(self, lines, width=3, color=(0,0,0)):
+        glLineWidth(width)
 
-        glBegin(GL_TRIANGLES)
-        for face in faces:
-            for vid in face:
-                glNormal3fv(vert_normals[vid])
-                glVertex3fv(verts[vid])
+        glColor3f(*color)
+        glBegin(GL_LINES)
+
+        for p1, p2 in lines:
+            glVertex3f(*p1)
+            glVertex3f(*p2)
+
         glEnd()
 
-        # Draw edges
-        glColor(.9, .9, .9)
-        for i, j in edges:
-            glLineWidth(1)
-            glBegin(GL_LINES)
-            glVertex3fv(verts[i]*1.001)
-            glVertex3fv(verts[j]*1.001)
-            glEnd()
-        glLineWidth(1)
+    def draw_cube(self, x, y, z, s=1, color=(.5, .5, .5)):
+        # glNewList(G_OBJ_CUBE, GL_COMPILE)
+        glColor3f(*color)
+        vertices = [[[-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [-0.5, 0.5, 0.5], [-0.5, 0.5, -0.5]],
+                    [[-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5], [0.5, -0.5, -0.5]],
+                    [[0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5]],
+                    [[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5]],
+                    [[-0.5, -0.5, 0.5], [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5]],
+                    [[-0.5, 0.5, -0.5], [-0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, -0.5]]]
 
-        # face normals
-        # glColor(0,0,1)
-        # for face, norm in zip(faces, face_normals):
-        #     glBegin(GL_LINES)
-        #     center = (verts[face[0]] + verts[face[1]] + verts[face[2]]) /3
-        #     norm *= norm_length
-        #     glVertex3fv(center)
-        #     glVertex3fv(center + norm)
-        #     glEnd()
+        vertices = np.array(vertices)
+        vertices *= s
+        vertices[:, :, 0] += x
+        vertices[:, :, 1] += y
+        vertices[:, :, 2] += z
 
-        # Draw curvature
-        # glColor(0, 1, 0)
-        # glLineWidth(3)
+        normals = [(-1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, -1.0, 0.0), (0.0, 1.0, 0.0)]
 
-        # for vert, norm, curve in zip(verts, vert_normals, curvature):
-        #     glBegin(GL_LINES)
-        #     norm *= curve
-        #     glVertex3fv(vert)
-        #     glVertex3fv(vert + norm)
-        #     glEnd()
+        glBegin(GL_QUADS)
+        for i in range(6):
+            glNormal3f(normals[i][0], normals[i][1], normals[i][2])
+            for j in range(4):
+                glVertex3f(vertices[i][j][0], vertices[i][j][1], vertices[i][j][2])
+        glEnd()
+        # glEndList()
 
+    def draw_text(self, x, y, text, r=1.0, g=1.0, b=1.0):
+        y = self.height - (y + 18)
+        glWindowPos2f(x, y)
+        glColor3f(r, g, b)
 
-        # vert normals
-        # glColor(1,0,0)
-        # for vert, norm in zip(verts, vert_normals):
-        #     glBegin(GL_LINES)
-        #     norm *= norm_length
-        #     glVertex3fv(vert)
-        #     glVertex3fv(vert + norm)
-        #     glEnd()
+        for c in text:
+            if c=='\n':
+                glRasterPos2f(x, y-0.2)
+            else:
+                glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(c))
 
     def clear(self):
         self.gl_lists = []
@@ -223,7 +219,7 @@ class Viewer(object):
         i = 0
 
         while self.on:
-            self.clock.tick(15)
+            self.clock.tick(30)
             self.step(i)
 
             for e in pygame.event.get():
@@ -247,92 +243,102 @@ class Viewer(object):
             pygame.display.flip()
             i += 1
 
+    def save(self, path):
+        pygame.image.save(self.surface, path)
+
 from cymesh.mesh import Mesh
 import numpy as np
 from colorsys import hsv_to_rgb
-
+import re
 class AnimationViewer(Viewer):
-    def __init__(self, files, view_size):
-        super(AnimationViewer, self).__init__(view_size)
+    def __init__(self, files, view_size, color=(0.7, 0.7, 0.7, 0.0)):
+        super(AnimationViewer, self).__init__(view_size, color)
         print('Loading Animation')
 
         self.frame = 0
         self.n_frames = len(files)
-        # self.frame_lists = []
         self.animation_playing = False
-
+        self.saving = False
         self.view = 0
 
-        self.n_views = 3
-        self.view_lists = [[] for _ in range(self.n_views)]
+        self.n_views = None
+        self.view_lists = None#
 
-        colors = [hsv_to_rgb((i/16.0), 1.0, 1.0) for i in range(16)]
+        dir = 'tmp'
+        if os.path.exists(dir):
+            shutil.rmtree(dir)
+        os.makedirs(dir)
+
+        get_generation = re.compile('out_.*?\/([0-9]+)\/')
+
+        # generations = set()
+        # for fi, file in enumerate(files):
+        #     generations.add(int(get_generation.search(file).groups()[0]))
+
+        # generations = sorted(list(generations))
 
         for fi, file in enumerate(files):
+            try:
+                generation = int(get_generation.search(file).groups()[0])
+            except AttributeError:
+                generation = None
+
+            # gidx = generations.index(generation)
+            # step_x = 3
+            # offset_x = (-len(generations)//2 + gidx) * step_x
+
+            """ Read the file and store the colors.
+            """
             mesh = Mesh.from_obj(file).export()
-
             mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
-            header = None # header = ['light', 'alive', 'ctype', 'flower']
-
             polyp_data = []
 
-            ci = 0
-            for l in open(file, 'r').read().splitlines():
-                if l.startswith("#coral"):
-                    header = l.split(' ')[1:]
+            for line in open(file, 'r').read().splitlines():
+                if line.startswith("#coral"):
+                    header = line.split(' ')[1:]
 
-                elif l.startswith('c'):
-                    d = l.split(' ')[1:]
-                    d[0] = float(d[0]) # light
-                    d[1] = float(d[1]) # flow
-                    d[2] = float(d[2]) # morphogen
-                    # d[3] = float(d[3])
-                    polyp_data.append(d)
-                    ci += 1
+                    if self.n_views is None:
+                        self.n_views = len(header)
+                        print(header)
+                        self.view_lists = [[] for _ in range(self.n_views)]
 
-            for v in range(self.n_views):
+                    else:
+                        assert self.n_views == len(header)
+
+                elif line.startswith('c'):
+                    d = [float(d) for d in line.split(' ')[1:]]
+
+                    assert len(d) == self.n_views
+
+                    # for i in range(self.n_views):
+                    #     d[i] = float(d[i])
+
+                    polyp_data.append( d )
+
+            """ Now compile mesh for each view given color data and mesh data.
+            """
+            for view_idx in range(self.n_views):
                 gl_list = glGenLists(1)
                 glNewList(gl_list, GL_COMPILE)
 
-                for i, data in enumerate(polyp_data):
-                    d = .2 + .8*data[0]
-                    if v == 0:
-                        color = (d, d, d)
-                    elif v == 1:
-                        color = (d, d, d)
-                    elif v == 2:
-                        # print(data[2])
-                        color = (0.74/2, 0.87/2, data[2])
-                        # color = colors[data[2]]
+                for polyp_idx, data in enumerate(polyp_data):
+                    if view_idx == 0:
+                        color = ( 0, data[-2], data[-1] )
+                    else:
+                        d = data[ view_idx - 1 ]
+                        color = ( d, d, d )
 
-                    mesh['vert_colors'][i] = color
+                    mesh['vert_colors'][polyp_idx] = color
 
-                self.build_compiled_gllist(mesh)
-                self.view_lists[v].append([gl_list])
+                self.draw_mesh(mesh)
+                # if generation is not None:
+                #     self.draw_text( 20, 20, 'Generation %i' % generation )
+                self.view_lists[ view_idx ].append([ gl_list ])
                 glEndList()
-                # mesh['vert_colors'][ci] = colors[d[2]]
-
-            # if d[3]:
-            #     mesh['vert_colors'][ci] = hsv_to_rgb(290.0/360, .70, .6 + .4*d[0])
-            # else:
-            #     mesh['vert_colors'][ci] = hsv_to_rgb(100.0/360, .70, .3 + .7*d[0])
-
-
-            # self.start_draw()
 
             print(fi, 'n_verts=', len(mesh['vertices']))
 
-            # self.gl_list = glGenLists(1)
-            # glNewList(self.gl_list, GL_COMPILE)
-
-
-
-            # self.frame_lists.append(self.gl_list)
-            # glEndList()
-            # self.gl_list = None
-
-        # self.gl_lists = [self.frame_lists[self.frame]]
-        self.gl_lists = self.view_lists[self.view][self.frame]
+        self.gl_lists = self.view_lists[ self.view ][ self.frame ]
         print('Finished Loading Animation')
 
     def handle_input(self, e):
@@ -353,24 +359,52 @@ class AnimationViewer(Viewer):
                 self.frame = 0
                 self.gl_lists = self.view_lists[self.view][self.frame]
 
+            elif e.key == K_s:
+                self.save(rand_string(4)+'.jpg')
+
+            elif e.key == K_f:
+                self.saving = not self.saving
+                print('Set saving=', self.saving)
+                # self.save(rand_string(4)+'.jpg')
+
             elif e.key == K_SPACE:
+                print('Animation Playing', 'saving=', self.saving)
                 self.animation_playing = not self.animation_playing
 
-            elif e.key == K_1:
-                self.view = 0
-            elif e.key == K_2:
-                self.view = 1
-            elif e.key == K_3:
-                self.view = 2
-            self.gl_lists = self.view_lists[self.view][self.frame]
-
+            else:
+                if e.key == K_1:
+                    self.view = 0
+                elif e.key == K_2:
+                    self.view = 1
+                elif e.key == K_3:
+                    self.view = 2
+                elif e.key == K_4:
+                    self.view = 3
+                elif e.key == K_5:
+                    self.view = 4
+                elif e.key == K_6:
+                    self.view = 5
+                elif e.key == K_7:
+                    self.view = 6
+                self.view = min(self.view, self.n_views-1)
+                print('switched to view', self.view)
+                # elif e.key == K_4:
+                #     self.view = 3
+                self.gl_lists = self.view_lists[self.view][self.frame]
 
     def step(self, i):
         if self.animation_playing:
-            self.rx += 1
-            # self.zpos += .25
+            # Do two rotation steps for every growth step.
+            # if i % 1 == 0:
+            if self.frame < self.n_frames - 1:
+                self.frame += 1
+                self.gl_lists = self.view_lists[self.view][self.frame]
 
-        if self.animation_playing and self.frame < self.n_frames - 1:
-            self.frame += 1
-            self.gl_lists = self.view_lists[self.view][self.frame]
+            if self.saving:
+                self.save('tmp/%04d.jpg'%i)
+
+            self.rx += .4
+
+
+
 

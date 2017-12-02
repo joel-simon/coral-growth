@@ -12,7 +12,7 @@ from cymesh.mesh cimport Mesh
 from cymesh.structures cimport Vert, Face, Edge
 from cymesh.vector3D cimport vangle
 
-from coral_growth.tri_hash_2d cimport TriHash2D
+from coral_growth.modules.tri_hash_2d cimport TriHash2D
 
 cdef bint pnt_in_tri(double[:] p, double[:] p0, double[:] p1, double[:] p2):
     # https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
@@ -59,7 +59,6 @@ cpdef void calculate_light(coral) except *:
 
     cdef double[:] boundingBox = coral.mesh.boundingBox()
     cdef double world_size = max(boundingBox[1]- boundingBox[0], boundingBox[3]- boundingBox[2])
-
 
     cdef double max_e = 0
     for e in coral.mesh.edges:
@@ -136,5 +135,3 @@ cpdef void calculate_light(coral) except *:
             if pnt_in_tri(p, a, b, c):
                 polyp_light[i] = 0
                 break
-
-        # assert (not isnan(coral.polyp_light[i]))

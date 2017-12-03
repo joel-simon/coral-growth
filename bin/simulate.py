@@ -32,6 +32,7 @@ if __name__ == "__main__":
         'growth_scalar': .5,
         'max_face_growth': 1.0,
         'max_edge_growth': 1.5,
+        'polyp_memory': 2
     }
 
 

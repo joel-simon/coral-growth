@@ -31,6 +31,7 @@ class Coral(object):
         self.growth_scalar = params['growth_scalar']
         self.max_polyps = params['max_polyps']
         self.moprhogen_steps = params['morphogen_steps']
+        self.n_memory = params['polyp_memory']
 
         self.morphogens = Morphogens(self, morphogens_params)
 
@@ -39,8 +40,10 @@ class Coral(object):
         self.max_face_area = mean_face * params['max_face_growth']
 
         self.n_polyps = 0
-        self.num_inputs = Coral.num_inputs + self.morphogens.n_morphogens
-        self.num_outputs = Coral.num_outputs + self.morphogens.n_morphogens
+
+        extra_extra = len(morphogens_params) + self.n_memory
+        self.num_inputs = Coral.num_inputs + extra_extra
+        self.num_outputs = Coral.num_outputs + extra_extra
 
         assert network.NumInputs() == self.num_inputs
         assert network.NumOutputs() == self.num_outputs
@@ -57,6 +60,8 @@ class Coral(object):
         self.polyp_last_pos = np.zeros((self.max_polyps, 3))
         self.polyp_gravity = np.zeros(self.max_polyps)
         self.polyp_collided = np.zeros(self.max_polyps, dtype='uint8')
+        assert self.n_memory <= 32
+        self.polyp_memory = np.zeros((self.max_polyps), dtype='uint32')
 
         for vert in self.mesh.verts:
             self.createPolyp(vert)
@@ -94,26 +99,29 @@ class Coral(object):
 
             assert len(output) == self.num_outputs
 
-            # energy = 1#.25 + .75 * self.polyp_light[i]
-            # growth_energy = output[0] * energy
-            # self.total_gametes += 1 - (growth_energy * energy)
-
             # Move in normal direction by growth amount.
             growth = output[0] * self.growth_scalar
             self.polyp_pos[i] += self.polyp_normal[i] * growth
 
             # Output morphogens.
+            out_idx = 1
             for mi in range(self.morphogens.n_morphogens):
-                if output[mi + 1] > 0.5:
-                    self.morphogens.V[mi, i] = 1# max(v_mi, v_mi + output[mi + 1])
+                if output[out_idx] > 0.5:
+                    self.morphogens.V[mi, i] = 1
+                out_idx += 1
+
+            for mi in range(self.n_memory):
+                if output[out_idx] > 0.5:
+                    self.polyp_memory[i] |= ( 1<< mi )
+                out_idx += 1
 
             assert (not isnan(self.polyp_pos[i, 0]))
             assert (not isnan(self.polyp_pos[i, 1]))
             assert (not isnan(self.polyp_pos[i, 2]))
 
     def updateAttributes(self):
-        self.polypDivision() # Divide mesh and create new polyps.
         relax_mesh(self.mesh) # Update mesh
+        self.polypDivision() # Divide mesh and create new polyps.
         self.mesh.calculateNormals()
         self.mesh.calculateCurvature()
 
@@ -136,8 +144,16 @@ class Coral(object):
         self.polyp_inputs[1] = (self.polyp_verts[i].curvature * 2) - 1
         self.polyp_inputs[2] = (self.polyp_gravity[i] * 2) - 1
 
+        input_idx = 3
         for mi in range(self.morphogens.n_morphogens):
-            self.polyp_inputs[3+mi] = (self.morphogens.U[mi, i] * 2) - 1
+            self.polyp_inputs[input_idx] = (self.morphogens.U[mi, i] * 2) - 1
+            input_idx += 1
+
+        for mi in range(self.n_memory):
+            if self.polyp_memory[i] & (1 << mi):
+                self.polyp_inputs[input_idx] = 1
+            else:
+                self.polyp_inputs[input_idx] = -1
 
     def handleCollisions(self):
         collisions = findCollisions(self.mesh)
@@ -216,7 +232,7 @@ class Coral(object):
         self.mesh.calculateNormals()
         self.mesh.calculateCurvature()
 
-        header = [ 'light', 'gravity', 'curvature', 'collided']
+        header = [ 'light', 'gravity', 'curvature', 'collided', 'memory']
         for i in range(self.morphogens.n_morphogens):
             header.append( 'u%i' % i )
 
@@ -249,7 +265,8 @@ class Coral(object):
             polyp_attributes[indx] = [ self.polyp_light[i],
                                        self.polyp_gravity[i],
                                        self.polyp_verts[i].curvature,
-                                       self.polyp_collided[i] ]
+                                       self.polyp_collided[i],
+                                       self.polyp_memory[i] ]
 
             for j in range(self.morphogens.n_morphogens):
                 polyp_attributes[indx].append(self.morphogens.U[j, i])

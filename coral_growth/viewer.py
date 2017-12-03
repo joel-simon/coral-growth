@@ -167,15 +167,15 @@ class Viewer(object):
         # glEndList()
 
     def draw_text(self, x, y, text, r=1.0, g=1.0, b=1.0):
-        y = self.height - (y + 18)
+        y = self.height - (y + 24)
         glWindowPos2f(x, y)
         glColor3f(r, g, b)
 
         for c in text:
             if c=='\n':
-                glRasterPos2f(x, y-0.2)
+                glRasterPos2f(x, y-0.24)
             else:
-                glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(c))
+                glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, ord(c))
 
     def clear(self):
         self.gl_lists = []

@@ -17,6 +17,7 @@ world_configs = {
     'growth_scalar': .125,
     'max_face_growth': 1.0,
     'morphogen_steps': 200,
+    'polyp_memory': 2,
 }
 
 morphogens = [{ 'diffU': 0.01, 'diffV': 0.005, 'F': 0.02, 'K': 0.05 }]

@@ -28,6 +28,7 @@ world_configs = {
     'growth_scalar': .25,
     'morphogen_steps': 200,
     'max_face_growth': 1.0,
+    'polyp_memory': 2,
 }
 
 def evaluate_from_path(genome_path, traits):
@@ -62,9 +63,9 @@ def evolve_neat(generations, out_dir, run_id, n_cores):
 
     genome_prototye = NEAT.Genome(
         0, # ID
-        Coral.num_inputs + neat_params.n_morphogens,
+        Coral.num_inputs + neat_params.n_morphogens + world_configs['polyp_memory'],
         0, # NUM_HIDDEN
-        Coral.num_outputs + neat_params.n_morphogens,
+        Coral.num_outputs + neat_params.n_morphogens + world_configs['polyp_memory'],
         False, # FS_NEAT
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function..

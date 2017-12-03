@@ -1,14 +1,14 @@
 import MultiNEAT as NEAT
 
 params = NEAT.Parameters()
-params.PopulationSize = 60
+params.PopulationSize = 40
 
 params.OldAgeTreshold = 6
 params.SpeciesMaxStagnation = 10
 params.MinSpecies = 2
 params.MaxSpecies = 5
 
-params.OverallMutationRate = 0.5
+params.OverallMutationRate = 0.8
 
 params.MutateAddNeuronProb = 0.05
 params.MutateAddLinkProb = 0.05

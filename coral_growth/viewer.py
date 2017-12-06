@@ -166,7 +166,7 @@ class Viewer(object):
         glEnd()
         # glEndList()
 
-    def draw_text(self, x, y, text, r=1.0, g=1.0, b=1.0):
+    def draw_text(self, x, y, text, r=0.0, g=0.0, b=0.0):
         y = self.height - (y + 24)
         glWindowPos2f(x, y)
         glColor3f(r, g, b)
@@ -213,6 +213,9 @@ class Viewer(object):
     def step(self, i):
         pass
 
+    def draw_step(self):
+        pass
+
     def main_loop(self):
         self.rotate = False
         self.move = False
@@ -240,6 +243,8 @@ class Viewer(object):
             if self.draw_grid:
                 glCallList(G_OBJ_PLANE)
 
+            self.draw_step()
+
             pygame.display.flip()
             i += 1
 
@@ -263,6 +268,8 @@ class AnimationViewer(Viewer):
 
         self.n_views = None
         self.view_lists = None#
+
+        self.subtitle= ''
 
         dir = 'tmp'
         if os.path.exists(dir):
@@ -292,28 +299,36 @@ class AnimationViewer(Viewer):
             mesh = Mesh.from_obj(file).export()
             mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
             polyp_data = []
+            max_ints = {}
 
             for line in open(file, 'r').read().splitlines():
                 if line.startswith("#coral"):
                     header = line.split(' ')[1:]
 
                     if self.n_views is None:
-                        self.n_views = len(header)
-                        print(header)
-                        self.view_lists = [[] for _ in range(self.n_views)]
+                        self.n_views = len(header) -1
 
-                    else:
-                        assert self.n_views == len(header)
+                        self.view_lists = [[] for _ in range(self.n_views)]
+                        self.view_names = ['morphogens'] + header[:-2]
+                        print(header)
+                        print(self.view_names)
 
                 elif line.startswith('c'):
-                    d = [float(d) for d in line.split(' ')[1:]]
-
-                    assert len(d) == self.n_views
-
-                    # for i in range(self.n_views):
-                    #     d[i] = float(d[i])
+                    d = line.split(' ')[1:]
+                    for i in range(self.n_views):
+                        if '.' in d[i]:
+                            d[i] = float(d[i])
+                        else:
+                            d[i] = int(d[i])
+                            max_ints[i] = max(max_ints.get(i, 0), d[i])
 
                     polyp_data.append( d )
+
+            assert self.n_views is not None
+
+            int_colors = {}
+            for i, maxv in max_ints.items():
+                int_colors[i] = [hsv_to_rgb((i/float(maxv)), 1.0, 1.0) for i in range(maxv)]
 
             """ Now compile mesh for each view given color data and mesh data.
             """
@@ -322,17 +337,22 @@ class AnimationViewer(Viewer):
                 glNewList(gl_list, GL_COMPILE)
 
                 for polyp_idx, data in enumerate(polyp_data):
-                    if view_idx == 0:
+                    if view_idx == 0: #hardcode in 2 morphogens.
                         color = ( 0, data[-2], data[-1] )
                     else:
                         d = data[ view_idx - 1 ]
-                        color = ( d, d, d )
+                        if type(d) == 'int':
+                            color = int_colors[view_idx][d]
+                        else:
+                            color = ( d, d, d )
 
                     mesh['vert_colors'][polyp_idx] = color
 
                 self.draw_mesh(mesh)
-                # if generation is not None:
-                #     self.draw_text( 20, 20, 'Generation %i' % generation )
+
+                if generation is not None:
+                    self.draw_text( 30, 30, 'Generation %i' % generation )
+
                 self.view_lists[ view_idx ].append([ gl_list ])
                 glEndList()
 
@@ -340,6 +360,10 @@ class AnimationViewer(Viewer):
 
         self.gl_lists = self.view_lists[ self.view ][ self.frame ]
         print('Finished Loading Animation')
+
+    def draw_step(self):
+        # if self.subtitle:
+        self.draw_text( 30, 60, 'View: '+self.view_names[self.view])
 
     def handle_input(self, e):
         super(AnimationViewer, self).handle_input(e)
@@ -365,7 +389,6 @@ class AnimationViewer(Viewer):
             elif e.key == K_f:
                 self.saving = not self.saving
                 print('Set saving=', self.saving)
-                # self.save(rand_string(4)+'.jpg')
 
             elif e.key == K_SPACE:
                 print('Animation Playing', 'saving=', self.saving)
@@ -386,10 +409,10 @@ class AnimationViewer(Viewer):
                     self.view = 5
                 elif e.key == K_7:
                     self.view = 6
+
                 self.view = min(self.view, self.n_views-1)
-                print('switched to view', self.view)
-                # elif e.key == K_4:
-                #     self.view = 3
+
+                print('switched to view', self.view_names[self.view])
                 self.gl_lists = self.view_lists[self.view][self.frame]
 
     def step(self, i):
@@ -403,7 +426,7 @@ class AnimationViewer(Viewer):
             if self.saving:
                 self.save('tmp/%04d.jpg'%i)
 
-            self.rx += .4
+            self.rx += .3
 
 
 

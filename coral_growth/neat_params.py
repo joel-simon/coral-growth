@@ -13,8 +13,8 @@ params.OverallMutationRate = 0.8
 params.MutateAddNeuronProb = 0.05
 params.MutateAddLinkProb = 0.05
 
-# TRAITS
 
+# TRAITS
 n_morphogens = 2
 params.MutateGenomeTraitsProb = 0.3
 

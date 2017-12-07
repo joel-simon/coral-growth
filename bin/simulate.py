@@ -11,30 +11,28 @@ from coral_growth.coral import Coral
 from coral_growth.simulate import simulate_genome
 from coral_growth.viewer import AnimationViewer
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("max_polyps", default=12000, help="Generations.", type=int)
+    parser.add_argument("max_polyps", default=10000, help="Generations.", type=int)
     parser.add_argument("time_steps", default=100, help="Output dir.", type=int)
     parser.add_argument("genome_path", help="")
     parser.add_argument("trait_path", help="")
     args = parser.parse_args()
-    # print(open(args.trait_path, 'r').readlines())
-    # exit()
+
     traits = ast.literal_eval(open(args.trait_path, 'r').readlines()[0])
     genome = NEAT.Genome(args.genome_path)
-    # traits = pickle.loads(open(args.trait_path, 'r').readlines()[0])
+
     print(traits)
 
     world_configs = {
-        'max_polyps': 8000,
+        'max_polyps': args.max_polyps,
         'growth_scalar': .5,
         'max_face_growth': 1.0,
         'max_edge_growth': 1.5,
-        'polyp_memory': 2
+        'morphogen_steps': 200,
+        'polyp_memory': 2,
+        'morph_thresholds': 2,
     }
-
 
     with TemporaryDirectory() as tmp_dir:
         simulate_genome(args.time_steps, genome, traits, [world_configs],

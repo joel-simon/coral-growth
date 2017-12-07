@@ -5,17 +5,18 @@
 # cython: cdivision=True
 
 from __future__ import print_function
-from math import isnan, sqrt
+from math import isnan, sqrt, floor
 import numpy as np
 from pykdtree.kdtree import KDTree
 
 from cymesh.mesh import Mesh
 from cymesh.collisions.findCollisions import findCollisions
 from cymesh.subdivision.sqrt3 import split
-from cymesh.operators.relax import relax_mesh
+# from cymesh.operators.relax import relax_mesh
 
 from coral_growth.modules import light, gravity
 from coral_growth.modules.morphogens import Morphogens
+
 
 class Coral(object):
     num_inputs = 4 # [light, curvature, gravity, extra-bias-bit?]
@@ -32,6 +33,7 @@ class Coral(object):
         self.max_polyps = params['max_polyps']
         self.moprhogen_steps = params['morphogen_steps']
         self.n_memory = params['polyp_memory']
+        self.morph_thresholds = params['morph_thresholds']
 
         self.morphogens = Morphogens(self, morphogens_params)
 
@@ -41,9 +43,8 @@ class Coral(object):
 
         self.n_polyps = 0
 
-        extra_extra = len(morphogens_params) + self.n_memory
-        self.num_inputs = Coral.num_inputs + extra_extra
-        self.num_outputs = Coral.num_outputs + extra_extra
+        self.num_inputs = Coral.num_inputs + self.n_memory + len(morphogens_params) * (self.morph_thresholds-1)
+        self.num_outputs = Coral.num_outputs + self.n_memory + len(morphogens_params)
 
         assert network.NumInputs() == self.num_inputs
         assert network.NumOutputs() == self.num_outputs
@@ -78,13 +79,14 @@ class Coral(object):
     def step(self):
         self.polypsGrow()
         self.handleCollisions()
+        # relax_mesh(self.mesh) # Update mesh
+        self.polypDivision() # Divide mesh and create new polyps.
         self.updateAttributes()
         self.age += 1
 
     def polypsGrow(self):
         """ Calculate the changes to coral by neural network.
         """
-        # self.total_gametes = 0
         self.polyp_last_pos[:, :] = self.polyp_pos
 
         for i in range(self.n_polyps):
@@ -112,7 +114,7 @@ class Coral(object):
 
             for mi in range(self.n_memory):
                 if output[out_idx] > 0.5:
-                    self.polyp_memory[i] |= ( 1<< mi )
+                    self.polyp_memory[i] |= ( 1 << mi )
                 out_idx += 1
 
             assert (not isnan(self.polyp_pos[i, 0]))
@@ -120,11 +122,10 @@ class Coral(object):
             assert (not isnan(self.polyp_pos[i, 2]))
 
     def updateAttributes(self):
-        relax_mesh(self.mesh) # Update mesh
-        self.polypDivision() # Divide mesh and create new polyps.
+
         self.mesh.calculateNormals()
         self.mesh.calculateCurvature()
-
+        print(max([abs(v.curvature) for v in self.mesh.verts]))
         light.calculate_light(self) # Update the light
 
         self.polyp_light[self.polyp_light != 0] -= .5
@@ -140,20 +141,29 @@ class Coral(object):
 
     def createPolypInputs(self, i):
         """ Map polyp stats to nerual input in [-1, 1] range. """
+        # morph_bin_size = 1.0 / self.morph_thresholds
+        self.polyp_inputs = [-1] * self.num_inputs
+
         self.polyp_inputs[0] = (self.polyp_light[i] * 2) - 1
         self.polyp_inputs[1] = (self.polyp_verts[i].curvature * 2) - 1
         self.polyp_inputs[2] = (self.polyp_gravity[i] * 2) - 1
 
         input_idx = 3
         for mi in range(self.morphogens.n_morphogens):
-            self.polyp_inputs[input_idx] = (self.morphogens.U[mi, i] * 2) - 1
-            input_idx += 1
+            mbin = int(floor(self.morphogens.U[mi, i] * self.morph_thresholds))
+            mbin = min(self.morph_thresholds - 1, mbin)
+
+            if mbin > 0:
+                self.polyp_inputs[input_idx + (mbin-1)] = 1
+
+            input_idx += (self.morph_thresholds-1)
 
         for mi in range(self.n_memory):
             if self.polyp_memory[i] & (1 << mi):
                 self.polyp_inputs[input_idx] = 1
             else:
                 self.polyp_inputs[input_idx] = -1
+            input_idx += 1
 
     def handleCollisions(self):
         collisions = findCollisions(self.mesh)

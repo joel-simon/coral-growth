@@ -13,9 +13,8 @@ params.OverallMutationRate = 0.8
 params.MutateAddNeuronProb = 0.05
 params.MutateAddLinkProb = 0.05
 
-
 # TRAITS
-n_morphogens = 2
+n_thresholds = 3
 params.MutateGenomeTraitsProb = 0.3
 
 for i in range(n_morphogens):

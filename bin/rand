@@ -10,7 +10,7 @@ from coral_growth.coral import Coral
 from coral_growth.simulate import simulate_network
 from coral_growth.viewer import AnimationViewer
 
-time_steps = 30
+time_steps = 20
 
 world_configs = {
     'max_polyps': 10000,
@@ -18,16 +18,18 @@ world_configs = {
     'max_face_growth': 1.0,
     'morphogen_steps': 200,
     'polyp_memory': 2,
+    'morph_thresholds': 3,
 }
 
-morphogens = [{ 'diffU': 0.01, 'diffV': 0.005, 'F': 0.02, 'K': 0.05 }]
+morphogens = [{ 'diffU': 0.01, 'diffV': 0.005, 'F': 0.02, 'K': 0.05 },
+              { 'diffU': 0.01, 'diffV': 0.005, 'F': 0.02, 'K': 0.05 }]
 
 class NetworkDummy(object):
     def NumInputs(self):
-        return Coral.num_inputs + len(morphogens)
+        return Coral.num_inputs + world_configs['polyp_memory'] + len(morphogens) * (world_configs['morph_thresholds']-1)
 
     def NumOutputs(self):
-        return Coral.num_outputs + len(morphogens)
+        return Coral.num_outputs + world_configs['polyp_memory'] + len(morphogens)
 
     def Input(self, input):
         self.input = input
@@ -61,5 +63,5 @@ with TemporaryDirectory() as tmp_dir:
     files = [f for f in os.listdir(exported) if '.coral.obj' in f]
     files = sorted(files, key=lambda f: int(f.split('.')[0]))
     files = [os.path.join(exported, f) for f in files]
-    view = AnimationViewer(files, (1400, 1050))
+    view = AnimationViewer(files, (800, 600))
     view.main_loop()

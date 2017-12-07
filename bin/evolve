@@ -24,11 +24,12 @@ from tempfile import TemporaryDirectory
 time_steps = 100
 
 world_configs = {
-    'max_polyps': 8000,
+    'max_polyps': 10000,
     'growth_scalar': .25,
     'morphogen_steps': 200,
     'max_face_growth': 1.0,
     'polyp_memory': 2,
+    'morph_thresholds': 3,
 }
 
 def evaluate_from_path(genome_path, traits):
@@ -57,15 +58,20 @@ def evaluate_parallel(pool, genomes):
         fitnesses = pool.starmap(evaluate_from_path, data)
     return fitnesses
 
-
 def evolve_neat(generations, out_dir, run_id, n_cores):
     pool = Pool(processes=n_cores)
+    n_t = world_configs['morph_thresholds'] - 1
+    num_inputs = Coral.num_inputs + world_configs['polyp_memory'] + \
+                            neat_params.n_morphogens * n_t
+
+    num_outputs = Coral.num_outputs + world_configs['polyp_memory'] + \
+                                                        neat_params.n_morphogens
 
     genome_prototye = NEAT.Genome(
         0, # ID
-        Coral.num_inputs + neat_params.n_morphogens + world_configs['polyp_memory'],
+        num_inputs,
         0, # NUM_HIDDEN
-        Coral.num_outputs + neat_params.n_morphogens + world_configs['polyp_memory'],
+        num_outputs,
         False, # FS_NEAT
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function..
@@ -152,6 +158,11 @@ if __name__ == '__main__':
     os.makedirs(dir_path)
     shutil.copy(os.path.abspath('..')+'/coral_growth/neat_params.py', \
                                        os.path.join(dir_path, 'neat_params.py'))
+
+    with open(os.path.join(dir_path, 'config.txt'), 'w+') as out:
+        for key, value in world_configs.items():
+            out.write(key+'\t'+str(value)+'\n')
+
     evolve_neat(args.gens, dir_path, rid, args.cores)
 
 

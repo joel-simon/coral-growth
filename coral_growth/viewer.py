@@ -320,15 +320,16 @@ class AnimationViewer(Viewer):
                             d[i] = float(d[i])
                         else:
                             d[i] = int(d[i])
-                            max_ints[i] = max(max_ints.get(i, 0), d[i])
+                            # max_ints[i] = max(max_ints.get(i, 0), d[i])
 
                     polyp_data.append( d )
 
             assert self.n_views is not None
 
-            int_colors = {}
-            for i, maxv in max_ints.items():
-                int_colors[i] = [hsv_to_rgb((i/float(maxv)), 1.0, 1.0) for i in range(maxv)]
+            # int_colors = {}
+            # for i, maxv in max_ints.items():
+            #     int_colors[i] = [hsv_to_rgb((i/float(maxv)), 1.0, 1.0) for i in range(maxv)]
+            int_colors = [hsv_to_rgb((i/float(8)), 1.0, 1.0) for i in range(8)]
 
             """ Now compile mesh for each view given color data and mesh data.
             """
@@ -341,8 +342,11 @@ class AnimationViewer(Viewer):
                         color = ( 0, data[-2], data[-1] )
                     else:
                         d = data[ view_idx - 1 ]
-                        if type(d) == 'int':
-                            color = int_colors[view_idx][d]
+                        if isinstance(d, int):
+                            color = int_colors[d]
+                        # if (view_idx-1) in int_colors:
+                            # print('int', int_colors, d)
+                            # color = int_colors[view_idx-1][d]
                         else:
                             color = ( d, d, d )
 

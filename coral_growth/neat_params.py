@@ -15,6 +15,7 @@ params.MutateAddLinkProb = 0.05
 
 # TRAITS
 n_thresholds = 3
+n_morphogens = 2
 params.MutateGenomeTraitsProb = 0.3
 
 for i in range(n_morphogens):

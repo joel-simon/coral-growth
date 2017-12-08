@@ -31,7 +31,7 @@ if __name__ == "__main__":
         'max_edge_growth': 1.5,
         'morphogen_steps': 200,
         'polyp_memory': 2,
-        'morph_thresholds': 2,
+        'morph_thresholds': 3,
     }
 
     with TemporaryDirectory() as tmp_dir:

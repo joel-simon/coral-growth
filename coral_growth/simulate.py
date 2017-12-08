@@ -30,7 +30,7 @@ def simulate_network(steps, network, world_params, morphogens, \
             if verbose:
                 print('Finished step %i: (%i polyps) (%04f)' % \
                     (s, coral.n_polyps, time.time() - step_start))
-                # print('Fitness', coral.fitness())
+                print('Fitness', coral.fitness())
                 print()
 
             if coral.n_polyps >= w_config['max_polyps']:

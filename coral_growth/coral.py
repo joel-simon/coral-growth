@@ -12,11 +12,10 @@ from pykdtree.kdtree import KDTree
 from cymesh.mesh import Mesh
 from cymesh.collisions.findCollisions import findCollisions
 from cymesh.subdivision.sqrt3 import split
-# from cymesh.operators.relax import relax_mesh
+from cymesh.operators.relax import relax_mesh
 
 from coral_growth.modules import light, gravity
 from coral_growth.modules.morphogens import Morphogens
-
 
 class Coral(object):
     num_inputs = 4 # [light, curvature, gravity, extra-bias-bit?]
@@ -79,7 +78,7 @@ class Coral(object):
     def step(self):
         self.polypsGrow()
         self.handleCollisions()
-        # relax_mesh(self.mesh) # Update mesh
+        relax_mesh(self.mesh) # Update mesh
         self.polypDivision() # Divide mesh and create new polyps.
         self.updateAttributes()
         self.age += 1
@@ -125,7 +124,7 @@ class Coral(object):
 
         self.mesh.calculateNormals()
         self.mesh.calculateCurvature()
-        print(max([abs(v.curvature) for v in self.mesh.verts]))
+        # print(max([abs(v.curvature) for v in self.mesh.verts]))
         light.calculate_light(self) # Update the light
 
         self.polyp_light[self.polyp_light != 0] -= .5
@@ -178,13 +177,30 @@ class Coral(object):
     def createPolyp(self, vert):
         if self.n_polyps == self.max_polyps:
             return
-        i = self.n_polyps
+
+        idx = self.n_polyps
         self.n_polyps += 1
-        vert.data['polyp'] = i
-        self.polyp_pos[i, :] = vert.p
-        vert.normal = self.polyp_normal[i]
-        vert.p = self.polyp_pos[i]
-        self.polyp_verts[i] = vert
+        vert.data['polyp'] = idx
+        self.polyp_pos[idx, :] = vert.p
+        vert.normal = self.polyp_normal[idx]
+        vert.p = self.polyp_pos[idx]
+        self.polyp_verts[idx] = vert
+
+        foo = np.zeros(self.n_memory, dtype='uint32')
+        neighbors = vert.neighbors()
+        half = len(neighbors) // 2
+
+        for vert_n in neighbors:
+            if 'polyp' in vert_n.data:
+                memory = self.polyp_memory[vert_n.data['polyp']]
+                for i in range(self.n_memory):
+                    if memory & (1 << i):
+                        foo[i] += 1
+        for i in range(self.n_memory):
+            if foo[i] > half:
+                self.polyp_memory[idx] |= (1 << i)
+
+        assert vert.id == idx
 
     def polypDivision(self):
         """ Update the mesh and create new polyps.
@@ -204,24 +220,26 @@ class Coral(object):
                 self.createPolyp(vert)
 
     def fitness(self):
-        light = sum(self.polyp_light[:self.n_polyps])
-        area = self.mesh.surfaceArea()
+        light = 0
+
         volume = self.mesh.volume()
 
         capture = 0
         tree = KDTree(self.polyp_pos[:self.n_polyps], leafsize=16)
-        foo = np.zeros((1, 3))
+        query = np.zeros((1, 3))
 
         for face in self.mesh.faces:
+            area = face.area()
             p = face.midpoint()
             if p[1] > .1:
-                foo[0] = p
-                d, indx = tree.query(foo, k=10)
-                capture += face.area() * np.mean(d)
+                query[0] = p
+                d, indx = tree.query(query, k=10)
+                capture += area * np.mean(d)
 
-        # Normalized values  (values for seed).
-        light /= 29.46
-        area /= 1.720
+            light += area * sum(self.polyp_light[v.id] for v in face.vertices())
+
+        # Normalized values (values for seed).
+        light /= 0.38655
         capture /= 0.154
         volume /= 1.209
         fitness = (light + capture) / sqrt(volume)

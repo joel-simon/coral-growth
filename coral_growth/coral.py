@@ -33,7 +33,7 @@ class Coral(object):
         self.moprhogen_steps = params['morphogen_steps']
         self.n_memory = params['polyp_memory']
         self.morph_thresholds = params['morph_thresholds']
-
+        self.C = params.get("C", 100)
         self.morphogens = Morphogens(self, morphogens_params)
 
         mean_face = np.mean([f.area() for f in self.mesh.faces])
@@ -133,18 +133,17 @@ class Coral(object):
         # Adjust values to depend on height of polpy.
         # Make polyp on bottom get half light of one on top.
         # Height goes to about 10.
-        self.polyp_light *= (.2 + self.polyp_pos[:, 1] * .2)
+        self.polyp_light *= (.2 + self.polyp_pos[:, 1] * .08)
 
         gravity.calculate_gravity(self)
         self.morphogens.update(self.moprhogen_steps) # Update the morphogens.
 
     def createPolypInputs(self, i):
         """ Map polyp stats to nerual input in [-1, 1] range. """
-        # morph_bin_size = 1.0 / self.morph_thresholds
         self.polyp_inputs = [-1] * self.num_inputs
 
         self.polyp_inputs[0] = (self.polyp_light[i] * 2) - 1
-        self.polyp_inputs[1] = (self.polyp_verts[i].curvature * 2) - 1
+        self.polyp_inputs[1] = (self.polyp_verts[i].curvature * 2)
         self.polyp_inputs[2] = (self.polyp_gravity[i] * 2) - 1
 
         input_idx = 3
@@ -242,7 +241,7 @@ class Coral(object):
         light /= 0.38655
         capture /= 0.154
         volume /= 1.209
-        fitness = (light + capture) / sqrt(volume)
+        fitness = self.C * (light + capture) / volume
 
         return fitness
 

@@ -143,7 +143,8 @@ class Coral(object):
 
             spring_strength = .3
             p = (1-spring_strength) * (self.polyp_pos_next[i]) + (spring_strength * spring_target)
-            self.collisionManager.attemptVertUpdate(vert.id, p)
+            successful = self.collisionManager.attemptVertUpdate(vert.id, p)
+            self.polyp_collided[i] = not successful
 
     # def correctGrowth(self):
     #     self.mesh.calculateNormals()
@@ -370,7 +371,7 @@ class Coral(object):
         self.mesh.calculateNormals()
         self.mesh.calculateCurvature()
 
-        header = [ 'light', 'gravity', 'curvature', 'memory']
+        header = [ 'light', 'gravity', 'curvature', 'memory', 'collided']
         for i in range(self.morphogens.n_morphogens):
             header.append( 'u%i' % i )
 
@@ -403,6 +404,7 @@ class Coral(object):
             polyp_attributes[indx] = [ self.polyp_light[i],
                                        self.polyp_gravity[i],
                                        self.polyp_verts[i].curvature,
+                                       self.polyp_collided[i],
                                        self.polyp_memory[i] ]
 
             for j in range(self.morphogens.n_morphogens):

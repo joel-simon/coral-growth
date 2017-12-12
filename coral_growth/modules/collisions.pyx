@@ -1,5 +1,5 @@
 from __future__ import print_function
-from libc.math cimport sqrt, floor
+from libc.math cimport sqrt, floor, fmin
 from collections import defaultdict
 import numpy as np
 cimport numpy as np
@@ -28,6 +28,16 @@ cdef class MeshCollisionManager:
 
         return d < (r1 + r2)
 
+    cpdef double radius(self, object vert):
+        cdef list edges = vert.edges()
+        cdef double r = edges[0].length()
+
+        for edge in edges[1:]:
+            r = fmin(r, edge.length())
+            # r += edge.length()
+        # r *= .5 / len(edges)
+        return .99 * r
+
     cpdef void newVert(self, int id) except *:
         """ Return True if add was accepted and False otherwise.
         """
@@ -40,14 +50,7 @@ cdef class MeshCollisionManager:
         cdef int yc = <int>(floor(p[1] / self.blocksize))
         cdef int zc = <int>(floor(p[2] / self.blocksize))
 
-        cdef list edges = vert.edges()
-        cdef double r = 0.0
-
-        for edge in edges:
-            r += edge.length()
-        r *= .5 / len(edges)
-
-        self.radii[id] = r
+        self.radii[id] = self.radius(vert)
         self.grid[(xc, yc, zc)].add(id)
         self.particles[id][0] = xc
         self.particles[id][1] = yc
@@ -83,12 +86,7 @@ cdef class MeshCollisionManager:
 
         # Accept the update.
         vert.p[:] = p
-        cdef double new_r = 0.0
-        cdef list edges = vert.edges()
-        for edge in edges:
-            new_r += edge.length()
-
-        self.radii[id] = new_r = .5 / len(edges)
+        self.radii[id] = self.radius(vert)
         self.particles[id][0] = xc
         self.particles[id][1] = yc
         self.particles[id][2] = zc

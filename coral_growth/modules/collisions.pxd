@@ -7,5 +7,6 @@ cdef class MeshCollisionManager:
     cdef public object grid
 
     cdef bint collides(self, int id1, int id2)
+    cpdef double radius(self, object vert)
     cpdef void newVert(self, int id) except *
     cpdef bint attemptVertUpdate(self, int id, double[:] p) except *

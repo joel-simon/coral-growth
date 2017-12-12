@@ -15,7 +15,7 @@ time_steps = 30
 world_configs = {
     'max_polyps': 10000,
     'growth_scalar': .2,
-    'max_face_growth': 1.5,
+    'max_face_growth': 2.0,
     'morphogen_steps': 150,
     'polyp_memory': 2,
     'morph_thresholds': 3,

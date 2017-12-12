@@ -48,7 +48,7 @@ class Viewer(object):
         glLightfv(GL_LIGHT0, GL_DIFFUSE, (0.05, 0.05, 0.05, 1.0))
         glLightfv(GL_LIGHT0, GL_SPECULAR, (0.05, 0.05, 0.05, 1.0))
 
-        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [.4, .4, .4, 1])
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [.6, .6, .6, 1])
         # glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, GLfloat_3(0, 0, -1))
 
         glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
@@ -361,10 +361,11 @@ class AnimationViewer(Viewer):
 
             """ Now compile mesh for each view given color data and mesh data.
             """
-            # radii = []
-            # for vert in raw_mesh.verts:
-            #     edges = vert.edges()
-            #     radii.append(sum(edge.length() for edge in edges) / len(edges))
+            radii = []
+            for vert in raw_mesh.verts:
+                edges = vert.edges()
+                radii.append(min(edge.length() for edge in edges))
+                # radii.append(sum(edge.length() for edge in edges) / len(edges))
 
             for view_idx in range(self.n_views):
                 gl_list = glGenLists(1)
@@ -383,8 +384,8 @@ class AnimationViewer(Viewer):
                         else:
                             color = ( d, d, d )
 
-                    # radii[polyp_idx]
-                    # radius = .1
+
+                    # radius = radii[polyp_idx]
                     # self.draw_sphere(mesh['vertices'][polyp_idx], radius, color)
 
                     mesh['vert_colors'][polyp_idx] = color

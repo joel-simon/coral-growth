@@ -21,11 +21,11 @@ from tempfile import mkdtemp
 import pickle
 from tempfile import TemporaryDirectory
 
-time_steps = 130
+time_steps = 120
 
 world_configs = {
-    'max_polyps': 20000,
-    'growth_scalar': .10,
+    'max_polyps': 12000,
+    'growth_scalar': .20,
     'morphogen_steps': 150,
     'max_face_growth': 1.0,
     'polyp_memory': 2,
@@ -34,7 +34,7 @@ world_configs = {
 
 def evaluate_from_path(genome_path, traits):
     genome = NEAT.Genome(genome_path)
-    assert len(traits) == neat_params.n_morphogens * 2
+    assert len(traits) == neat_params.n_morphogens * 4
     try:
         coral = simulate_genome(time_steps, genome, traits, [world_configs])[0]
         fitness = coral.fitness()

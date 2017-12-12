@@ -46,7 +46,7 @@ def simulate_genome(steps, genome, traits, params, export_folder=None, verbose=F
 
     morphogens = []
 
-    for i in range(len(traits)//2):
+    for i in range(len(traits)//4):
         morphogens.append({
             'diffU': traits['diffU%i'%i],
             'diffV': traits['diffV%i'%i],

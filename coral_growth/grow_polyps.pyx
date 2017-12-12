@@ -48,7 +48,8 @@ cpdef void grow_polyps(object coral) except *:
     cdef int i, out_idx
     cdef unsigned int mi
     cdef int n_memory = coral.n_memory
-    cdef list output, neighbors
+    cdef list neighbors
+    cdef object output
     cdef double[:,:] polyp_pos = coral.polyp_pos
     cdef double[:,:] polyp_normal = coral.polyp_normal
     cdef double[:,:] polyp_pos_next = coral.polyp_pos_next

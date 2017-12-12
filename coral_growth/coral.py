@@ -10,12 +10,13 @@ import numpy as np
 from pykdtree.kdtree import KDTree
 
 from cymesh.mesh import Mesh
-from cymesh.collisions.findCollisions import findCollisions
 from cymesh.subdivision.sqrt3 import split
-from cymesh.operators.relax import relax_mesh
+from cymesh.operators.relax import relax_mesh, relax_mesh_cotangent, relax_vert_cotangent
 
+from coral_growth.grow_polyps import grow_polyps
 from coral_growth.modules import light, gravity
 from coral_growth.modules.morphogens import Morphogens
+from coral_growth.modules.collisions import MeshCollisionManager
 
 class Coral(object):
     num_inputs = 4 # [light, curvature, gravity, extra-bias-bit?]
@@ -34,34 +35,43 @@ class Coral(object):
         self.n_memory = params['polyp_memory']
         self.morph_thresholds = params['morph_thresholds']
         self.C = params.get("C", 100)
+        self.spring_strength = params.get("spring_strength", .3)
         self.morphogens = Morphogens(self, morphogens_params)
 
         mean_face = np.mean([f.area() for f in self.mesh.faces])
-        mean_edge = np.mean([e.length() for e in self.mesh.edges])
+        self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
         self.max_face_area = mean_face * params['max_face_growth']
 
-        self.n_polyps = 0
+        self.max_edge_len = self.target_edge_len * params['max_face_growth']
+        block_size = sqrt(4 * self.max_face_area / sqrt(3))
+        # block_size = self.max_edge_len
 
+
+        self.n_polyps = 0
         self.num_inputs = Coral.num_inputs + self.n_memory + len(morphogens_params) * (self.morph_thresholds-1)
         self.num_outputs = Coral.num_outputs + self.n_memory + len(morphogens_params)
 
         assert network.NumInputs() == self.num_inputs
         assert network.NumOutputs() == self.num_outputs
 
-        self.polyp_inputs = [0 for _ in range(self.num_inputs)]
-        self.polyp_inputs[self.num_inputs-1] = 1 # The last input is always used as bias.
+        self.polyp_inputs = np.zeros((self.max_polyps, self.num_inputs))
+        # self.polyp_inputs = [0 for _ in range(self.num_inputs)]
+        # self.polyp_inputs[self.num_inputs-1] = 1 # The last input is always used as bias.
 
         self.polyp_verts = [None] * self.max_polyps
         self.polyp_light = np.zeros(self.max_polyps)
         self.polyp_energy = np.zeros(self.max_polyps)
         self.polyp_flow = np.zeros(self.max_polyps)
         self.polyp_pos = np.zeros((self.max_polyps, 3))
+        self.polyp_pos_next = np.zeros((self.max_polyps, 3))
         self.polyp_normal = np.zeros((self.max_polyps, 3))
-        self.polyp_last_pos = np.zeros((self.max_polyps, 3))
+        # self.polyp_last_pos = np.zeros((self.max_polyps, 3))
         self.polyp_gravity = np.zeros(self.max_polyps)
         self.polyp_collided = np.zeros(self.max_polyps, dtype='uint8')
         assert self.n_memory <= 32
         self.polyp_memory = np.zeros((self.max_polyps), dtype='uint32')
+
+        self.collisionManager = MeshCollisionManager(self.mesh, self.polyp_pos, block_size)
 
         for vert in self.mesh.verts:
             self.createPolyp(vert)
@@ -77,8 +87,7 @@ class Coral(object):
 
     def step(self):
         self.polypsGrow()
-        self.handleCollisions()
-        relax_mesh(self.mesh) # Update mesh
+        # self.correctGrowth()
         self.polypDivision() # Divide mesh and create new polyps.
         self.updateAttributes()
         self.age += 1
@@ -86,39 +95,70 @@ class Coral(object):
     def polypsGrow(self):
         """ Calculate the changes to coral by neural network.
         """
-        self.polyp_last_pos[:, :] = self.polyp_pos
+        grow_polyps(self)
 
-        for i in range(self.n_polyps):
-            if self.polyp_pos[i, 1] < 0:
-                continue
+        # for i in range(self.n_polyps):
+        #     self.createPolypInputs(i)
+        #     self.network.Flush() # Compute feed-forward network results.
+        #     self.network.Input(self.polyp_inputs)
+        #     self.network.ActivateFast()
+        #     output = self.network.Output()
 
-            self.createPolypInputs(i)
-            self.network.Flush() # Compute feed-forward network results.
-            self.network.Input(self.polyp_inputs)
-            self.network.ActivateFast()
-            output = self.network.Output()
+        #     assert len(output) == self.num_outputs
 
-            assert len(output) == self.num_outputs
+        #     # Move in normal direction by growth amount.
+        #     growth = output[0] * self.growth_scalar
+        #     self.polyp_pos_next[i, :] = self.polyp_pos[i] + growth * self.polyp_normal[i]
 
-            # Move in normal direction by growth amount.
-            growth = output[0] * self.growth_scalar
-            self.polyp_pos[i] += self.polyp_normal[i] * growth
+        #     # Output morphogens.
+        #     out_idx = 1
+        #     for mi in range(self.morphogens.n_morphogens):
+        #         if output[out_idx] > 0.5:
+        #             self.morphogens.V[mi, i] = 1
+        #         out_idx += 1
 
-            # Output morphogens.
-            out_idx = 1
-            for mi in range(self.morphogens.n_morphogens):
-                if output[out_idx] > 0.5:
-                    self.morphogens.V[mi, i] = 1
-                out_idx += 1
+        #     for mi in range(self.n_memory):
+        #         if output[out_idx] > 0.5:
+        #             self.polyp_memory[i] |= ( 1 << mi )
+        #         out_idx += 1
 
-            for mi in range(self.n_memory):
-                if output[out_idx] > 0.5:
-                    self.polyp_memory[i] |= ( 1 << mi )
-                out_idx += 1
+        # spring_target = np.zeros(3)
+        # for i in range(self.n_polyps):
+        #     vert = self.mesh.verts[i]
 
-            assert (not isnan(self.polyp_pos[i, 0]))
-            assert (not isnan(self.polyp_pos[i, 1]))
-            assert (not isnan(self.polyp_pos[i, 2]))
+        #     if vert.p[1] < 0:
+        #         continue
+
+        #     neighbors = vert.neighbors()
+        #     spring_target *= 0
+
+        #     for neighbor in neighbors:
+        #         spring_target += self.target_edge_len * normed(np.array(neighbor.p) - vert.p)
+
+        #     spring_target /= len(neighbors)
+        #     spring_target += vert.p
+
+        #     spring_strength = .3
+        #     p = (1-spring_strength) * (self.polyp_pos_next[i]) + (spring_strength * spring_target)
+        #     self.collisionManager.attemptVertUpdate(vert.id, p)
+
+    # def correctGrowth(self):
+    #     self.mesh.calculateNormals()
+    #     self.mesh.calculateCurvature()
+
+    #     self.max_curvature = .3
+
+    #     for vi in range(self.n_polyps):
+    #         vert = self.mesh.verts[vi]
+    #         invalid = False
+
+    #         if self.polyp_pos[vi, 1] < 0:
+    #             invalid = True
+    #         elif abs(vert.curvature) > self.max_curvature:
+    #             invalid = True
+
+    #         if invalid:
+    #             vert.p[:] = self.polyp_last_pos[vi]
 
     def updateAttributes(self):
 
@@ -138,40 +178,31 @@ class Coral(object):
         gravity.calculate_gravity(self)
         self.morphogens.update(self.moprhogen_steps) # Update the morphogens.
 
-    def createPolypInputs(self, i):
-        """ Map polyp stats to nerual input in [-1, 1] range. """
-        self.polyp_inputs = [-1] * self.num_inputs
+    # def createPolypInputs(self, i):
 
-        self.polyp_inputs[0] = (self.polyp_light[i] * 2) - 1
-        self.polyp_inputs[1] = (self.polyp_verts[i].curvature * 2)
-        self.polyp_inputs[2] = (self.polyp_gravity[i] * 2) - 1
+        # """ Map polyp stats to nerual input in [-1, 1] range. """
+        # self.polyp_inputs = [-1] * self.num_inputs
 
-        input_idx = 3
-        for mi in range(self.morphogens.n_morphogens):
-            mbin = int(floor(self.morphogens.U[mi, i] * self.morph_thresholds))
-            mbin = min(self.morph_thresholds - 1, mbin)
+        # self.polyp_inputs[0] = (self.polyp_light[i] * 2) - 1
+        # self.polyp_inputs[1] = (self.polyp_verts[i].curvature * 2)
+        # self.polyp_inputs[2] = (self.polyp_gravity[i] * 2) - 1
 
-            if mbin > 0:
-                self.polyp_inputs[input_idx + (mbin-1)] = 1
+        # input_idx = 3
+        # for mi in range(self.morphogens.n_morphogens):
+        #     mbin = int(floor(self.morphogens.U[mi, i] * self.morph_thresholds))
+        #     mbin = min(self.morph_thresholds - 1, mbin)
 
-            input_idx += (self.morph_thresholds-1)
+        #     if mbin > 0:
+        #         self.polyp_inputs[input_idx + (mbin-1)] = 1
 
-        for mi in range(self.n_memory):
-            if self.polyp_memory[i] & (1 << mi):
-                self.polyp_inputs[input_idx] = 1
-            else:
-                self.polyp_inputs[input_idx] = -1
-            input_idx += 1
+        #     input_idx += (self.morph_thresholds-1)
 
-    def handleCollisions(self):
-        collisions = findCollisions(self.mesh)
-        self.polyp_collided *= 0 # Used for debugging
-
-        for vi, collided in enumerate(collisions):
-            if collided:
-                vert = self.mesh.verts[vi]
-                vert.p[:] = self.polyp_last_pos[vi]
-                self.polyp_collided[vi] = 1
+        # for mi in range(self.n_memory):
+        #     if self.polyp_memory[i] & (1 << mi):
+        #         self.polyp_inputs[input_idx] = 1
+        #     else:
+        #         self.polyp_inputs[input_idx] = -1
+            # input_idx += 1
 
     def createPolyp(self, vert):
         if self.n_polyps == self.max_polyps:
@@ -195,28 +226,87 @@ class Coral(object):
                 for i in range(self.n_memory):
                     if memory & (1 << i):
                         foo[i] += 1
+
         for i in range(self.n_memory):
             if foo[i] > half:
                 self.polyp_memory[idx] |= (1 << i)
 
+        self.collisionManager.newVert(vert.id)
+
         assert vert.id == idx
+
+    def splitFace(self, face):
+        return False
+        # if face.area() > self.max_face_area:
+        #     return True
+
+        # edges = face.edges()
+        # if edges[0].length >
+        # # assert len(edges) == 3, edges
 
     def polypDivision(self):
         """ Update the mesh and create new polyps.
         """
-        to_divide = []
-        for face in self.mesh.faces:
-            if face.area() > self.max_face_area:
-                to_divide.append(face)
+        # edge_splits = set()
+        to_divide = set()
+        # for face in self.mesh.faces:
+        #     l1 = face.he.edge.length()
+        #     l2 = face.he.next.edge.length()
+        #     l3 = face.he.next.next.edge.length()
+        #     minl = min(l1, l2, l3)
+        #     maxl = max(l1, l2, l3)
 
-        for face in to_divide:
+        #     if maxl > 3 * minl:
+        #         if maxl == l1:
+        #             edge_splits.add(face.he.edge)
+        #         elif maxl == l2:
+        #             edge_splits.add(face.he.next.edge)
+        #         else:
+        #             edge_splits.add(face.he.next.next.edge)
+
+        # for edge in edge_splits:
+        #     if len(self.mesh.verts) == self.max_polyps:
+        #         break
+        #     self.mesh.splitEdge(edge)
+
+        # for edge in self.mesh.edges:
+        #     if edge.length() > self.max_edge_len:
+        #         to_divide.add(edge.he.face)
+        #         to_divide.add(edge.he.twin.face)
+
+        # to_divide = []
+        # for face in self.mesh.faces:
+        #     if self.splitFace(face):
+        #         to_divide.append(face)
+
+        # for face in to_divide:
+        #     if len(self.mesh.verts) == self.max_polyps:
+        #         break
+        #     split(self.mesh, face, self.max_polyps)
+
+        old = set([ e.id for e in self.mesh.edges ])
+
+        for edge in self.mesh.edges:
+            if edge.length() > self.max_edge_len:
+                self.mesh.splitEdge(edge)
+
             if len(self.mesh.verts) == self.max_polyps:
                 break
-            split(self.mesh, face, self.max_polyps)
+
+        for edge in self.mesh.edges:
+            if edge.id not in old:
+                v1 = edge.he.next.next.vert
+                v2 = edge.he.twin.next.next.vert
+
+                d = sqrt((v1.p[0] - v2.p[0])**2 + (v1.p[1] - v2.p[1])**2 + (v1.p[2] - v2.p[2])**2)
+
+                if edge.length() > d:
+                    edge.flip()
 
         for vert in self.mesh.verts:
             if 'polyp' not in vert.data:
                 self.createPolyp(vert)
+                # relax_vert_cotangent(vert, vert.p)
 
     def fitness(self):
         light = 0
@@ -229,6 +319,19 @@ class Coral(object):
 
         for face in self.mesh.faces:
             area = face.area()
+
+            if isnan(area):
+                v1, v2, v3 = face.vertices()
+                p1 = v1.p
+                p2 = v2.p
+                p3 = v3.p
+                a = (p1[0] - p2[0])**2 + (p1[1] - p2[1])**2 + (p1[2] - p2[2])**2 # 1-2
+                b = (p3[0] - p2[0])**2 + (p3[1] - p2[1])**2 + (p3[2] - p2[2])**2 # 2-3
+                c = (p1[0] - p3[0])**2 + (p1[1] - p3[1])**2 + (p1[2] - p3[2])**2 # 1-3
+                print(2*a*b + 2*b*c + 2*c*a - a*a - b*b - c*c)
+                print(sqrt(2*a*b + 2*b*c + 2*c*a - a*a - b*b - c*c))
+                assert not isnan(area), ([list(v.p) for v in face.vertices()])
+
             p = face.midpoint()
             if p[1] > .1:
                 query[0] = p
@@ -238,10 +341,16 @@ class Coral(object):
             light += area * sum(self.polyp_light[v.id] for v in face.vertices())
 
         # Normalized values (values for seed).
-        light /= 0.38655
-        capture /= 0.154
-        volume /= 1.209
-        fitness = self.C * (light + capture) / volume
+        # print(light, capture, volume)
+        light /= 0.257166
+        capture /= 0.1255804
+        volume /= 0.99041421
+
+        # print(light, capture, volume)
+        light_percent = .8
+        fitness = self.C * (light_percent*light + (1-light_percent)*capture) / volume
+
+        assert not isnan(fitness), (self.C, light, capture, volume)
 
         return fitness
 
@@ -259,7 +368,7 @@ class Coral(object):
         self.mesh.calculateNormals()
         self.mesh.calculateCurvature()
 
-        header = [ 'light', 'gravity', 'curvature', 'collided', 'memory']
+        header = [ 'light', 'gravity', 'curvature', 'memory']
         for i in range(self.morphogens.n_morphogens):
             header.append( 'u%i' % i )
 
@@ -292,7 +401,6 @@ class Coral(object):
             polyp_attributes[indx] = [ self.polyp_light[i],
                                        self.polyp_gravity[i],
                                        self.polyp_verts[i].curvature,
-                                       self.polyp_collided[i],
                                        self.polyp_memory[i] ]
 
             for j in range(self.morphogens.n_morphogens):

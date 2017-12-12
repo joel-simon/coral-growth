@@ -91,10 +91,10 @@ def make_plane(n, arrows=False):
     glLineWidth(1)
     glEndList()
 
-def make_sphere():
+def make_sphere(n=30):
     glNewList(G_OBJ_SPHERE, GL_COMPILE)
     quad = gluNewQuadric()
-    gluSphere(quad, 0.5, 30, 30)
+    gluSphere(quad, 1.0, n, n)
     gluDeleteQuadric(quad)
     glEndList()
 

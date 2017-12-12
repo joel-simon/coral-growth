@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     world_configs = {
         'max_polyps': args.max_polyps,
-        'growth_scalar': .5,
+        'growth_scalar': .2,
         'max_face_growth': 1.0,
         'max_edge_growth': 1.5,
         'morphogen_steps': 200,

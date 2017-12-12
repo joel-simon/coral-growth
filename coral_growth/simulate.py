@@ -3,7 +3,7 @@ import time
 from coral_growth.coral import Coral
 import MultiNEAT as NEAT
 
-obj_path = os.getcwd() + '/../data/triangulated_half_sphere_3.obj'
+obj_path = os.getcwd() + '/../data/half_sphere_smooth.obj'
 
 def export(coral, folder, w_i, s):
     out = open(os.path.join(folder, str(w_i), '%i.coral.obj'%s), 'w+')
@@ -48,8 +48,10 @@ def simulate_genome(steps, genome, traits, params, export_folder=None, verbose=F
 
     for i in range(len(traits)//2):
         morphogens.append({
-            'diffU': 0.01, 'diffV': 0.005,
-            'F': traits['F%i'%i], 'K': traits['K%i'%i]
+            'diffU': traits['diffU%i'%i],
+            'diffV': traits['diffV%i'%i],
+            'F': traits['F%i'%i],
+            'K': traits['K%i'%i]
         })
 
     return simulate_network(steps, network, params, morphogens, export_folder, verbose)

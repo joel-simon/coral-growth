@@ -5,13 +5,13 @@
 # Scroll wheel: zoom in/out
 import sys, pygame, math
 from pygame.locals import *
+import numpy as np
 from pygame.constants import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 import shutil
-from coral_growth.primitive import make_plane, G_OBJ_PLANE, G_OBJ_SPHERE
-
+from coral_growth.primitive import make_plane, make_sphere, G_OBJ_PLANE, G_OBJ_SPHERE
 
 from OpenGL.arrays import vbo
 from OpenGL.raw.GL.ARB.vertex_array_object import glGenVertexArrays, \
@@ -37,22 +37,30 @@ class Viewer(object):
         viewport = view_size
 
         self.surface = pygame.display.set_mode(view_size, OPENGL | DOUBLEBUF|  GLUT_MULTISAMPLE )
+        glEnable(GL_DEPTH_CLAMP)
 
-        glLightfv(GL_LIGHT0, GL_POSITION,  (-40, 200, 100, 0.0))
-        glLightfv(GL_LIGHT0, GL_AMBIENT, (0.2, 0.2, 0.2, 1.0))
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, (0.5, 0.5, 0.5, 1.0))
         glEnable(GL_LIGHT0)
         glEnable(GL_LIGHTING)
+
+        # glLightfv(GL_LIGHT0, GL_POSITION,  (-40, 200, 100, 0.0))
+        glLightfv(GL_LIGHT0, GL_POSITION, [0,0, 100, 0.0])
+        glLightfv(GL_LIGHT0, GL_AMBIENT, (0.05, 0.05, 0.05, 1.0))
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, (0.05, 0.05, 0.05, 1.0))
+        glLightfv(GL_LIGHT0, GL_SPECULAR, (0.05, 0.05, 0.05, 1.0))
+
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [.4, .4, .4, 1])
+        # glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, GLfloat_3(0, 0, -1))
+
         glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
         glEnable(GL_COLOR_MATERIAL)
         glEnable(GL_MULTISAMPLE)
 
+        glDepthFunc(GL_LESS)
+
         glClearColor(*background)
 
-        glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_SMOOTH)
-
-        # glCullFace(GL_BACK)
+        glCullFace(GL_BACK)
         # glDisable( GL_CULL_FACE )
         # glPolygonMode ( GL_FRONT_AND_BACK, GL_LINE )
 
@@ -77,6 +85,9 @@ class Viewer(object):
         self.gl_lists = []
 
         make_plane(5)
+        make_sphere(15)
+        self.translation_matrix = np.identity(4)
+        self.scaling_matrix = np.identity(4)
 
     def start_draw(self):
         self.gl_list = glGenLists(1)
@@ -177,6 +188,36 @@ class Viewer(object):
             else:
                 glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, ord(c))
 
+    def draw_sphere(self, p, r, color):
+        glPushMatrix()
+
+        self.translation_matrix[0, 3] = p[0]
+        self.translation_matrix[1, 3] = p[1]
+        self.translation_matrix[2, 3] = p[2]
+
+        self.translation_matrix[0, 0] = r
+        self.translation_matrix[1, 1] = r
+        self.translation_matrix[2, 2] = r
+        self.translation_matrix[3, 3] = 1
+
+        glMultMatrixf(np.transpose(self.translation_matrix))
+        # glMultMatrixf(self.scaling_matrix)
+
+        glColor3f(color[0], color[1], color[2])
+
+        emmision = False
+
+        # if emmision:  # emit light if the node is selected
+        #     glMaterialfv(GL_FRONT, GL_EMISSION, [0.3, 0.3, 0.3])
+
+        glCallList(G_OBJ_SPHERE)
+
+        # if emmision:
+        #     glMaterialfv(GL_FRONT, GL_EMISSION, [0.0, 0.0, 0.0])
+
+        glPopMatrix()
+
+
     def clear(self):
         self.gl_lists = []
 
@@ -255,6 +296,7 @@ from cymesh.mesh import Mesh
 import numpy as np
 from colorsys import hsv_to_rgb
 import re
+
 class AnimationViewer(Viewer):
     def __init__(self, files, view_size, color=(0.7, 0.7, 0.7, 0.0)):
         super(AnimationViewer, self).__init__(view_size, color)
@@ -269,20 +311,12 @@ class AnimationViewer(Viewer):
         self.n_views = None
         self.view_lists = None#
 
-        self.subtitle= ''
-
-        dir = 'tmp'
-        if os.path.exists(dir):
-            shutil.rmtree(dir)
-        os.makedirs(dir)
+        # dir = 'tmp'
+        # if os.path.exists(dir):
+            # shutil.rmtree(dir)
+        # os.makedirs(dir)
 
         get_generation = re.compile('out_.*?\/([0-9]+)\/')
-
-        # generations = set()
-        # for fi, file in enumerate(files):
-        #     generations.add(int(get_generation.search(file).groups()[0]))
-
-        # generations = sorted(list(generations))
 
         for fi, file in enumerate(files):
             try:
@@ -296,7 +330,8 @@ class AnimationViewer(Viewer):
 
             """ Read the file and store the colors.
             """
-            mesh = Mesh.from_obj(file).export()
+            raw_mesh = Mesh.from_obj(file)
+            mesh = raw_mesh.export()
             mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
             polyp_data = []
             max_ints = {}
@@ -315,24 +350,22 @@ class AnimationViewer(Viewer):
 
                 elif line.startswith('c'):
                     d = line.split(' ')[1:]
-                    for i in range(self.n_views):
-                        if '.' in d[i]:
-                            d[i] = float(d[i])
-                        else:
-                            d[i] = int(d[i])
-                            # max_ints[i] = max(max_ints.get(i, 0), d[i])
+                    for i in range(self.n_views+1):
+                        d[i] = float(d[i]) if '.' in d[i] else int(d[i])
 
                     polyp_data.append( d )
 
             assert self.n_views is not None
 
-            # int_colors = {}
-            # for i, maxv in max_ints.items():
-            #     int_colors[i] = [hsv_to_rgb((i/float(maxv)), 1.0, 1.0) for i in range(maxv)]
             int_colors = [hsv_to_rgb((i/float(8)), 1.0, 1.0) for i in range(8)]
 
             """ Now compile mesh for each view given color data and mesh data.
             """
+            # radii = []
+            # for vert in raw_mesh.verts:
+            #     edges = vert.edges()
+            #     radii.append(sum(edge.length() for edge in edges) / len(edges))
+
             for view_idx in range(self.n_views):
                 gl_list = glGenLists(1)
                 glNewList(gl_list, GL_COMPILE)
@@ -350,6 +383,10 @@ class AnimationViewer(Viewer):
                         else:
                             color = ( d, d, d )
 
+                    # radii[polyp_idx]
+                    # radius = .1
+                    # self.draw_sphere(mesh['vertices'][polyp_idx], radius, color)
+
                     mesh['vert_colors'][polyp_idx] = color
 
                 self.draw_mesh(mesh)
@@ -366,7 +403,6 @@ class AnimationViewer(Viewer):
         print('Finished Loading Animation')
 
     def draw_step(self):
-        # if self.subtitle:
         self.draw_text( 30, 60, 'View: '+self.view_names[self.view])
 
     def handle_input(self, e):

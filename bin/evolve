@@ -21,12 +21,12 @@ from tempfile import mkdtemp
 import pickle
 from tempfile import TemporaryDirectory
 
-time_steps = 100
+time_steps = 130
 
 world_configs = {
-    'max_polyps': 10000,
-    'growth_scalar': .25,
-    'morphogen_steps': 200,
+    'max_polyps': 20000,
+    'growth_scalar': .10,
+    'morphogen_steps': 150,
     'max_face_growth': 1.0,
     'polyp_memory': 2,
     'morph_thresholds': 3,

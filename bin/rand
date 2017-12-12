@@ -10,13 +10,13 @@ from coral_growth.coral import Coral
 from coral_growth.simulate import simulate_network
 from coral_growth.viewer import AnimationViewer
 
-time_steps = 10
+time_steps = 30
 
 world_configs = {
     'max_polyps': 10000,
-    'growth_scalar': .125,
-    'max_face_growth': 1.0,
-    'morphogen_steps': 200,
+    'growth_scalar': .2,
+    'max_face_growth': 1.5,
+    'morphogen_steps': 150,
     'polyp_memory': 2,
     'morph_thresholds': 3,
 }
@@ -41,7 +41,9 @@ class NetworkDummy(object):
         pass
 
     def Output(self):
+        # out = [0 for _ in range(self.NumOutputs())]
         out = [random.random() for _ in range(self.NumOutputs())]
+        # out[0] = 1
         # out = [0] * self.NumOutputs()
         # out[0] = random.random()# * world_configs[]
         # out[1] = random.random()
@@ -60,11 +62,11 @@ with TemporaryDirectory() as tmp_dir:
     net = NEAT.NeuralNetwork()
     coral = simulate_network(time_steps, NetworkDummy(), [world_configs], morphogens, \
                                             export_folder=tmp_dir, verbose=True)[0]
-    print(coral.n_polyps)
-    print(coral.polyp_memory[:coral.n_polyps])
+    # print(coral.n_polyps)
+    # print(coral.polyp_memory[:coral.n_polyps])
     exported = os.path.join(tmp_dir, '0')
     files = [f for f in os.listdir(exported) if '.coral.obj' in f]
     files = sorted(files, key=lambda f: int(f.split('.')[0]))
     files = [os.path.join(exported, f) for f in files]
-    view = AnimationViewer(files, (800, 600))
+    view = AnimationViewer(files, (1400, 1000))
     view.main_loop()

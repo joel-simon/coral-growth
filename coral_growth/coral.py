@@ -33,23 +33,26 @@ class Coral(object):
 
         self.vc = params.vc
         self.n_memory = params.polyp_memory
-        self.morphogens = Morphogens(self, traits, self.n_morphogens)
         self.max_polyps = params.max_polyps
-        self.world_depth = params.world_depth
-        self.light_bottom = params.light_bottom
+        self.morphogens = Morphogens(self, traits, params.n_morphogens)
+        self.morphogen_steps = params.morphogen_steps
+        # self.world_depth = params.world_depth
+        # self.light_bottom = params.light_bottom
+        # self.world_depth = wor
+        self.light_amount = params.light_amount
         self.n_morphogens = params.n_morphogens
         self.growth_scalar = params.growth_scalar
         self.morph_thresholds = params.morph_thresholds
-        self.light_fitness_percent = param.light_fitness_percent
+        # self.light_fitness_percent = params.light_fitness_percent
 
         # Some parameters are evolved traits.
         self.spring_strength = traits['spring_strength']
 
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
         self.polyp_size = self.target_edge_len * 0.33
-        self.max_edge_len = self.target_edge_len * params['max_face_growth']
+        self.max_edge_len = self.target_edge_len * params.max_face_growth
         mean_face = np.mean([f.area() for f in self.mesh.faces])
-        self.max_face_area = mean_face * params['max_face_growth']
+        self.max_face_area = mean_face * params.max_face_growth
 
         self.n_polyps = 0
         self.num_inputs = Coral.num_inputs + self.n_memory + self.n_morphogens * (self.morph_thresholds-1)
@@ -181,7 +184,7 @@ class Coral(object):
         # (self.light_bottom + (1-self.light_bottom)*self.polyp_pos[:,1,:] / self.world_depth)
 
         gravity.calculate_gravity(self)
-        self.morphogens.update(self.params.moprhogen_steps) # Update the morphogens.
+        self.morphogens.update(self.morphogen_steps) # Update the morphogens.
 
     def createPolypInputs(self, i):
         """ Map polyp stats to nerual input in [-1, 1] range. """
@@ -244,10 +247,13 @@ class Coral(object):
         """
         for face in self.mesh.faces:
             if max(e.length() for e in face.edges()) > self.max_edge_len:
-                split(self.mesh, face)
+                split(self.mesh, face, max_vertices=self.max_polyps)
 
             elif face.area() > self.max_face_area:
-                split(self.mesh, face)
+                split(self.mesh, face, max_vertices=self.max_polyps)
+            
+            if self.n_polyps == self.max_polyps:
+                break
 
         for vert in self.mesh.verts:
             if 'polyp' not in vert.data:

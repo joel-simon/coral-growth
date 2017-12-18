@@ -9,11 +9,10 @@ def export(coral, folder, w_i, s):
     out = open(os.path.join(folder, str(w_i), '%i.coral.obj'%s), 'w+')
     coral.export(out)
 
-def simulate_network(steps, network, traits, world_params, \
-                                             export_folder=None, verbose=False):
+def simulate_network(network, traits, params, export_folder=None, verbose=False):
     corals = []
 
-    for w_i, w_config in enumerate(world_params):
+    for w_i, w_config in enumerate(params):
         coral = Coral(obj_path, network, traits, w_config)
 
         if export_folder:
@@ -24,7 +23,7 @@ def simulate_network(steps, network, traits, world_params, \
             print('Initial Fitness', coral.fitness())
             print()
 
-        for s in range(steps):
+        for s in range(w_config.max_steps):
             step_start = time.time()
 
             coral.step()
@@ -38,28 +37,14 @@ def simulate_network(steps, network, traits, world_params, \
                 print('Fitness', coral.fitness())
                 print()
 
-            if coral.n_polyps >= w_config['max_polyps']:
+            if coral.n_polyps >= w_config.max_polyps:
                 break
 
         corals.append(coral)
 
     return corals
 
-def simulate_genome(steps, genome, traits, params, export_folder=None, \
-                                                                 verbose=False):
+def simulate_genome(genome, traits, params, export_folder=None, verbose=False):
     network = NEAT.NeuralNetwork()
     genome.BuildPhenotype(network)
-    return simulate_network(steps, network, params, morphogens, export_folder, verbose)
-
-    # morphogens = []
-
-    # for i in range(2):
-    #     morphogens.append({
-    #         'diffU': traits['diffU%i'%i],
-    #         'diffV': traits['diffV%i'%i],
-    #         'F': traits['F%i'%i],
-    #         'K': traits['K%i'%i]
-    #     })
-
-    # params['spring_strength'] = traits['spring_strength']
-
+    return simulate_network(network, traits, params, export_folder, verbose)

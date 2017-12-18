@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 from __future__ import print_function
-import random, os, sys, string, argparse
+import random, os, sys, string, argparse, time
 from datetime import datetime
+from multiprocessing import Pool
 sys.path.append(os.path.abspath('..'))
+from tempfile import TemporaryDirectory
+import MultiNEAT as NEAT
+from coral_growth.simulate import simulate_network
 
-from coral_growth.evolution import evolve_neat
+from coral_growth.coral import Coral
+from coral_growth.simulate import simulate_genome
+# from coral_growth.evolution import evolve_neat
 from coral_growth.parameters import Parameters
 
 # Run with two morphogens.
@@ -12,6 +18,121 @@ params = Parameters()
 params.addMorphogen()
 params.addMorphogen()
 params.light_amount = 1.0
+
+def evaluate(genome, traits):
+    try:
+        coral = simulate_genome(genome, traits, [params])[0]
+        fitness = coral.fitness()
+    except AssertionError as e:
+        print('Exception:', e)
+        fitness = 0
+    print('.', end='', flush=True)
+    return fitness
+
+def evaluate_from_path(genome_path, traits):
+    """ Load a genome text file and run the simulation.
+    """
+    genome = NEAT.Genome(genome_path)
+    return evaluate(genome, traits)
+
+def evaluate_parallel(pool, genomes):
+    """ The genome object from MultiNEAT cannot be pickled :'(
+        So save to disk and pass path to subprocess.
+    """
+    with TemporaryDirectory() as tmp_dir:
+        t = time.time()
+        data = []
+        for i, genome in enumerate(genomes):
+            path = tmp_dir+'/'+str(i)
+            genome.Save(path)
+            data.append((path, genome.GetGenomeTraits()))
+        fitnesses = pool.starmap(evaluate_from_path, data)
+        # fitnesses = pool.map(evaluate_from_path, data)
+
+    return fitnesses
+
+def evolve_neat(generations, out_dir, run_id, n_cores):
+    if n_cores > 1:
+        pool = Pool(processes=n_cores)
+
+    num_inputs = Coral.num_inputs + params.polyp_memory + \
+                 params.n_morphogens*(params.morph_thresholds - 1)
+
+    num_outputs = Coral.num_outputs + params.polyp_memory + params.n_morphogens
+
+    genome_prototye = NEAT.Genome(
+        0, # ID
+        num_inputs,
+        0, # NUM_HIDDEN
+        num_outputs,
+        False, # FS_NEAT
+        NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
+        NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
+        0, # Seed type, must be 1 to have hidden nodes.
+        params
+    )
+
+    pop = NEAT.Population(
+        genome_prototye, # Seed genome.
+        params,
+        True, # Randomize weights.
+        1.0, # Random Range.
+        int(time.time()) # Random number generator seed.
+    )
+
+    last_fitness = 0.0
+    t = time.time()
+
+    for generation in range(generations):
+        print(run_id, 'Starting generation', generation)
+
+        genomes = NEAT.GetGenomeList(pop)
+
+        if n_cores > 1:
+            fitnesses = evaluate_parallel(pool, genomes)
+        else:
+            fitnesses = [evaluate(g, g.GetGenomeTraits()) for g in genomes]
+
+        for genome, fitness in zip(genomes, fitnesses):
+            genome.SetFitness(fitness)
+            genome.SetEvaluated()
+
+        mean = sum(fitnesses) / float(len(fitnesses))
+        maxf = max(fitnesses)
+
+        runtime = time.time() - t
+        t = time.time()
+
+        print('\nGeneration %i ran in %f, %f per coral' % \
+                                    (generation, runtime, runtime/len(genomes)))
+        print('Max fitness:', maxf, 'Mean fitness:', mean)
+
+        if maxf != last_fitness:
+            last_fitness = maxf
+
+            best = pop.GetBestGenome()
+            best.Save(out_dir+'/best_%i' % generation)
+            best = NEAT.Genome(out_dir+'/best_%i' % generation)
+            traits = genome.GetGenomeTraits()
+
+            print('New best fitness.', best.NumNeurons(), best.NumLinks())
+
+            with open(out_dir+'/scores.txt', "a") as f:
+                f.write("%i\t%f\n"%(generation, maxf))
+
+            with open(out_dir+'/best_%i_traits.txt' % generation, "w+") as f:
+                f.write(str(traits))
+
+            export_folder = os.path.join(out_dir, str(generation))
+            os.mkdir(export_folder)
+            simulate_genome(best, traits, [params], export_folder=export_folder)
+        pop.Epoch()
+        print('#'*80)
+
+    print('Run Complete.')
+    pool.close()
+    pool.join()
+
 
 def generate_id(n):
     options = string.ascii_uppercase + string.digits
@@ -36,4 +157,4 @@ if __name__ == '__main__':
         for key, value in vars(params).items():
             out.write(key+'\t'+str(value)+'\n')
 
-    evolve_neat(params, args.gens, dir_path, rid, args.cores)
+    evolve_neat(args.gens, dir_path, rid, args.cores)

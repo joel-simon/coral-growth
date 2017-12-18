@@ -36,26 +36,29 @@ class Viewer(object):
         self.height = view_size[1]
         viewport = view_size
 
-        self.surface = pygame.display.set_mode(view_size, OPENGL | DOUBLEBUF|  GLUT_MULTISAMPLE )
-        glEnable(GL_DEPTH_CLAMP)
+        self.surface = pygame.display.set_mode(view_size, OPENGL | DOUBLEBUF )
+        # glEnable(GL_DEPTH_CLAMP)
 
         glEnable(GL_LIGHT0)
         glEnable(GL_LIGHTING)
 
-        # glLightfv(GL_LIGHT0, GL_POSITION,  (-40, 200, 100, 0.0))
-        glLightfv(GL_LIGHT0, GL_POSITION, [0,0, 100, 0.0])
-        glLightfv(GL_LIGHT0, GL_AMBIENT, (0.05, 0.05, 0.05, 1.0))
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, (0.05, 0.05, 0.05, 1.0))
-        glLightfv(GL_LIGHT0, GL_SPECULAR, (0.05, 0.05, 0.05, 1.0))
 
-        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [.6, .6, .6, 1])
+        ambient = .2
+        diffuse = .5
+        # glLightfv(GL_LIGHT0, GL_POSITION, [0,0, 100, 0.0])
+        glLightfv(GL_LIGHT0, GL_POSITION,  (-40, 200, 100, 0.0))
+        glLightfv(GL_LIGHT0, GL_AMBIENT, (ambient, ambient, ambient, 1.0))
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, (diffuse, diffuse, diffuse, 1.0))
+        # glLightfv(GL_LIGHT0, GL_SPECULAR, (foo, foo, foo, 1.0))
+
+        # glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [.6, .6, .6, 1])
         # glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, GLfloat_3(0, 0, -1))
 
         glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
         glEnable(GL_COLOR_MATERIAL)
-        glEnable(GL_MULTISAMPLE)
+        # glEnable(GL_MULTISAMPLE)
 
-        glDepthFunc(GL_LESS)
+        # glDepthFunc(GL_LESS)
 
         glClearColor(*background)
 
@@ -334,10 +337,14 @@ class AnimationViewer(Viewer):
             mesh = raw_mesh.export()
             mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
             polyp_data = []
-            max_ints = {}
+            coral_data = {}
 
             for line in open(file, 'r').read().splitlines():
-                if line.startswith("#coral"):
+                if line.startswith("#attr"):
+                    line = line.split(':')
+                    coral_data[line[1]] = line[2]
+
+                elif line.startswith("#coral"):
                     header = line.split(' ')[1:]
 
                     if self.n_views is None:
@@ -361,11 +368,12 @@ class AnimationViewer(Viewer):
 
             """ Now compile mesh for each view given color data and mesh data.
             """
-            radii = []
-            for vert in raw_mesh.verts:
-                edges = vert.edges()
-                radii.append(min(edge.length() for edge in edges))
-                # radii.append(sum(edge.length() for edge in edges) / len(edges))
+            radius = float(coral_data['polyp_size'])
+            # radii = []
+            # for vert in raw_mesh.verts:
+            #     edges = vert.edges()
+            #     radii.append(min(edge.length() for edge in edges))
+            #     # radii.append(sum(edge.length() for edge in edges) / len(edges))
 
             for view_idx in range(self.n_views):
                 gl_list = glGenLists(1)
@@ -385,7 +393,6 @@ class AnimationViewer(Viewer):
                             color = ( d, d, d )
 
 
-                    # radius = radii[polyp_idx]
                     # self.draw_sphere(mesh['vertices'][polyp_idx], radius, color)
 
                     mesh['vert_colors'][polyp_idx] = color
@@ -467,7 +474,7 @@ class AnimationViewer(Viewer):
             if self.saving:
                 self.save('tmp/%04d.jpg'%i)
 
-            self.rx += .3
+            self.rx += .6
 
 
 

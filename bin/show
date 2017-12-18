@@ -6,8 +6,8 @@ from coral_growth.viewer import AnimationViewer
 
 if __name__ == '__main__':
     assert(len(sys.argv) >= 2)
-    width = 1400
-    height = 1050
+    width = 1330
+    height = 1000
 
     directories = sys.argv[1:]
     print(directories)
@@ -29,13 +29,13 @@ if __name__ == '__main__':
         files = [f for f in os.listdir(folder) if '.coral.obj' in f]
         files = sorted(files, key=lambda f: int(f.split('.')[0]))
         files = [os.path.join(folder, f) for f in files]
-        all_files.extend(files)
 
-        if len(directories) > 1:
-            for _ in range(5):
-                all_files.append(all_files[-1])
+        # all_files.extend(files)
+        # if len(directories) > 1:
+        #     for _ in range(5):
+        #         all_files.append(all_files[-1])
+
+        all_files.append(files[-2])
 
     view = AnimationViewer(all_files, (width, height))
-    # view = AnimationViewer(all_files, (600, 1200))
-    # view = AnimationViewer(all_files, (600, 600), (1.0, 1.0, 1.0, 0.0))
     view.main_loop()

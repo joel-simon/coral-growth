@@ -10,21 +10,21 @@ import numpy as np
 from cymesh.structures cimport Vert
 
 cdef class Morphogens:
-    def __init__(self, coral, config):
+    def __init__(self, coral, config, n_morphogens):
         self.coral = coral
         self.mesh = coral.mesh
-        self.n_morphogens = len(config)
+        self.n_morphogens = n_morphogens
 
         self.F = np.zeros(self.n_morphogens)
         self.K = np.zeros(self.n_morphogens)
         self.diffU = np.zeros(self.n_morphogens)
         self.diffV = np.zeros(self.n_morphogens)
 
-        for i, c in enumerate(config):
-            self.F[i] = c['F']
-            self.K[i] = c['K']
-            self.diffU[i] = c['diffU']
-            self.diffV[i] = c['diffV']
+        for i in range(n_morphogens):
+            self.F[i] = config['F%i'%i]
+            self.K[i] = config['K%i'%i]
+            self.diffU[i] = config['diffU%i'%i]
+            self.diffV[i] = config['diffV%i'%i]
 
         self.U = np.ones((self.n_morphogens, coral.max_polyps))
         self.V = np.zeros((self.n_morphogens, coral.max_polyps))

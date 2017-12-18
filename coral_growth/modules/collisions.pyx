@@ -5,38 +5,24 @@ import numpy as np
 cimport numpy as np
 
 cdef class MeshCollisionManager:
-    def __init__(self, mesh, vertices, blocksize):
+    def __init__(self, mesh, vertices, r=1):
         self.mesh = mesh
         self.vertices = vertices
-        self.blocksize = blocksize
-        self.radii = np.zeros(vertices.shape[0])
+        self.blocksize = 2*r
+        self.r = r
         self.particles = np.zeros((vertices.shape[0], 3), dtype='uint32')
         self.grid = defaultdict(set)
-
 
     cdef bint collides(self, int id1, int id2):
         cdef double[:] p1 = self.vertices[id1]
         cdef double[:] p2 = self.vertices[id2]
-
-        cdef double r1 = self.radii[id1]
-        cdef double r2 = self.radii[id2]
 
         cdef double dx = p1[0] - p2[0]
         cdef double dy = p1[1] - p2[1]
         cdef double dz = p1[2] - p2[2]
         cdef double d = sqrt(dx*dx + dy*dy + dz*dz)
 
-        return d < (r1 + r2)
-
-    cpdef double radius(self, object vert):
-        cdef list edges = vert.edges()
-        cdef double r = edges[0].length()
-
-        for edge in edges[1:]:
-            r = fmin(r, edge.length())
-            # r += edge.length()
-        # r *= .5 / len(edges)
-        return .99 * r
+        return d < self.blocksize
 
     cpdef void newVert(self, int id) except *:
         """ Return True if add was accepted and False otherwise.
@@ -50,7 +36,7 @@ cdef class MeshCollisionManager:
         cdef int yc = <int>(floor(p[1] / self.blocksize))
         cdef int zc = <int>(floor(p[2] / self.blocksize))
 
-        self.radii[id] = self.radius(vert)
+        # self.radii[id] = self.radius(vert)
         self.grid[(xc, yc, zc)].add(id)
         self.particles[id][0] = xc
         self.particles[id][1] = yc
@@ -86,7 +72,7 @@ cdef class MeshCollisionManager:
 
         # Accept the update.
         vert.p[:] = p
-        self.radii[id] = self.radius(vert)
+        # self.radii[id] = self.radius(vert)
         self.particles[id][0] = xc
         self.particles[id][1] = yc
         self.particles[id][2] = zc

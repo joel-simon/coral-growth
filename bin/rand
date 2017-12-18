@@ -10,15 +10,17 @@ from coral_growth.coral import Coral
 from coral_growth.simulate import simulate_network
 from coral_growth.viewer import AnimationViewer
 
-time_steps = 30
+time_steps = 10
 
 world_configs = {
-    'max_polyps': 10000,
+    'max_polyps': 4000,
     'growth_scalar': .2,
-    'max_face_growth': 2.0,
+    'max_face_growth': 1.5,
     'morphogen_steps': 150,
     'polyp_memory': 2,
     'morph_thresholds': 3,
+    'spring_strength': .5,
+    'vc': .5,
 }
 
 morphogens = [{ 'diffU': 0.01, 'diffV': 0.005, 'F': 0.02, 'K': 0.05 },

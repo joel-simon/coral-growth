@@ -1,7 +1,7 @@
 import MultiNEAT as NEAT
 
 class Parameters(NEAT.Parameters):
-    def __init__(self):
+    def __init__(self, path=None):
         super(Parameters, self).__init__()
         # Evolution.
         self.PopulationSize = 60
@@ -34,6 +34,11 @@ class Parameters(NEAT.Parameters):
         # light = light_bottom + ( 1 - light_bottom ) * polyp_height / world_depth
         # self.world_depth = 5
         # self.light_decay = .15 # Percent of light lost every unit height.
+
+        if path:
+            for line in open(path).readlines():
+                key, value = line.strip().split('\t')
+                setattr(self, key, float(value) if '.' in value else int(value))
 
     def addTrait(self, name, vrange, type='float'):
         trait = {

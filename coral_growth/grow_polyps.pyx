@@ -3,8 +3,12 @@
 # cython: initializedcheck=False
 # cython: nonecheck=False
 # cython: cdivision=True
+from __future__ import division
 import numpy as np
 cimport numpy as np
+# from random import shuffle
+from cyrandom import shuffle
+
 from libc.math cimport floor, fmin, fmax, fabs
 from cymesh.vector3D cimport inormalized, vadd, vsub, vmultf, vset
 
@@ -48,6 +52,7 @@ cpdef void grow_polyps(object coral) except *:
     cdef int i, out_idx
     cdef unsigned int mi
     cdef int n_memory = coral.n_memory
+    cdef int n_morphogens = coral.n_morphogens
     cdef list neighbors
     cdef object output
     cdef double[:,:] polyp_pos = coral.polyp_pos
@@ -65,52 +70,58 @@ cpdef void grow_polyps(object coral) except *:
     createPolypInputs(coral)
 
     for i in range(coral.n_polyps):
-        # coral.createPolypInputs(i)
         coral.network.Flush() # Compute feed-forward network results.
         coral.network.Input(coral.polyp_inputs[i])
         coral.network.ActivateFast()
         output = coral.network.Output()
 
+        assert len(output) == coral.num_outputs
+
         # Move in normal direction by growth amount.
         growth = output[0] * growth_scalar
+        # polyp_pos_next[i, :] = polyp_pos[i] + growth * polyp_normal[i]
         polyp_pos_next[i, 0] = polyp_pos[i, 0] + growth * polyp_normal[i, 0]
         polyp_pos_next[i, 1] = polyp_pos[i, 1] + growth * polyp_normal[i, 1]
         polyp_pos_next[i, 2] = polyp_pos[i, 2] + growth * polyp_normal[i, 2]
 
         # Output morphogens.
         out_idx = 1
-        for mi in range(coral.morphogens.n_morphogens):
+        for mi in range(n_morphogens):
             if output[out_idx] > 0.5:
                 morphogensV[mi, i] = 1
             out_idx += 1
 
         for mi in range(n_memory):
             if output[out_idx] > 0.5:
-                polyp_memory[i] = polyp_memory[i] | ( 1 << mi )
+                polyp_memory[i] |= ( 1 << mi )
             out_idx += 1
 
-    for i in range(coral.n_polyps):
+    ordering = list(range(coral.n_polyps))
+    shuffle(ordering)
+
+    for i in ordering:
         vert = coral.mesh.verts[i]
 
         if vert.p[1] < 0:
             continue
 
         neighbors = vert.neighbors()
-
-        vmultf(spring_target, spring_target, 0) # Reset to 0
+        
+        vmultf(spring_target, spring_target, 0.0)
 
         for neighbor in neighbors:
-            # spring_target += target_edge_len * normed(neighbor.p - vert.p)
+            # spring_target += coral.target_edge_len * normed(np.array(neighbor.p) - vert.p)
             vsub(temp, neighbor.p, vert.p)
             inormalized(temp)
-            vmultf(temp, temp, target_edge_len)
+            vmultf(temp, temp, coral.target_edge_len)
             vadd(spring_target, spring_target, temp)
 
-        vmultf(spring_target, spring_target, 1/len(neighbors))
+        vmultf(spring_target, spring_target, 1.0 / len(neighbors))
         vadd(spring_target, spring_target, vert.p)
-
-        # temp = (1-spring_strength) * (self.polyp_pos_next[i]) + (spring_strength * spring_target)
-        vmultf(temp, polyp_pos_next[i],  1 - spring_strength)
-        vmultf(spring_target, spring_target, spring_strength)
-        vadd(temp, temp, spring_target)
-        coral.collisionManager.attemptVertUpdate(vert.id, temp)
+        
+        temp[0] = (1-spring_strength) * polyp_pos_next[i, 0] + spring_strength * spring_target[0]
+        temp[1] = (1-spring_strength) * polyp_pos_next[i, 1] + spring_strength * spring_target[1]
+        temp[2] = (1-spring_strength) * polyp_pos_next[i, 2] + spring_strength * spring_target[2]
+        
+        successful = coral.collisionManager.attemptVertUpdate(vert.id, temp)
+        coral.polyp_collided[i] = not successful

@@ -20,8 +20,8 @@ from coral_growth.modules import light, gravity
 from coral_growth.modules.morphogens import Morphogens
 from coral_growth.modules.collisions import MeshCollisionManager
 
-def normed(x):
-    return x / np.linalg.norm(x)
+# def normed(x):
+#     return x / np.linalg.norm(x)
 
 class Coral(object):
     num_inputs = 4 # [light, curvature, gravity, extra-bias-bit]
@@ -36,20 +36,16 @@ class Coral(object):
         self.max_polyps = params.max_polyps
         self.morphogens = Morphogens(self, traits, params.n_morphogens)
         self.morphogen_steps = params.morphogen_steps
-        # self.world_depth = params.world_depth
-        # self.light_bottom = params.light_bottom
-        # self.world_depth = wor
         self.light_amount = params.light_amount
         self.n_morphogens = params.n_morphogens
         self.growth_scalar = params.growth_scalar
         self.morph_thresholds = params.morph_thresholds
-        # self.light_fitness_percent = params.light_fitness_percent
 
         # Some parameters are evolved traits.
         self.spring_strength = traits['spring_strength']
 
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
-        self.polyp_size = self.target_edge_len * 0.33
+        self.polyp_size = self.target_edge_len * 0.5
         self.max_edge_len = self.target_edge_len * params.max_face_growth
         mean_face = np.mean([f.area() for f in self.mesh.faces])
         self.max_face_area = mean_face * params.max_face_growth
@@ -178,7 +174,7 @@ class Coral(object):
 
             elif face.area() > self.max_face_area:
                 split(self.mesh, face, max_vertices=self.max_polyps)
-            
+
             if self.n_polyps == self.max_polyps:
                 break
 
@@ -216,9 +212,8 @@ class Coral(object):
         capture /= self.start_capture
         volume /= self.start_volume
 
-        # lfc = self.light_fitness_percent
-        # fitness = (lfc*light + (1-lfc)*capture) / (volume**self.vc)
-        fitness = (self.light_amount*light + capture) / (volume**self.vc)
+        la = self.light_amount
+        fitness = (la*light + (1-la)*capture) / (volume**self.vc)
 
         assert not isnan(fitness), (light, capture, volume)
 

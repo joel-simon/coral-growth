@@ -30,12 +30,12 @@ if __name__ == '__main__':
         files = sorted(files, key=lambda f: int(f.split('.')[0]))
         files = [os.path.join(folder, f) for f in files]
 
-        # all_files.extend(files)
-        # if len(directories) > 1:
-        #     for _ in range(5):
-        #         all_files.append(all_files[-1])
+        all_files.extend(files)
+        if len(directories) > 1:
+            for _ in range(5):
+                all_files.append(all_files[-1])
 
-        all_files.append(files[-2])
+        # all_files.append(files[-2])
 
     view = AnimationViewer(all_files, (width, height))
     view.main_loop()

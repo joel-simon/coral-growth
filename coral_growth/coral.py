@@ -189,8 +189,8 @@ class Coral(object):
     def fitnessAttributes(self):
         light = 0
         capture = 0
-        tree = KDTree(self.polyp_pos[:self.n_polyps], leafsize=16)
-        query = np.zeros((1, 3))
+        tree = KDTree(self.polyp_pos[:self.n_polyps, :2], leafsize=16)
+        query = np.zeros((1, 2))
 
         for face in self.mesh.faces:
             area = face.area()
@@ -200,7 +200,7 @@ class Coral(object):
 
             p = face.midpoint()
             if p[1] > .1:
-                query[0] = p
+                query[0] = p[:2]
                 d, indx = tree.query(query, k=15)
                 capture += area * np.mean(d)
 
@@ -216,9 +216,9 @@ class Coral(object):
         capture /= self.start_capture
         volume /= self.start_volume
 
-        # lfc = self.light_fitness_percent
-        # fitness = (lfc*light + (1-lfc)*capture) / (volume**self.vc)
-        fitness = (self.light_amount*light + capture) / (volume**self.vc)
+        la = self.light_amount
+        fitness = (la*light + (1-la)*capture) / (volume**self.vc)
+        # fitness = (self.light_amount*light + capture) / (volume**self.vc)
 
         assert not isnan(fitness), (light, capture, volume)
 

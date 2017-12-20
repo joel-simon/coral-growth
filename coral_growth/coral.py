@@ -169,10 +169,10 @@ class Coral(object):
             l1 = face.he.edge.length()
             l2 = face.he.next.edge.length()
             l3 = face.he.next.next.edge.length()
-            if max(l1, l2, l3) > self.max_edge_len:
-                split(self.mesh, face, max_vertices=self.max_polyps)
+            # if max(l1, l2, l3) > self.max_edge_len:
+            #     split(self.mesh, face, max_vertices=self.max_polyps)
 
-            elif face.area() > self.max_face_area:
+            if face.area() > self.max_face_area:
                 split(self.mesh, face, max_vertices=self.max_polyps)
 
             if self.n_polyps == self.max_polyps:

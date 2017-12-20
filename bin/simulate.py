@@ -17,8 +17,8 @@ if __name__ == "__main__":
     parser.add_argument("max_polyps", default=10000, help="Generations.", type=int)
     parser.add_argument("time_steps", default=100, help="Output dir.", type=int)
     parser.add_argument("genome_path", help="")
-    parser.add_argument("params_path", help="")
     parser.add_argument("trait_path", help="")
+    parser.add_argument("params_path", help="")
     args = parser.parse_args()
 
     traits = ast.literal_eval(open(args.trait_path, 'r').readlines()[0])

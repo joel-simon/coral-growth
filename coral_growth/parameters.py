@@ -9,7 +9,7 @@ class Parameters(NEAT.Parameters):
         self.SpeciesMaxStagnation = 10
         self.MinSpecies = 2
         self.MaxSpecies = 8
-        self.OverallMutationRate = 0.8
+        self.OverallMutationRate = 0.6
         self.MutateAddNeuronProb = 0.05
         self.MutateAddLinkProb = 0.05
 

@@ -87,8 +87,8 @@ cpdef void grow_polyps(object coral) except *:
         # Output morphogens.
         out_idx = 1
         for mi in range(n_morphogens):
-            if output[out_idx] > 0.5:
-                morphogensV[mi, i] = 1
+            # if output[out_idx] > 0.5:
+            morphogensV[mi, i] = 1
             out_idx += 1
 
         for mi in range(n_memory):
@@ -106,7 +106,7 @@ cpdef void grow_polyps(object coral) except *:
             continue
 
         neighbors = vert.neighbors()
-        
+
         vmultf(spring_target, spring_target, 0.0)
 
         for neighbor in neighbors:
@@ -118,10 +118,10 @@ cpdef void grow_polyps(object coral) except *:
 
         vmultf(spring_target, spring_target, 1.0 / len(neighbors))
         vadd(spring_target, spring_target, vert.p)
-        
+
         temp[0] = (1-spring_strength) * polyp_pos_next[i, 0] + spring_strength * spring_target[0]
         temp[1] = (1-spring_strength) * polyp_pos_next[i, 1] + spring_strength * spring_target[1]
         temp[2] = (1-spring_strength) * polyp_pos_next[i, 2] + spring_strength * spring_target[2]
-        
+
         successful = coral.collisionManager.attemptVertUpdate(vert.id, temp)
         coral.polyp_collided[i] = not successful

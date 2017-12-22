@@ -22,11 +22,7 @@ import dill
 params = Parameters()
 params.addMorphogen()
 params.addMorphogen()
-params.light_amount = .2
-
-# params.PopulationSize = 20
-# params.max_polyps = 10000
-
+params.light_amount = .3
 
 def create_initial_population(params):
     # Create netowrk size based off coral and parameters.
@@ -91,8 +87,8 @@ def evaluate(genome, traits):
 
 
 def simulate_and_save(genome, out_dir, generation, fitness):
-    # best.Save(out_dir+'/best_%i' % generation)
-    # best = NEAT.Genome(out_dir+'/best_%i' % generation)
+    genome.Save(out_dir+'/genome_%i' % generation)
+    # genome = NEAT.Genome(out_dir+'/best_%i' % generation)
     traits = genome.GetGenomeTraits()
 
     with open(out_dir+'/scores.txt', "a") as f:
@@ -134,8 +130,9 @@ def evolve_neat(params, generations, out_dir, run_id, pool):
         print('Max fitness:', maxf, 'Mean fitness:', meanf)
 
         if maxf > max_ever:
-            max_ever = maxf
             best = pop.GetBestGenome()
+            max_ever = maxf
+            print('New best fitness.', best.NumNeurons(), best.NumLinks())
             simulate_and_save(best, out_dir, generation, maxf)
 
         pop.Epoch()
@@ -193,28 +190,24 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
             ff = [ evaluate_novelty(g, g.GetGenomeTraits(), params) for g in genomes ]
 
         fitness_list, feature_list = zip(*ff)
-
-        # corals = [ fn_simulate(g)[0] for g in genomes ]
-        # fitness_list = [ c.fitness() for c in corals ]
-        # features = np.array([fn_features(c) for c in corals])
         
         if not len(archive):
             return None, None, feature_list
 
         a, b = np.array(archive), np.array(feature_list)
-        # print(a.shape, b.shape)
         tree = KDTree(np.vstack((a, b)))
         dists, _ = tree.query(np.array(feature_list), k=ns_K+1)
         sparseness_list = np.mean(dists[:, 1:], axis=1)
 
         print()
-        print('Avg novelty:', np.mean(sparseness_list))
-        print('Avg fitness:', np.mean(fitness_list))
+        print('Novelty - avg: %f, max:%f' % (np.mean(sparseness_list), max(sparseness_list)))
+        print('Fitness - avg: %f, max:%f' % (np.mean(fitness_list), max(fitness_list)))
 
         return sparseness_list, fitness_list, feature_list
 
     print('Creating intitial archive.')
     pop = create_initial_population(params)
+    
     # Create Initial Archive.
     genomes = NEAT.GetGenomeList(pop)
     _, _, feature_list = evaluate_genomes(genomes)
@@ -222,7 +215,7 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
 
     # Main loop
     for generation in range(generations):
-        print('')
+        print('\n'+'#'*80)
         print('Starting generation %i' % generation)
         print('Novelty threshhold', novelty_threshold)
         genomes = NEAT.GetGenomeList(pop)
@@ -235,7 +228,6 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
             genome.SetEvaluated()
 
             if sparseness > novelty_threshold:
-                print('Novel genome found.')
                 archive.append(feature)
                 n_archive_added += 1
 
@@ -270,13 +262,22 @@ if __name__ == '__main__':
     parser.add_argument("--gens", default=100, help="Generations.", type=int)
     parser.add_argument("--out", default='../output', help="Output dir.")
     parser.add_argument("--cores", default=1, help="Number of cores.", type=int)
-    args = parser.parse_args()
-    print(args)
+    parser.add_argument('--novelty', action='store_true')
 
+    args = parser.parse_args()
     rid = generate_id(4)
+    
+    print(args)
     print('Run ID: ', rid)
 
-    dir_name = rid+"__{:%B_%d_%Y_%H_%M}".format(datetime.now())
+    pool = None
+
+    if args.novelty:
+        params.PopulationSize = 20
+        dir_name = rid+"__novelty_{:%B_%d_%Y_%H_%M}".format(datetime.now())
+    else:
+        dir_name = rid+"__{:%B_%d_%Y_%H_%M}".format(datetime.now())
+
     dir_path = os.path.join(args.out, dir_name)
     os.makedirs(dir_path)
 
@@ -284,9 +285,10 @@ if __name__ == '__main__':
         for key, value in vars(params).items():
             out.write(key+'\t'+str(value)+'\n')
 
-    pool = None
     if args.cores > 1:
         pool = Pool(processes=args.cores)
 
-    evolve_neat(params, args.gens, dir_path, rid, pool)
-    # evolve_novelty(params, args.gens, dir_path, rid, pool)
+    if args.novelty:
+        evolve_novelty(params, args.gens, dir_path, rid, pool)
+    else:
+        evolve_neat(params, args.gens, dir_path, rid, pool)

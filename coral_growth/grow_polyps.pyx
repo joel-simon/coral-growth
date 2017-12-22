@@ -87,8 +87,8 @@ cpdef void grow_polyps(object coral) except *:
         # Output morphogens.
         out_idx = 1
         for mi in range(n_morphogens):
-            # if output[out_idx] > 0.5:
-            morphogensV[mi, i] = 1
+            if output[out_idx] > 0.5:
+                morphogensV[mi, i] = 1
             out_idx += 1
 
         for mi in range(n_memory):

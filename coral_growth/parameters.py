@@ -4,6 +4,7 @@ class Parameters(NEAT.Parameters):
     def __init__(self, path=None):
         super(Parameters, self).__init__()
         # Evolution.
+
         self.PopulationSize = 60
         self.OldAgeTreshold = 6
         self.SpeciesMaxStagnation = 10
@@ -27,7 +28,8 @@ class Parameters(NEAT.Parameters):
         self.vc = .5
         # self.light_fitness_percent = .5
 
-        self.addTrait('spring_strength', (.1, .7))
+        self.spring_strength = .5
+        # self.addTrait('spring_strength', (.3, .7))
 
         # Coral enviornment
         self.light_amount = 1.0
@@ -61,3 +63,5 @@ class Parameters(NEAT.Parameters):
         self.addTrait('diffU%i'%i, (.005, .02))
         self.addTrait('diffV%i'%i, (.0025, .01))
         self.n_morphogens += 1
+
+    #TODO add calculate_traits

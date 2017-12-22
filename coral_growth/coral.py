@@ -42,10 +42,11 @@ class Coral(object):
         self.morph_thresholds = params.morph_thresholds
 
         # Some parameters are evolved traits.
-        self.spring_strength = traits['spring_strength']
+        # self.spring_strength = traits['spring_strength']
+        self.spring_strength = params.spring_strength
 
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
-        self.polyp_size = self.target_edge_len * 0.5
+        self.polyp_size = self.target_edge_len * 0.3
         self.max_edge_len = self.target_edge_len * params.max_face_growth
         mean_face = np.mean([f.area() for f in self.mesh.faces])
         self.max_face_area = mean_face * params.max_face_growth
@@ -190,17 +191,16 @@ class Coral(object):
 
         for face in self.mesh.faces:
             area = face.area()
+            p = face.midpoint()
 
             if isnan(area):
                 area = 0
 
-            p = face.midpoint()
-            if p[1] > .1:
-                query[0] = p[:2]
-                d, indx = tree.query(query, k=15)
-                capture += area * np.mean(d)
+            query[0] = p[:2]
+            d, indx = tree.query(query, k=23)
+            capture += area * np.mean(d[0, 3:]) ** 2
 
-            light += area * sum(self.polyp_light[v.id] for v in face.vertices())
+            light += area * sum(self.polyp_light[v.id] for v in face.vertices())*.333
 
         return light, capture, self.mesh.volume()
 

@@ -6,13 +6,14 @@ class Parameters(NEAT.Parameters):
         # Evolution.
 
         self.PopulationSize = 60
-        self.OldAgeTreshold = 6
+        self.OldAgeTreshold = 10
         self.SpeciesMaxStagnation = 10
         self.MinSpecies = 2
         self.MaxSpecies = 8
         self.OverallMutationRate = 0.6
         self.MutateAddNeuronProb = 0.05
         self.MutateAddLinkProb = 0.05
+        self.AllowLoops = False
 
         # Coral Growth.
         self.max_polyps = 10000
@@ -25,14 +26,14 @@ class Parameters(NEAT.Parameters):
         self.morphogen_thresholds = 3
         self.morphogen_steps = 200
         self.morph_thresholds = 3
+        self.competition_radius = 2 # Multiplies poly size.
         self.vc = .5
-        # self.light_fitness_percent = .5
 
-        self.spring_strength = .5
-        # self.addTrait('spring_strength', (.3, .7))
+        # self.spring_strength = .5
+        self.addTrait('spring_strength', (.1, .6))
 
         # Coral enviornment
-        self.light_amount = 1.0
+        self.light_amount = 0.5
         # light = light_bottom + ( 1 - light_bottom ) * polyp_height / world_depth
         # self.world_depth = 5
         # self.light_decay = .15 # Percent of light lost every unit height.
@@ -65,3 +66,6 @@ class Parameters(NEAT.Parameters):
         self.n_morphogens += 1
 
     #TODO add calculate_traits
+
+# p = Parameters()
+# print(p.DontUseBiasNeuron)

@@ -3,7 +3,7 @@
 # LMB + move: rotate
 # RMB + move: pan
 # Scroll wheel: zoom in/out
-import sys, pygame, math
+import sys, pygame, math, pickle
 from pygame.locals import *
 import numpy as np
 from pygame.constants import *
@@ -11,7 +11,7 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 import shutil
-from coral_growth.primitive import make_plane, make_sphere, G_OBJ_PLANE, G_OBJ_SPHERE
+from coral_growth.primitive import *
 
 from OpenGL.arrays import vbo
 from OpenGL.raw.GL.ARB.vertex_array_object import glGenVertexArrays, \
@@ -87,8 +87,9 @@ class Viewer(object):
 
         self.gl_lists = []
 
-        make_plane(5)
-        make_sphere(15)
+        make_plane(5, arrows=True)
+        make_sphere(4)
+        make_cube()
         self.translation_matrix = np.identity(4)
         self.scaling_matrix = np.identity(4)
 
@@ -142,7 +143,7 @@ class Viewer(object):
         glDrawElements(GL_LINES, len(eindices), GL_UNSIGNED_INT, eindices)
         glPopClientAttrib()
 
-    def draw_lines(self, lines, width=3, color=(0,0,0)):
+    def draw_lines(self, lines, width=3, color=(0, 0, 0)):
         glLineWidth(width)
 
         glColor3f(*color)
@@ -154,31 +155,42 @@ class Viewer(object):
 
         glEnd()
 
-    def draw_cube(self, x, y, z, s=1, color=(.5, .5, .5)):
-        # glNewList(G_OBJ_CUBE, GL_COMPILE)
-        glColor3f(*color)
-        vertices = [[[-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [-0.5, 0.5, 0.5], [-0.5, 0.5, -0.5]],
-                    [[-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5], [0.5, -0.5, -0.5]],
-                    [[0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5]],
-                    [[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5]],
-                    [[-0.5, -0.5, 0.5], [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5]],
-                    [[-0.5, 0.5, -0.5], [-0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, -0.5]]]
+    def draw_cube(self, p, s=1, color=(.5, .5, .5, .5)):
+        # glColor4f(*color)
+        # vertices = [[[-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [-0.5, 0.5, 0.5], [-0.5, 0.5, -0.5]],
+        #             [[-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5], [0.5, -0.5, -0.5]],
+        #             [[0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5]],
+        #             [[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5]],
+        #             [[-0.5, -0.5, 0.5], [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5]],
+        #             [[-0.5, 0.5, -0.5], [-0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, -0.5]]]
 
-        vertices = np.array(vertices)
-        vertices *= s
-        vertices[:, :, 0] += x
-        vertices[:, :, 1] += y
-        vertices[:, :, 2] += z
+        # vertices = np.array(vertices)
+        # vertices *= s
+        # vertices[:, :] += p
+        # # vertices[:, :, 0] += x
+        # # vertices[:, :, 1] += y
+        # # vertices[:, :, 2] += z
 
-        normals = [(-1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, -1.0, 0.0), (0.0, 1.0, 0.0)]
+        # normals = [(-1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, -1.0, 0.0), (0.0, 1.0, 0.0)]
 
-        glBegin(GL_QUADS)
-        for i in range(6):
-            glNormal3f(normals[i][0], normals[i][1], normals[i][2])
-            for j in range(4):
-                glVertex3f(vertices[i][j][0], vertices[i][j][1], vertices[i][j][2])
-        glEnd()
-        # glEndList()
+        # glBegin(GL_QUADS)
+        # for i in range(6):
+        #     glNormal3f(normals[i][0], normals[i][1], normals[i][2])
+        #     for j in range(4):
+        #         glVertex3f(vertices[i][j][0], vertices[i][j][1], vertices[i][j][2])
+        # glEnd()
+        glPushMatrix()
+        self.translation_matrix[0, 3] = p[0]
+        self.translation_matrix[1, 3] = p[1]
+        self.translation_matrix[2, 3] = p[2]
+        self.translation_matrix[0, 0] = s
+        self.translation_matrix[1, 1] = s
+        self.translation_matrix[2, 2] = s
+        self.translation_matrix[3, 3] = 1
+        glMultMatrixf(np.transpose(self.translation_matrix))
+        glColor4f(*color)
+        glCallList(G_OBJ_CUBE)
+        glPopMatrix()
 
     def draw_text(self, x, y, text, r=0.0, g=0.0, b=0.0):
         y = self.height - (y + 24)
@@ -191,7 +203,7 @@ class Viewer(object):
             else:
                 glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, ord(c))
 
-    def draw_sphere(self, p, r, color):
+    def draw_sphere(self, p, r, color=(.5, .5, .5)):
         glPushMatrix()
 
         self.translation_matrix[0, 3] = p[0]
@@ -205,7 +217,6 @@ class Viewer(object):
 
         glMultMatrixf(np.transpose(self.translation_matrix))
         # glMultMatrixf(self.scaling_matrix)
-
         glColor3f(color[0], color[1], color[2])
 
         emmision = False
@@ -300,6 +311,39 @@ import numpy as np
 from colorsys import hsv_to_rgb
 import re
 
+def parse_coral_file(file):
+    polyp_data = []
+    coral_data = {}
+    view_names = None
+    n_views = None
+
+    for line in open(file, 'r').read().splitlines():
+        if line.startswith("#attr"):
+            line = line.split(':')
+            coral_data[line[1]] = line[2]
+
+        elif line.startswith("#coral"):
+            header = line.split(' ')[1:]
+
+            # if n_views is None:
+            n_views = len(header) - 1
+            view_names = ['morphogens'] + header[:-2]
+
+        elif line.startswith('c'):
+            d = line.split(' ')[1:]
+            for i in range(n_views + 1):
+                d[i] = float(d[i]) if '.' in d[i] else int(d[i])
+            polyp_data.append( d )
+
+    return coral_data, polyp_data, view_names, n_views
+
+generation_re = re.compile('out_.*?\/([0-9]+)\/')
+def get_generation(filename):
+    try:
+        return int(generation_re.search(filename).groups()[0])
+    except AttributeError:
+        return None
+
 class AnimationViewer(Viewer):
     def __init__(self, files, view_size, color=(0.7, 0.7, 0.7, 0.0)):
         super(AnimationViewer, self).__init__(view_size, color)
@@ -314,91 +358,57 @@ class AnimationViewer(Viewer):
         self.n_views = None
         self.view_lists = None#
 
-        # dir = 'tmp'
-        # if os.path.exists(dir):
-            # shutil.rmtree(dir)
-        # os.makedirs(dir)
+        coral_data, polyp_data, view_names, n_views = parse_coral_file(files[0])
+        radius = float(coral_data['polyp_size'])
+        self.view_names = view_names
+        self.n_views = n_views
+        # print(view_names, n_views)
+        self.view_lists = [[] for _ in range(self.n_views)]
 
-        get_generation = re.compile('out_.*?\/([0-9]+)\/')
+        # self.n_views = 1
 
         for fi, file in enumerate(files):
-            try:
-                generation = int(get_generation.search(file).groups()[0])
-            except AttributeError:
-                generation = None
-
-            # gidx = generations.index(generation)
-            # step_x = 3
-            # offset_x = (-len(generations)//2 + gidx) * step_x
+            generation = get_generation(file)
+            # voxel_length, voxel_grid = pickle.load(open(file+'.grid.p', 'rb'))
+            # voxel_length, flow_directions = pickle.load(open(file+'.flow_directions.p', 'rb'))
+            voxel_length, (flow_grid, min_v) = pickle.load(open(file+'.flow_grid.p', 'rb'))
 
             """ Read the file and store the colors.
             """
+            _, polyp_data, _, _ = parse_coral_file(file)
             raw_mesh = Mesh.from_obj(file)
             mesh = raw_mesh.export()
             mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
-            polyp_data = []
-            coral_data = {}
-
-            for line in open(file, 'r').read().splitlines():
-                if line.startswith("#attr"):
-                    line = line.split(':')
-                    coral_data[line[1]] = line[2]
-
-                elif line.startswith("#coral"):
-                    header = line.split(' ')[1:]
-
-                    if self.n_views is None:
-                        self.n_views = len(header) -1
-
-                        self.view_lists = [[] for _ in range(self.n_views)]
-                        self.view_names = ['morphogens'] + header[:-2]
-                        print(header)
-                        print(self.view_names)
-
-                elif line.startswith('c'):
-                    d = line.split(' ')[1:]
-                    for i in range(self.n_views+1):
-                        d[i] = float(d[i]) if '.' in d[i] else int(d[i])
-
-                    polyp_data.append( d )
-
-            assert self.n_views is not None
-
-            int_colors = [hsv_to_rgb((i/float(8)), 1.0, 1.0) for i in range(8)]
 
             """ Now compile mesh for each view given color data and mesh data.
             """
-            radius = float(coral_data['polyp_size'])
-            # radii = []
-            # for vert in raw_mesh.verts:
-            #     edges = vert.edges()
-            #     radii.append(min(edge.length() for edge in edges))
-            #     # radii.append(sum(edge.length() for edge in edges) / len(edges))
+
+            int_colors = [hsv_to_rgb((i/float(8)), 1.0, 1.0) for i in range(8)]
 
             for view_idx in range(self.n_views):
                 gl_list = glGenLists(1)
                 glNewList(gl_list, GL_COMPILE)
 
+
+                # Calculate Colors
                 for polyp_idx, data in enumerate(polyp_data):
                     if view_idx == 0: #hardcode in 2 morphogens.
                         color = ( 0, data[-2], data[-1] )
                     else:
                         d = data[ view_idx - 1 ]
-                        if isinstance(d, int):
-                            color = int_colors[d]
-                        # if (view_idx-1) in int_colors:
-                            # print('int', int_colors, d)
-                            # color = int_colors[view_idx-1][d]
-                        else:
-                            color = ( d, d, d )
-
-
-                    # self.draw_sphere(mesh['vertices'][polyp_idx], radius, color)
-
+                        color = int_colors[d] if isinstance(d, int) else (d,d,d)
                     mesh['vert_colors'][polyp_idx] = color
 
-                self.draw_mesh(mesh)
+                    # glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
+                    # glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
 
+                # Do Drawing
+                # for p in voxel_grid:
+                #     p = np.array(p)
+                #     self.draw_cube(p*voxel_length, voxel_length)
+
+                self.draw_mesh(mesh)
+                # self.draw_flow_grid(voxel_length, flow_grid, min_v)
                 if generation is not None:
                     self.draw_text( 30, 30, 'Generation %i' % generation )
 
@@ -409,6 +419,31 @@ class AnimationViewer(Viewer):
 
         self.gl_lists = self.view_lists[ self.view ][ self.frame ]
         print('Finished Loading Animation')
+        print(len(self.view_lists[ 0 ]))
+
+    def draw_flow_grid(self, voxel_length, flow_grid, min_v):
+        offset = min_v
+
+        vmax = flow_grid.max()
+        for p, v in np.ndenumerate(flow_grid):
+            if p[1] > 3:
+                p = np.array(p) + offset
+                color = (v / vmax, 0, 0, .5)
+                self.draw_cube(p*voxel_length, voxel_length, color)
+
+    # def draw_flow_grid(self, voxel_length, flow_directions):
+    #     # print(flow_directions)
+    #     for (x,y,z), directions in flow_directions.items():
+    #         for dx, dy, dz in directions:
+    #             x *= voxel_length
+    #             y *= voxel_length
+    #             z *= voxel_length
+    #             if dx:
+    #                 self.draw_lines([((x,y,z),(x+voxel_length, y, z))], width=2, color=(0, 0, 1.0))
+    #             if dy:
+    #                 self.draw_lines([((x,y,z),(x, y+voxel_length, z))], width=2, color=(0, 0, 1.0))
+    #             if dz:
+    #                 self.draw_lines([((x,y,z),(x, y, z+voxel_length))], width=2, color=(0, 0, 1.0))
 
     def draw_step(self):
         self.draw_text( 30, 60, 'View: '+self.view_names[self.view])

@@ -7,29 +7,29 @@
 from __future__ import print_function
 from math import isnan, sqrt, floor
 import numpy as np
-from pykdtree.kdtree import KDTree
-from random import shuffle
+import time
+import pickle
+from collections import defaultdict
 
 from cymesh.mesh import Mesh
 from cymesh.subdivision.sqrt3 import divide_adaptive, split
 from cymesh.collisions.findCollisions import findCollisions
-# from cymesh.operators.relax import relax_mesh, relax_mesh_cotangent, relax_vert_cotangent
+from cymesh.operators.relax import relax_mesh#, relax_mesh_cotangent, relax_vert_cotangent
 
 from coral_growth.grow_polyps import grow_polyps
-from coral_growth.modules import light, gravity
+from coral_growth.modules import light, gravity #, flow
+from coral_growth.modules import flowx as flow
 from coral_growth.modules.morphogens import Morphogens
 from coral_growth.modules.collisions import MeshCollisionManager
 
-# def normed(x):
-#     return x / np.linalg.norm(x)
-
 class Coral(object):
-    num_inputs = 4 # [light, curvature, gravity, extra-bias-bit]
+    num_inputs = 5 # [light, curvature, gravity, collection, extra-bias-bit]
     num_outputs = 1
 
-    def __init__(self, obj_path, network, traits, params):
+    def __init__(self, obj_path, network, net_depth, traits, params):
         self.mesh = Mesh.from_obj(obj_path)
         self.network = network
+        self.net_depth = net_depth
 
         self.vc = params.vc
         self.n_memory = params.polyp_memory
@@ -40,10 +40,13 @@ class Coral(object):
         self.n_morphogens = params.n_morphogens
         self.growth_scalar = params.growth_scalar
         self.morph_thresholds = params.morph_thresholds
+        self.competition_radius = params.competition_radius
 
         # Some parameters are evolved traits.
-        # self.spring_strength = traits['spring_strength']
-        self.spring_strength = params.spring_strength
+        self.spring_strength = traits['spring_strength']
+        # self.spring_strength = params.spring_strength
+
+        self.function_times = defaultdict(int)
 
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
         self.polyp_size = self.target_edge_len * 0.3
@@ -51,7 +54,12 @@ class Coral(object):
         mean_face = np.mean([f.area() for f in self.mesh.faces])
         self.max_face_area = mean_face * params.max_face_growth
 
+        self.voxel_length = self.target_edge_len * .6
+        # print('voxel_length', self.voxel_length)
+
         self.n_polyps = 0
+
+        # Update the input and output for the variable in/outs.
         self.num_inputs = Coral.num_inputs + self.n_memory + self.n_morphogens * (self.morph_thresholds-1)
         self.num_outputs = Coral.num_outputs + self.n_memory + self.n_morphogens
 
@@ -69,9 +77,11 @@ class Coral(object):
         self.polyp_normal = np.zeros((self.max_polyps, 3))
         # self.polyp_last_pos = np.zeros((self.max_polyps, 3))
         self.polyp_gravity = np.zeros(self.max_polyps)
+        self.polyp_collection = np.zeros(self.max_polyps)
         self.polyp_collided = np.zeros(self.max_polyps, dtype='uint8')
         assert self.n_memory <= 32
         self.polyp_memory = np.zeros((self.max_polyps), dtype='uint32')
+        self.voxel_grid = set()
 
         self.collisionManager = MeshCollisionManager(self.mesh, self.polyp_pos, self.polyp_size)
 
@@ -82,11 +92,10 @@ class Coral(object):
         self.mesh.calculateCurvature()
         self.updateAttributes()
 
-        light, capture, volume = self.fitnessAttributes()
+        collection, light, volume = self.fitnessAttributes()
+        self.start_collection = collection
         self.start_light = light
-        self.start_capture = capture
         self.start_volume = volume
-
         self.age = 0
 
     def __str__(self):
@@ -94,43 +103,47 @@ class Coral(object):
         return s
 
     def step(self):
+        t1 = time.time()
         grow_polyps(self)
+        self.function_times['grow_polyps'] += time.time() - t1
+
+        t1 = time.time()
+        relax_mesh(self.mesh)
+        self.function_times['relax_mesh'] += time.time() - t1
+
+        t1 = time.time()
         self.polypDivision() # Divide mesh and create new polyps.
+        self.function_times['polyp_division'] += time.time() - t1
+
         self.updateAttributes()
         self.age += 1
 
-    # def correctGrowth(self):
-    #     self.mesh.calculateNormals()
-    #     self.mesh.calculateCurvature()
-
-    #     self.max_curvature = .3
-
-    #     for vi in range(self.n_polyps):
-    #         vert = self.mesh.verts[vi]
-    #         invalid = False
-
-    #         if self.polyp_pos[vi, 1] < 0:
-    #             invalid = True
-    #         elif abs(vert.curvature) > self.max_curvature:
-    #             invalid = True
-
-    #         if invalid:
-    #             vert.p[:] = self.polyp_last_pos[vi]
-
     def updateAttributes(self):
-
         self.mesh.calculateNormals()
         self.mesh.calculateCurvature()
+        # self.updateVoxelGrid()
+
+        t1 = time.time()
         light.calculate_light(self) # Update the light
+        self.function_times['calculate_light'] += time.time() - t1
+
+
+        t1 = time.time()
+        self.flow_grid = flow.calculate_collection(self, 2)
+        self.function_times['calculate_collection'] += time.time() - t1
+
 
         self.polyp_light[self.polyp_light != 0] -= .5
         self.polyp_light *= 2 # all light values go from 0-1
-
-        # self.polyp_light *= self.light_amount
+        # self.polyp_light *= (.2 + self.polyp_pos[:, 1] * .2)
         # (self.light_bottom + (1-self.light_bottom)*self.polyp_pos[:,1,:] / self.world_depth)
 
         gravity.calculate_gravity(self)
+
+        t1 = time.time()
         self.morphogens.update(self.morphogen_steps) # Update the morphogens.
+        self.function_times['morphogens.update'] += time.time() - t1
+
 
     def createPolyp(self, vert):
         if self.n_polyps == self.max_polyps:
@@ -170,8 +183,9 @@ class Coral(object):
             l1 = face.he.edge.length()
             l2 = face.he.next.edge.length()
             l3 = face.he.next.next.edge.length()
-            # if max(l1, l2, l3) > self.max_edge_len:
-            #     split(self.mesh, face, max_vertices=self.max_polyps)
+
+            if max(l1, l2, l3) > self.max_edge_len:
+                split(self.mesh, face, max_vertices=self.max_polyps)
 
             if face.area() > self.max_face_area:
                 split(self.mesh, face, max_vertices=self.max_polyps)
@@ -185,41 +199,85 @@ class Coral(object):
 
     def fitnessAttributes(self):
         light = 0
-        capture = 0
-        tree = KDTree(self.polyp_pos[:self.n_polyps, :2], leafsize=16)
-        query = np.zeros((1, 2))
+        collection = 0
 
         for face in self.mesh.faces:
             area = face.area()
-            p = face.midpoint()
+            vertices = face.vertices()
+            assert not isnan(area), 'Zero area face.'
 
-            if isnan(area):
-                area = 0
+            light += area * sum(self.polyp_light[v.id] for v in vertices) / 3
+            collection += area * sum(self.polyp_collection[v.id] for v in vertices) / 3
 
-            query[0] = p[:2]
-            d, indx = tree.query(query, k=23)
-            capture += area * np.mean(d[0, 3:]) ** 2
+        return collection, light, self.mesh.volume()
 
-            light += area * sum(self.polyp_light[v.id] for v in face.vertices())*.333
+    def fitness(self, verbose=False):
+        # bbox = self.mesh.boundingBox()
+        # return (bbox[1]-bbox[0]) * (bbox[3]-bbox[2]) * (bbox[5]-bbox[4]) / sqrt(self.mesh.volume())
+        collection, light, volume = self.fitnessAttributes()
 
-        return light, capture, self.mesh.volume()
-
-    def fitness(self):
-        light, capture, volume = self.fitnessAttributes()
+        if verbose:
+            print('unnormed', collection, light, volume)
 
         # Normalized values (values for seed).
+        collection /= self.start_collection
         light /= self.start_light
-        capture /= self.start_capture
         volume /= self.start_volume
 
-        la = self.light_amount
-        fitness = (la*light + (1-la)*capture) / (volume**self.vc)
+        if verbose:
+            print('normed', collection, light, volume)
+            print()
 
-        assert not isnan(fitness), (light, capture, volume)
+        la = self.light_amount
+        fitness = (la*light + (1-la)*collection) / (volume**self.vc)
+
+        assert not isnan(fitness), (light, collection, volume)
 
         return fitness
 
-    def export(self, out):
+    # def addVoxelPoint(self, p):
+    #     # nx, ny, nz = self.voxel_grid.shape
+    #     x = int(round(p[0] / self.voxel_length))
+    #     y = int(round(p[1] / self.voxel_length))
+    #     z = int(round(p[2] / self.voxel_length))
+
+    # def updateVoxelGrid(self):
+
+    #     for i in range(self.n_polyps):
+    #         x = int(round(self.polyp_pos[i, 0] / self.voxel_length))
+    #         y = int(round(self.polyp_pos[i, 1] / self.voxel_length))
+    #         z = int(round(self.polyp_pos[i, 2] / self.voxel_length))
+    #         self.voxel_grid.add((x, y, z))
+
+    #     for face in self.mesh.faces:
+    #         p = face.midpoint()
+    #         x = int(round(p[0] / self.voxel_length))
+    #         y = int(round(p[1] / self.voxel_length))
+    #         z = int(round(p[2] / self.voxel_length))
+    #         self.voxel_grid.add((x, y, z))
+
+    # def calculateCollection(self):
+    #     search_radius = 2
+    #     total = float((2*search_radius+1)**3)
+
+    #     for i in range(self.n_polyps):
+    #         x = int(self.polyp_pos[i, 0] / self.voxel_length)
+    #         y = int(self.polyp_pos[i, 1] / self.voxel_length)
+    #         z = int(self.polyp_pos[i, 2] / self.voxel_length)
+    #         seen = 0
+
+    #         for dx in range(x-search_radius, x+search_radius+1):
+    #             for dy in range(y-search_radius, y+search_radius+1):
+    #                 for dz in range(z-search_radius, z+search_radius+1):
+    #                     seen += (dx, dy, dz) in self.voxel_grid
+    #         # print(seen, total)
+    #         self.polyp_collection[i] = 1 - seen / total
+
+        # print(self.polyp_collection[:self.n_polyps].mean())
+        # print(len(self.voxel_grid))
+        # print()
+
+    def export(self, path):
         """ Export the coral to .coral.obj file
             A .coral.obj file is a 3d mesh with polyp specific information.
             it is a compatable superset of the .obj file format.
@@ -230,10 +288,10 @@ class Coral(object):
             2. A line that begins with 'c' for each vert that contains values
                 for each attribute. Ordered the same as the vertices.
         """
-        self.mesh.calculateNormals()
-        self.mesh.calculateCurvature()
+        out = open(path, 'w+')
+        self.updateAttributes()
 
-        header = [ 'light', 'gravity', 'curvature', 'memory', 'collided']
+        header = [ 'light', 'collection', 'gravity', 'curvature', 'memory', 'collided']
         for i in range(self.n_morphogens):
             header.append( 'u%i' % i )
 
@@ -265,6 +323,7 @@ class Coral(object):
             indx = id_to_indx[self.polyp_verts[i].id]
 
             polyp_attributes[indx] = [ self.polyp_light[i],
+                                       self.polyp_collection[i],
                                        self.polyp_gravity[i],
                                        self.polyp_verts[i].curvature,
                                        self.polyp_memory[i],
@@ -282,3 +341,11 @@ class Coral(object):
 
         for face in mesh_data['faces']:
             out.write('f %i %i %i\n' % tuple(face + 1))
+
+        # f = open(path+'.grid.p', 'wb')
+        # pickle.dump((self.voxel_length, self.voxel_grid), f)
+        # f.close()
+
+        f = open(path+'.flow_grid.p', 'wb')
+        pickle.dump((self.voxel_length, self.flow_grid), f)
+        f.close()

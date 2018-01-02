@@ -6,11 +6,13 @@
 
 cimport numpy as np
 import numpy as np
+from cymem.cymem cimport Pool
 
 from cymesh.structures cimport Vert
 
 cdef class Morphogens:
     def __init__(self, coral, config, n_morphogens):
+        self.mem = Pool()
         self.coral = coral
         self.mesh = coral.mesh
         self.n_morphogens = n_morphogens
@@ -20,6 +22,7 @@ cdef class Morphogens:
         self.diffU = np.zeros(self.n_morphogens)
         self.diffV = np.zeros(self.n_morphogens)
 
+        cdef size_t i
         for i in range(n_morphogens):
             self.F[i] = config['F%i'%i]
             self.K[i] = config['K%i'%i]
@@ -32,19 +35,27 @@ cdef class Morphogens:
         self.dU = np.zeros((coral.max_polyps))
         self.dV = np.zeros((coral.max_polyps))
 
-        self.n_neighbors = np.zeros(coral.max_polyps, dtype='uint16')
-        self.neighbors = []
+        # self.n_neighbors = np.zeros(coral.max_polyps, dtype='uint16')
+        self.neighbors = NULL
 
     cpdef void update(self, int steps) except *:
-        self.neighbors = []
-        cdef size_t i = 0
+        cdef int n = self.coral.n_polyps
+        cdef int i = 0
+        cdef int c
+        cdef Node *node
+        cdef Vert vert, nvert
 
-        for i in range(self.coral.n_polyps):
+        self.neighbors = <Node **>self.mem.alloc(n, sizeof(Node *))
+
+        for i in range(n):
+            self.neighbors[i] = NULL
             vert = self.coral.polyp_verts[i]
-            self.neighbors.append([])
+
             for nvert in vert.neighbors():
-                self.neighbors[i].append(nvert.id)
-            self.n_neighbors[i] = len(self.neighbors[i])
+                node = <Node *>self.mem.alloc(1, sizeof(Node))
+                node.key = nvert.id
+                node.next = self.neighbors[i]
+                self.neighbors[i] = node
 
         for i in range(self.n_morphogens):
             self.gray_scott(steps, i)
@@ -54,7 +65,7 @@ cdef class Morphogens:
         cdef int n = self.coral.n_polyps
         cdef int nidx, nn
         cdef double uvv, u, v, lapU, lapV
-
+        cdef Node *node
         cdef double[:] U = self.U[mi]
         cdef double[:] V = self.V[mi]
         cdef double diffU = self.diffU[mi]
@@ -66,18 +77,24 @@ cdef class Morphogens:
             for i in range(n):
                 u = U[i]
                 v = V[i]
-                nn = self.n_neighbors[i]
+                node = self.neighbors[i]
+                nn = 0
                 uvv = u*v*v
-                lapU = -(nn*u)
-                lapV = -(nn*v)
+                lapU = 0
+                lapV = 0
 
-                for nidx in self.neighbors[i]:
-                    lapU += U[nidx]
-                    lapV += V[nidx]
+                while node != NULL:
+                    lapU += U[node.key]
+                    lapV += V[node.key]
+                    nn += 1
+                    node = node.next
+
+                lapU -= nn*u
+                lapV -= nn*v
 
                 self.dU[i] = diffU * lapU - uvv + F*(1 - u)
                 self.dV[i] = diffV * lapV + uvv - (K+F)*v
 
-            for i in range(self.coral.n_polyps):
+            for i in range(n):
                 U[i] += self.dU[i]
                 V[i] += self.dV[i]

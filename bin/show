@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     for folder in directories:
         folder += '/0'
-        files = [f for f in os.listdir(folder) if '.coral.obj' in f]
+        files = [f for f in os.listdir(folder) if f.endswith('.coral.obj')]
         files = sorted(files, key=lambda f: int(f.split('.')[0]))
         files = [os.path.join(folder, f) for f in files]
 

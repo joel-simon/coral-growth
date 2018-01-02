@@ -7,8 +7,7 @@ from __future__ import division
 import numpy as np
 cimport numpy as np
 # from random import shuffle
-from cyrandom import shuffle
-
+# from cyrandom import shuffle
 from libc.math cimport floor, fmin, fmax, fabs
 from cymesh.vector3D cimport inormalized, vadd, vsub, vmultf, vset
 
@@ -20,17 +19,20 @@ cpdef void createPolypInputs(object coral) except *:
     cdef double[:,:] morphogensU = coral.morphogens.U
     cdef double[:] polyp_light = coral.polyp_light
     cdef double[:] polyp_gravity = coral.polyp_gravity
+    cdef double[:] polyp_collection = coral.polyp_collection
     cdef double[:,:] inputs = coral.polyp_inputs
     cdef unsigned int[:] polyp_memory = coral.polyp_memory
+    cdef int num_inputs = coral.num_inputs
 
-    inputs[:,:] = -1
+    inputs[:, :] = -1
 
     for i in range(coral.n_polyps):
         inputs[i, 0] = (polyp_light[i] * 2) - 1
         inputs[i, 1] = (coral.polyp_verts[i].curvature * 2)
         inputs[i, 2] = (polyp_gravity[i] * 2) - 1
+        inputs[i, 3] = (polyp_collection[i] * 2) - 1
 
-        input_idx = 3
+        input_idx = 4
 
         for mi in range(n_morphogens):
             mbin = <int>(floor(morphogensU[mi, i] * morph_thresholds))
@@ -44,9 +46,11 @@ cpdef void createPolypInputs(object coral) except *:
         for mi in range(coral.n_memory):
             if polyp_memory[i] & (1 << mi):
                 inputs[i, input_idx] = 1
-            else:
-                inputs[i, input_idx] = -1
             input_idx += 1
+
+        inputs[input_idx] = 1 # Bias Bit
+
+        assert input_idx == (num_inputs-1)
 
 cpdef void grow_polyps(object coral) except *:
     cdef int i, out_idx
@@ -66,13 +70,15 @@ cpdef void grow_polyps(object coral) except *:
     cdef double spring_strength = coral.spring_strength
     cdef double[:] spring_target = np.zeros(3)
     cdef double[:] temp = np.zeros(3)
+    cdef unsigned int net_depth = coral.net_depth
 
     createPolypInputs(coral)
 
     for i in range(coral.n_polyps):
         coral.network.Flush() # Compute feed-forward network results.
         coral.network.Input(coral.polyp_inputs[i])
-        coral.network.ActivateFast()
+        for _ in range(net_depth):
+            coral.network.ActivateFast()
         output = coral.network.Output()
 
         assert len(output) == coral.num_outputs
@@ -87,23 +93,21 @@ cpdef void grow_polyps(object coral) except *:
         # Output morphogens.
         out_idx = 1
         for mi in range(n_morphogens):
-            if output[out_idx] > 0.5:
+            if output[out_idx] > 0.75:
                 morphogensV[mi, i] = 1
             out_idx += 1
 
         for mi in range(n_memory):
-            if output[out_idx] > 0.5:
+            if output[out_idx] > 0.75:
                 polyp_memory[i] |= ( 1 << mi )
             out_idx += 1
 
-    ordering = list(range(coral.n_polyps))
-    shuffle(ordering)
+    # ordering = list(range(coral.n_polyps))
+    # shuffle(ordering)
+    # for i in ordering:
 
-    for i in ordering:
+    for i in range(coral.n_polyps):
         vert = coral.mesh.verts[i]
-
-        if vert.p[1] < 0:
-            continue
 
         neighbors = vert.neighbors()
 
@@ -122,6 +126,10 @@ cpdef void grow_polyps(object coral) except *:
         temp[0] = (1-spring_strength) * polyp_pos_next[i, 0] + spring_strength * spring_target[0]
         temp[1] = (1-spring_strength) * polyp_pos_next[i, 1] + spring_strength * spring_target[1]
         temp[2] = (1-spring_strength) * polyp_pos_next[i, 2] + spring_strength * spring_target[2]
+
+
+        if temp[1] < 0:
+            continue
 
         successful = coral.collisionManager.attemptVertUpdate(vert.id, temp)
         coral.polyp_collided[i] = not successful

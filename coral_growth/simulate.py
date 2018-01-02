@@ -6,14 +6,15 @@ import MultiNEAT as NEAT
 obj_path = os.getcwd() + '/../data/half_sphere_smooth.obj'
 
 def export(coral, folder, w_i, s):
-    out = open(os.path.join(folder, str(w_i), '%i.coral.obj'%s), 'w+')
-    coral.export(out)
+    path = os.path.join(folder, str(w_i), '%i.coral.obj'%s)
+    # out = open(path, 'w+')
+    coral.export(path)
 
-def simulate_network(network, traits, params, export_folder=None, verbose=False):
+def simulate_network(network, net_depth, traits, params, export_folder=None, verbose=False):
     corals = []
 
     for w_i, w_config in enumerate(params):
-        coral = Coral(obj_path, network, traits, w_config)
+        coral = Coral(obj_path, network, net_depth, traits, w_config)
 
         if export_folder:
             os.mkdir(os.path.join(export_folder, str(w_i)))
@@ -34,7 +35,7 @@ def simulate_network(network, traits, params, export_folder=None, verbose=False)
             if verbose:
                 print('Finished step %i: (%i polyps) (%04f)' % \
                     (s, coral.n_polyps, time.time() - step_start))
-                print('Fitness', coral.fitness())
+                print('Fitness', coral.fitness(verbose))
                 print()
 
             if coral.n_polyps >= w_config.max_polyps:
@@ -47,4 +48,7 @@ def simulate_network(network, traits, params, export_folder=None, verbose=False)
 def simulate_genome(genome, traits, params, export_folder=None, verbose=False):
     network = NEAT.NeuralNetwork()
     genome.BuildPhenotype(network)
-    return simulate_network(network, traits, params, export_folder, verbose)
+
+    genome.CalculateDepth()
+    depth = genome.GetDepth()
+    return simulate_network(network, depth, traits, params, export_folder, verbose)

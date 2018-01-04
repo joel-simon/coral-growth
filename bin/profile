@@ -23,3 +23,8 @@ genome = NEAT.Genome(0, num_inputs, 0, num_outputs, False, usig, usig, 0, params
 start = time.time()
 simulate_genome(genome, genome.GetGenomeTraits(), [params])
 print('finished in', time.time() - start)
+
+total = sum(coral.function_times.values())
+for k, v in sorted(coral.function_times.items()):
+    print(k, v, v/ total)
+print()

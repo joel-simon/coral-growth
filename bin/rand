@@ -17,7 +17,7 @@ params.addMorphogen()
 
 params.max_steps = 50
 params.max_polyps = 5000
-params.vc = .5
+# params.vc = .5
 num_inputs = Coral.num_inputs + params.polyp_memory + \
              params.n_morphogens*(params.morph_thresholds - 1)
 

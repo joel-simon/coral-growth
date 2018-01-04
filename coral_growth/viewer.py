@@ -371,7 +371,7 @@ class AnimationViewer(Viewer):
             generation = get_generation(file)
             # voxel_length, voxel_grid = pickle.load(open(file+'.grid.p', 'rb'))
             # voxel_length, flow_directions = pickle.load(open(file+'.flow_directions.p', 'rb'))
-            voxel_length, (flow_grid, min_v) = pickle.load(open(file+'.flow_grid.p', 'rb'))
+            # voxel_length, (flow_grid, min_v) = pickle.load(open(file+'.flow_grid.p', 'rb'))
 
             """ Read the file and store the colors.
             """
@@ -501,7 +501,6 @@ class AnimationViewer(Viewer):
     def step(self, i):
         if self.animation_playing:
             # Do two rotation steps for every growth step.
-            # if i % 1 == 0:
             if self.frame < self.n_frames - 1:
                 self.frame += 1
                 self.gl_lists = self.view_lists[self.view][self.frame]
@@ -509,7 +508,7 @@ class AnimationViewer(Viewer):
             if self.saving:
                 self.save('tmp/%04d.jpg'%i)
 
-            self.rx += .6
+            # self.rx += .6
 
 
 

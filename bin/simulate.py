@@ -31,7 +31,7 @@ if __name__ == "__main__":
     with TemporaryDirectory() as tmp_dir:
         simulate_genome(genome, traits, [params], export_folder=tmp_dir, verbose=True)
         exported = os.path.join(tmp_dir, '0')
-        files = [f for f in os.listdir(exported) if '.coral.obj' in f]
+        files = [f for f in os.listdir(exported) if f.endswith('.coral.obj')]
         files = sorted(files, key=lambda f: int(f.split('.')[0]))
         files = [os.path.join(exported, f) for f in files]
         view = AnimationViewer(files, (1000, 1000))

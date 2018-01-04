@@ -64,13 +64,16 @@ cpdef void grow_polyps(object coral) except *:
     cdef double[:,:] polyp_pos_next = coral.polyp_pos_next
     cdef double[:,:] morphogensV = coral.morphogens.V
     cdef unsigned int[:] polyp_memory = coral.polyp_memory
-    cdef double growth_scalar = coral.growth_scalar
-    cdef double growth
+    # cdef double growth_scalar = coral.growth_scalar
+    cdef double[:] growth = np.zeros(coral.n_polyps)
     cdef double target_edge_len = coral.target_edge_len
     cdef double spring_strength = coral.spring_strength
     cdef double[:] spring_target = np.zeros(3)
     cdef double[:] temp = np.zeros(3)
     cdef unsigned int net_depth = coral.net_depth
+
+    cdef double growth_scalar, g
+    cdef double total_growth = 0
 
     createPolypInputs(coral)
 
@@ -84,11 +87,8 @@ cpdef void grow_polyps(object coral) except *:
         assert len(output) == coral.num_outputs
 
         # Move in normal direction by growth amount.
-        growth = output[0] * growth_scalar
-        # polyp_pos_next[i, :] = polyp_pos[i] + growth * polyp_normal[i]
-        polyp_pos_next[i, 0] = polyp_pos[i, 0] + growth * polyp_normal[i, 0]
-        polyp_pos_next[i, 1] = polyp_pos[i, 1] + growth * polyp_normal[i, 1]
-        polyp_pos_next[i, 2] = polyp_pos[i, 2] + growth * polyp_normal[i, 2]
+        growth[i] = output[0]
+        total_growth += output[0]
 
         # Output morphogens.
         out_idx = 1
@@ -102,6 +102,18 @@ cpdef void grow_polyps(object coral) except *:
                 polyp_memory[i] |= ( 1 << mi )
             out_idx += 1
 
+    if total_growth == 0:
+        return
+
+    growth_scalar = coral.C * coral.energy / total_growth
+
+    for i in range(coral.n_polyps):
+        g = growth[i] * growth_scalar
+        polyp_pos_next[i, 0] = polyp_pos[i, 0] + g * polyp_normal[i, 0]
+        polyp_pos_next[i, 1] = polyp_pos[i, 1] + g * polyp_normal[i, 1]
+        polyp_pos_next[i, 2] = polyp_pos[i, 2] + g * polyp_normal[i, 2]
+
+
     # ordering = list(range(coral.n_polyps))
     # shuffle(ordering)
     # for i in ordering:
@@ -114,7 +126,7 @@ cpdef void grow_polyps(object coral) except *:
         vmultf(spring_target, spring_target, 0.0)
 
         for neighbor in neighbors:
-            # spring_target += coral.target_edge_len * normed(np.array(neighbor.p) - vert.p)
+            # spring_target += target_edge_len * normed(neighbor.p - vert.p)
             vsub(temp, neighbor.p, vert.p)
             inormalized(temp)
             vmultf(temp, temp, coral.target_edge_len)
@@ -126,7 +138,6 @@ cpdef void grow_polyps(object coral) except *:
         temp[0] = (1-spring_strength) * polyp_pos_next[i, 0] + spring_strength * spring_target[0]
         temp[1] = (1-spring_strength) * polyp_pos_next[i, 1] + spring_strength * spring_target[1]
         temp[2] = (1-spring_strength) * polyp_pos_next[i, 2] + spring_strength * spring_target[2]
-
 
         if temp[1] < 0:
             continue

@@ -17,8 +17,8 @@ class Parameters(NEAT.Parameters):
 
         # Coral Growth.
         self.max_polyps = 10000
-        self.max_steps = 100
-        self.growth_scalar = .20
+        self.max_steps = 40
+        # self.growth_scalar = .20
         self.max_face_growth = 1.5
         self.polyp_memory = 2
 
@@ -26,17 +26,13 @@ class Parameters(NEAT.Parameters):
         self.morphogen_thresholds = 3
         self.morphogen_steps = 200
         self.morph_thresholds = 3
-        self.competition_radius = 2 # Multiplies poly size.
-        self.vc = .5
 
         # self.spring_strength = .5
         self.addTrait('spring_strength', (.1, .6))
 
         # Coral enviornment
         self.light_amount = 0.5
-        # light = light_bottom + ( 1 - light_bottom ) * polyp_height / world_depth
-        # self.world_depth = 5
-        # self.light_decay = .15 # Percent of light lost every unit height.
+        self.C = 10
 
         if path:
             for line in open(path).readlines():

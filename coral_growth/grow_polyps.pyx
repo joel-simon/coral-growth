@@ -6,10 +6,10 @@
 from __future__ import division
 import numpy as np
 cimport numpy as np
-# from random import shuffle
+from random import shuffle
 # from cyrandom import shuffle
 from libc.math cimport floor, fmin, fmax, fabs
-from cymesh.vector3D cimport inormalized, vadd, vsub, vmultf, vset
+from cymesh.vector3D cimport inormalized, vadd, vsub, vmultf, vset, dot
 
 cpdef void createPolypInputs(object coral) except *:
     """ Map polyp stats to nerual input in [-1, 1] range. """
@@ -48,7 +48,7 @@ cpdef void createPolypInputs(object coral) except *:
                 inputs[i, input_idx] = 1
             input_idx += 1
 
-        inputs[input_idx] = 1 # Bias Bit
+        inputs[i, input_idx] = 1 # Bias Bit
 
         assert input_idx == (num_inputs-1)
 
@@ -61,7 +61,7 @@ cpdef void grow_polyps(object coral) except *:
     cdef object output
     cdef double[:,:] polyp_pos = coral.polyp_pos
     cdef double[:,:] polyp_normal = coral.polyp_normal
-    cdef double[:,:] polyp_pos_next = coral.polyp_pos_next
+    cdef double[:,:] pos_next = coral.polyp_pos_next
     cdef double[:,:] morphogensV = coral.morphogens.V
     cdef unsigned int[:] polyp_memory = coral.polyp_memory
     # cdef double growth_scalar = coral.growth_scalar
@@ -70,8 +70,9 @@ cpdef void grow_polyps(object coral) except *:
     cdef double spring_strength = coral.spring_strength
     cdef double[:] spring_target = np.zeros(3)
     cdef double[:] temp = np.zeros(3)
-    cdef unsigned int net_depth = coral.net_depth
 
+    cdef unsigned int net_depth = coral.net_depth
+    cdef double max_growth = coral.max_growth
     cdef double growth_scalar, g
     cdef double total_growth = 0
 
@@ -103,31 +104,33 @@ cpdef void grow_polyps(object coral) except *:
             out_idx += 1
 
     if total_growth == 0:
-        return
-
-    growth_scalar = coral.C * coral.energy / total_growth
+        growth_scalar = 0.0
+    else:
+        growth_scalar = coral.C * coral.energy / total_growth
 
     for i in range(coral.n_polyps):
-        g = growth[i] * growth_scalar
-        polyp_pos_next[i, 0] = polyp_pos[i, 0] + g * polyp_normal[i, 0]
-        polyp_pos_next[i, 1] = polyp_pos[i, 1] + g * polyp_normal[i, 1]
-        polyp_pos_next[i, 2] = polyp_pos[i, 2] + g * polyp_normal[i, 2]
-
+        g = min(growth[i] * growth_scalar, max_growth)
+        # g = coral.growth_scalar
+        pos_next[i, 0] = polyp_pos[i, 0] + g * polyp_normal[i, 0]
+        pos_next[i, 1] = polyp_pos[i, 1] + g * polyp_normal[i, 1]
+        pos_next[i, 2] = polyp_pos[i, 2] + g * polyp_normal[i, 2]
 
     # ordering = list(range(coral.n_polyps))
     # shuffle(ordering)
-    # for i in ordering:
 
+    cdef double[:] AB = np.zeros(3)
+
+    # for i in ordering:
     for i in range(coral.n_polyps):
         vert = coral.mesh.verts[i]
 
         neighbors = vert.neighbors()
 
+        # Calculate a spring target based off neighbors positions.
         vmultf(spring_target, spring_target, 0.0)
-
         for neighbor in neighbors:
             # spring_target += target_edge_len * normed(neighbor.p - vert.p)
-            vsub(temp, neighbor.p, vert.p)
+            vsub(temp, polyp_pos[neighbor.id], vert.p)
             inormalized(temp)
             vmultf(temp, temp, coral.target_edge_len)
             vadd(spring_target, spring_target, temp)
@@ -135,12 +138,25 @@ cpdef void grow_polyps(object coral) except *:
         vmultf(spring_target, spring_target, 1.0 / len(neighbors))
         vadd(spring_target, spring_target, vert.p)
 
-        temp[0] = (1-spring_strength) * polyp_pos_next[i, 0] + spring_strength * spring_target[0]
-        temp[1] = (1-spring_strength) * polyp_pos_next[i, 1] + spring_strength * spring_target[1]
-        temp[2] = (1-spring_strength) * polyp_pos_next[i, 2] + spring_strength * spring_target[2]
+        # Calculate the smoothed target position.
+        temp[0] = (1-spring_strength) * pos_next[i, 0] + spring_strength * spring_target[0]
+        temp[1] = (1-spring_strength) * pos_next[i, 1] + spring_strength * spring_target[1]
+        temp[2] = (1-spring_strength) * pos_next[i, 2] + spring_strength * spring_target[2]
+
+        # Check if the smoothed position is actually behind where we are
+        # currently. If so, don't include smoothing term.
+        vsub(AB, temp, vert.p)
+        if dot(AB, vert.normal) > 0:
+            temp[:] = pos_next[i,:]
 
         if temp[1] < 0:
-            continue
+            temp[1] = 0
+
+        pos_next[i, :] = temp
+
+    for i in range(coral.n_polyps):
+        vert = coral.mesh.verts[i]
+        temp = pos_next[i]
 
         successful = coral.collisionManager.attemptVertUpdate(vert.id, temp)
         coral.polyp_collided[i] = not successful

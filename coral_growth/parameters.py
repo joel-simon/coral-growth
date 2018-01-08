@@ -18,7 +18,8 @@ class Parameters(NEAT.Parameters):
         # Coral Growth.
         self.max_polyps = 10000
         self.max_steps = 40
-        # self.growth_scalar = .20
+        self.max_growth = .5
+
         self.max_face_growth = 1.5
         self.polyp_memory = 2
 
@@ -28,7 +29,7 @@ class Parameters(NEAT.Parameters):
         self.morph_thresholds = 3
 
         # self.spring_strength = .5
-        self.addTrait('spring_strength', (.1, .6))
+        self.addTrait('spring_strength', (.15, .5))
 
         # Coral enviornment
         self.light_amount = 0.5

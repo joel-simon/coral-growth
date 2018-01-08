@@ -1,6 +1,7 @@
 from __future__ import print_function
 from libc.math cimport sqrt, floor, fmin
 from collections import defaultdict
+from cymesh.vector3D cimport dot
 import numpy as np
 cimport numpy as np
 
@@ -22,7 +23,14 @@ cdef class MeshCollisionManager:
         cdef double dz = p1[2] - p2[2]
         cdef double d = sqrt(dx*dx + dy*dy + dz*dz)
 
-        return d < self.blocksize
+        if d > self.blocksize:
+            return False
+
+        # Do a check that one is in front of the other and not behind.
+        cdef double[:] AB = np.array(p2) - p1
+        cdef bint is_in_front = dot(AB, self.mesh.verts[id1].normal) > 0
+
+        return is_in_front
 
     cpdef void newVert(self, int id) except *:
         """ Return True if add was accepted and False otherwise.
@@ -36,7 +44,6 @@ cdef class MeshCollisionManager:
         cdef int yc = <int>(floor(p[1] / self.blocksize))
         cdef int zc = <int>(floor(p[2] / self.blocksize))
 
-        # self.radii[id] = self.radius(vert)
         self.grid[(xc, yc, zc)].add(id)
         self.particles[id][0] = xc
         self.particles[id][1] = yc
@@ -72,7 +79,6 @@ cdef class MeshCollisionManager:
 
         # Accept the update.
         vert.p[:] = p
-        # self.radii[id] = self.radius(vert)
         self.particles[id][0] = xc
         self.particles[id][1] = yc
         self.particles[id][2] = zc

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import division, print_function
-import math, random, os, sys
+import math, random, os, sys, time
 sys.path.append(os.path.abspath('..'))
-
+import numpy as np
 import MultiNEAT as NEAT
 from tempfile import TemporaryDirectory
 
 from coral_growth.coral import Coral
-from coral_growth.simulate import simulate_network
+from coral_growth.simulate import simulate_network, simulate_genome
 from coral_growth.viewer import AnimationViewer
 from coral_growth.parameters import Parameters
 
@@ -15,8 +15,9 @@ params = Parameters()
 params.addMorphogen()
 params.addMorphogen()
 
-params.max_steps = 50
+params.max_steps = 25
 params.max_polyps = 5000
+params.C = 15
 # params.vc = .5
 num_inputs = Coral.num_inputs + params.polyp_memory + \
              params.n_morphogens*(params.morph_thresholds - 1)
@@ -24,7 +25,38 @@ num_inputs = Coral.num_inputs + params.polyp_memory + \
 num_outputs = Coral.num_outputs + params.polyp_memory + params.n_morphogens
 
 usig = NEAT.ActivationFunction.UNSIGNED_SIGMOID
-genome = NEAT.Genome(0, num_inputs, 4, num_outputs, False, usig, usig, 1, params, 1)
+# genome = NEAT.Genome(0, num_inputs, 4, num_outputs, False, usig, usig, 1, params, 1)
+
+def create_initial_population():
+    # Create network size based off coral and parameters.
+    num_inputs = Coral.num_inputs + params.polyp_memory + \
+                 params.n_morphogens*(params.morph_thresholds - 1)
+
+    num_outputs = Coral.num_outputs + params.polyp_memory + params.n_morphogens
+
+    print(num_inputs, num_outputs)
+
+    genome_prototype = NEAT.Genome(
+        0, # ID
+        num_inputs,
+        0, # NUM_HIDDEN
+        num_outputs,
+        False, # FS_NEAT
+        NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
+        NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
+        0, # Seed type, must be 1 to have hidden nodes.
+        params,
+        0,
+    )
+
+    pop = NEAT.Population(
+        genome_prototype, # Seed genome.
+        params,
+        True, # Randomize weights.
+        1.0, # Random Range.
+        int(time.time()) # Random number generator seed.
+    )
+    return pop
 
 
 class NetworkDummy(object):
@@ -47,17 +79,39 @@ class NetworkDummy(object):
     def Output(self):
         # out = [1 for _ in range(self.NumOutputs())]
         out = [random.random() for _ in range(self.NumOutputs())]
-
+        # out = [0 for _ in range(self.NumOutputs())]
+        out[0] = 1
         return out
 
 with TemporaryDirectory() as tmp_dir:
-    net = NEAT.NeuralNetwork()
-    coral = simulate_network(NetworkDummy(), 1, genome.GetGenomeTraits(), [params],\
-                                         export_folder=tmp_dir, verbose=True)[0]
+    pop = create_initial_population()
+    genomes = NEAT.GetGenomeList(pop)
 
-    total = sum(coral.function_times.values())
-    for k, v in sorted(coral.function_times.items()):
-        print(k, v, v/ total)
+    # net = NEAT.NeuralNetwork()
+    # traits = genome.GetGenomeTraits()
+    # traits['spring_strength'] = .2
+    genome = genomes[0]
+    traits = genome.GetGenomeTraits()
+
+    # coral = simulate_network(NetworkDummy(), 1, traits, [params],\
+    #                                      export_folder=tmp_dir, verbose=True)[0]
+
+    # coral = simulate_genome(genome, traits, [params], export_folder=None,
+    #                         verbose=False)[0]
+    # print('fitness',coral.fitness())
+
+    coral = simulate_genome(genome, traits, [params], export_folder=tmp_dir,
+                            verbose=False)[0]
+    # print('fitness',coral.fitness())
+
+    # coral = simulate_genome(genome, traits, [params], export_folder=None,
+    #                         verbose=False)[0]
+    print('fitness', coral.fitness())
+    print('light', sum(coral.polyp_light[:coral.n_polyps]))
+    print('collection', sum(coral.polyp_collection[:coral.n_polyps]))
+    # total = sum(coral.function_times.values())
+    # for k, v in sorted(coral.function_times.items()):
+    #     print(k, v, v/ total)
     print()
 
     exported = os.path.join(tmp_dir, '0')

@@ -22,6 +22,7 @@ from coral_growth.modules import flowx as flow
 from coral_growth.modules.morphogens import Morphogens
 from coral_growth.modules.collisions import MeshCollisionManager
 
+
 class Coral(object):
     num_inputs = 5 # [light, curvature, gravity, collection, extra-bias-bit]
     num_outputs = 1
@@ -34,6 +35,7 @@ class Coral(object):
         self.C = params.C
         self.n_memory = params.polyp_memory
         self.max_polyps = params.max_polyps
+        self.max_growth = params.max_growth
         self.morphogens = Morphogens(self, traits, params.n_morphogens)
         self.morphogen_steps = params.morphogen_steps
         self.light_amount = params.light_amount
@@ -94,9 +96,11 @@ class Coral(object):
         grow_polyps(self)
         self.function_times['grow_polyps'] += time.time() - t1
 
-        t1 = time.time()
-        relax_mesh(self.mesh)
-        self.function_times['relax_mesh'] += time.time() - t1
+        assert not np.isnan(np.sum(self.polyp_pos[:self.n_polyps])), 'NaN position :\'('
+
+        # t1 = time.time()
+        # relax_mesh(self.mesh)
+        # self.function_times['relax_mesh'] += time.time() - t1
 
         t1 = time.time()
         self.polypDivision() # Divide mesh and create new polyps.
@@ -108,15 +112,13 @@ class Coral(object):
     def updateAttributes(self):
         self.mesh.calculateNormals()
         self.mesh.calculateCurvature()
-        # self.updateVoxelGrid()
 
         t1 = time.time()
         light.calculate_light(self) # Update the light
         self.function_times['calculate_light'] += time.time() - t1
 
-
         t1 = time.time()
-        self.flow_grid = flow.calculate_collection(self, 2)
+        self.flow_sgrid = flow.calculate_collection(self, 2)
         self.function_times['calculate_collection'] += time.time() - t1
 
         self.polyp_light[self.polyp_light != 0] -= .5
@@ -197,7 +199,6 @@ class Coral(object):
                 self.createPolyp(vert)
 
     def fitness(self, verbose=False):
-        # return self.n_polyps
         return self.energy
 
     def export(self, path):
@@ -212,7 +213,7 @@ class Coral(object):
                 for each attribute. Ordered the same as the vertices.
         """
         out = open(path, 'w+')
-        self.updateAttributes()
+        # self.updateAttributes()
 
         header = [ 'light', 'collection', 'gravity', 'curvature', 'memory', 'collided']
         for i in range(self.n_morphogens):
@@ -270,5 +271,5 @@ class Coral(object):
         # f.close()
 
         # f = open(path+'.flow_grid.p', 'wb')
-        pickle.dump((self.voxel_length, self.flow_grid), f)
-        f.close()
+        # pickle.dump((self.voxel_length, self.flow_grid), f)
+        # f.close()

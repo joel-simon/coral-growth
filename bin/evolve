@@ -23,18 +23,19 @@ params = Parameters()
 params.addMorphogen()
 params.addMorphogen()
 
-params.light_amount = .3
+params.light_amount = .5
 params.PopulationSize = 50
 
 params.polyp_memory = 2
 params.morphogen_thresholds = 3
-# params.max_polyps = 8000
-self.C = 10
+
+params.C = 15
+params.max_growth = .5
 params.max_polyps = 10000
 params.max_steps = 80
 
 def create_initial_population():
-    # Create netowrk size based off coral and parameters.
+    # Create network size based off coral and parameters.
     num_inputs = Coral.num_inputs + params.polyp_memory + \
                  params.n_morphogens*(params.morph_thresholds - 1)
 
@@ -74,7 +75,6 @@ def evaluate(genome, traits):
 
 def simulate_and_save(genome, out_dir, generation, fitness):
     genome.Save(out_dir+'/genome_%i' % generation)
-    # genome = NEAT.Genome(out_dir+'/best_%i' % generation)
     traits = genome.GetGenomeTraits()
 
     with open(out_dir+'/scores.txt', "a") as f:
@@ -85,7 +85,7 @@ def simulate_and_save(genome, out_dir, generation, fitness):
 
     export_folder = os.path.join(out_dir, str(generation))
     os.mkdir(export_folder)
-    simulate_genome(genome, traits, [params], export_folder=export_folder)
+    return simulate_genome(genome, traits, [params], export_folder=export_folder)
 
 def evolve_neat(params, generations, out_dir, run_id, pool):
     pop = create_initial_population()
@@ -97,8 +97,6 @@ def evolve_neat(params, generations, out_dir, run_id, pool):
         genomes = NEAT.GetGenomeList(pop)
 
         if pool:
-            # fitnesses = evaluate_parallel(pool, genomes)
-            # data.append((path, genome.GetGenomeTraits()))
             data = [ (g, g.GetGenomeTraits()) for g in genomes ]
             fitnesses = pool.starmap(evaluate, data)
         else:
@@ -120,7 +118,8 @@ def evolve_neat(params, generations, out_dir, run_id, pool):
             best = pop.GetBestGenome()
             max_ever = maxf
             print('New best fitness.', best.NumNeurons(), best.NumLinks())
-            simulate_and_save(best, out_dir, generation, maxf)
+            coral = simulate_and_save(best, out_dir, generation, maxf)[0]
+            print(coral.fitness(), maxf)
 
         pop.Epoch()
         print('#'*80)

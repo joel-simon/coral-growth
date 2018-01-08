@@ -28,6 +28,8 @@ if __name__ == "__main__":
     params.max_steps = args.time_steps
     params.max_polyps = args.max_polyps
 
+    # traits['spring_strength'] = .2
+
     with TemporaryDirectory() as tmp_dir:
         simulate_genome(genome, traits, [params], export_folder=tmp_dir, verbose=True)
         exported = os.path.join(tmp_dir, '0')

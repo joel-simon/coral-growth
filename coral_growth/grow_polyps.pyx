@@ -3,7 +3,7 @@
 # cython: initializedcheck=False
 # cython: nonecheck=False
 # cython: cdivision=True
-from __future__ import division
+from __future__ import division, print_function
 import numpy as np
 cimport numpy as np
 from random import shuffle
@@ -64,7 +64,7 @@ cpdef void grow_polyps(object coral) except *:
     cdef double[:,:] pos_next = coral.polyp_pos_next
     cdef double[:,:] morphogensV = coral.morphogens.V
     cdef unsigned int[:] polyp_memory = coral.polyp_memory
-    # cdef double growth_scalar = coral.growth_scalar
+
     cdef double[:] growth = np.zeros(coral.n_polyps)
     cdef double target_edge_len = coral.target_edge_len
     cdef double spring_strength = coral.spring_strength
@@ -76,20 +76,25 @@ cpdef void grow_polyps(object coral) except *:
     cdef double growth_scalar, g
     cdef double total_growth = 0
 
+    cdef double[:,:] polyp_pos_past = np.zeros((coral.n_polyps, 3))
+    polyp_pos_past[:,:] = polyp_pos[:coral.n_polyps, :]
+
     createPolypInputs(coral)
 
-    for i in range(coral.n_polyps):
-        coral.network.Flush() # Compute feed-forward network results.
-        coral.network.Input(coral.polyp_inputs[i])
-        for _ in range(net_depth):
-            coral.network.ActivateFast()
-        output = coral.network.Output()
+    cdef double old_volume = coral.mesh.volume()
 
-        assert len(output) == coral.num_outputs
+    for i in range(coral.n_polyps):
+        # Compute feed-forward network results.
+        coral.network.Flush()
+        coral.network.Input(coral.polyp_inputs[i])
+        for _ in range(net_depth): coral.network.ActivateFast()
+        output = coral.network.Output()
 
         # Move in normal direction by growth amount.
         growth[i] = output[0]
-        total_growth += output[0]
+        polyp_pos[i, 0] += growth[i] * polyp_normal[i, 0]
+        polyp_pos[i, 1] += growth[i] * polyp_normal[i, 1]
+        polyp_pos[i, 2] += growth[i] * polyp_normal[i, 2]
 
         # Output morphogens.
         out_idx = 1
@@ -103,6 +108,12 @@ cpdef void grow_polyps(object coral) except *:
                 polyp_memory[i] |= ( 1 << mi )
             out_idx += 1
 
+    cdef double new_volume = coral.mesh.volume()
+
+    polyp_pos[:coral.n_polyps, :] = polyp_pos_past[:,:]
+
+    total_growth = new_volume - old_volume
+
     if total_growth == 0:
         growth_scalar = 0.0
     else:
@@ -110,7 +121,6 @@ cpdef void grow_polyps(object coral) except *:
 
     for i in range(coral.n_polyps):
         g = min(growth[i] * growth_scalar, max_growth)
-        # g = coral.growth_scalar
         pos_next[i, 0] = polyp_pos[i, 0] + g * polyp_normal[i, 0]
         pos_next[i, 1] = polyp_pos[i, 1] + g * polyp_normal[i, 1]
         pos_next[i, 2] = polyp_pos[i, 2] + g * polyp_normal[i, 2]

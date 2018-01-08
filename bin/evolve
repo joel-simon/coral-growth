@@ -23,16 +23,16 @@ params = Parameters()
 params.addMorphogen()
 params.addMorphogen()
 
-params.light_amount = .5
+params.light_amount = .3
 params.PopulationSize = 50
 
 params.polyp_memory = 2
 params.morphogen_thresholds = 3
 
-params.C = 15
+params.C = .8
 params.max_growth = .5
 params.max_polyps = 10000
-params.max_steps = 80
+params.max_steps = 70
 
 def create_initial_population():
     # Create network size based off coral and parameters.

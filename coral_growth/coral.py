@@ -48,7 +48,7 @@ class Coral(object):
         self.function_times = defaultdict(int)
 
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
-        self.polyp_size = self.target_edge_len * 0.3
+        self.polyp_size = self.target_edge_len * 0.4
         self.max_edge_len = self.target_edge_len * params.max_face_growth
         mean_face = np.mean([f.area() for f in self.mesh.faces])
         self.max_face_area = mean_face * params.max_face_growth
@@ -92,6 +92,7 @@ class Coral(object):
         return s
 
     def step(self):
+        assert not np.isnan(np.sum(self.polyp_pos[:self.n_polyps])), 'NaN position :\'('
         t1 = time.time()
         grow_polyps(self)
         self.function_times['grow_polyps'] += time.time() - t1
@@ -107,18 +108,27 @@ class Coral(object):
         self.function_times['polyp_division'] += time.time() - t1
 
         self.updateAttributes()
+
+        assert not np.isnan(np.sum(self.polyp_gravity)), 'NaN :\'('
+        assert not np.isnan(np.sum(self.polyp_memory)), 'NaN :\'('
+        assert not np.isnan(np.sum(self.polyp_light)), 'NaN :\'('
+        assert not np.isnan(np.sum(self.polyp_collection)), 'NaN :\'('
+
         self.age += 1
 
+
     def updateAttributes(self):
+
         self.mesh.calculateNormals()
         self.mesh.calculateCurvature()
+        assert not np.isnan(np.sum(self.polyp_normal)), 'NaN Normal :\'('
 
         t1 = time.time()
         light.calculate_light(self) # Update the light
         self.function_times['calculate_light'] += time.time() - t1
 
         t1 = time.time()
-        self.flow_sgrid = flow.calculate_collection(self, 2)
+        flow.calculate_collection(self, 2)
         self.function_times['calculate_collection'] += time.time() - t1
 
         self.polyp_light[self.polyp_light != 0] -= .5
@@ -126,7 +136,20 @@ class Coral(object):
         # self.polyp_light *= (.2 + self.polyp_pos[:, 1] * .2)
         # (self.light_bottom + (1-self.light_bottom)*self.polyp_pos[:,1,:] / self.world_depth)
 
+        # assert not np.isnan(np.sum(self.polyp_gravity[:self.n_polyps])), 'NaN position :\'('
+        # assert not np.isnan(np.sum(self.polyp_normal[:self.n_polyps])), 'NaN position :\'('
+
         gravity.calculate_gravity(self)
+
+        # for i in range(self.n_polyps):
+        #     if np.isnan(self.polyp_gravity[i]):
+        #         self.polyp_gravity[i] = 0
+        #     if np.isnan(self.polyp_light[i]):
+        #         self.polyp_light[i] = 0
+                # print(self.polyp_pos[i])
+                # print(self.polyp_normal[i])
+                # assert False
+        # assert not np.isnan(np.sum(self.polyp_gravity[:self.n_polyps])), 'NaN position :\'('
 
         t1 = time.time()
         self.morphogens.update(self.morphogen_steps) # Update the morphogens.

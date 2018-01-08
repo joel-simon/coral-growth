@@ -8,7 +8,7 @@ class Parameters(NEAT.Parameters):
         self.PopulationSize = 60
         self.OldAgeTreshold = 10
         self.SpeciesMaxStagnation = 10
-        self.MinSpecies = 2
+        self.MinSpecies = 3
         self.MaxSpecies = 8
         self.OverallMutationRate = 0.6
         self.MutateAddNeuronProb = 0.05

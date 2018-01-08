@@ -16,15 +16,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("max_polyps", default=10000, help="Generations.", type=int)
     parser.add_argument("time_steps", default=100, help="Output dir.", type=int)
-    parser.add_argument("genome_path", help="")
-    parser.add_argument("trait_path", help="")
-    parser.add_argument("params_path", help="")
+    parser.add_argument("root_path", help="")
+    parser.add_argument("generation", type=int, help="")
+    # parser.add_argument("genome_path", help="")
+    # parser.add_argument("trait_path", help="")
+    # parser.add_argument("params_path", help="")
     args = parser.parse_args()
 
-    traits = ast.literal_eval(open(args.trait_path, 'r').readlines()[0])
-    genome = NEAT.Genome(args.genome_path)
+    genome_path = os.path.join(args.root_path, 'genome_%i'%args.generation)
+    trait_path = os.path.join(args.root_path, 'best_%i_traits.txt'%args.generation)
+    params_path = os.path.join(args.root_path, 'params.txt')
 
-    params = Parameters(args.params_path)
+    traits = ast.literal_eval(open(trait_path, 'r').readlines()[0])
+    genome = NEAT.Genome(genome_path)
+
+    params = Parameters(params_path)
     params.max_steps = args.time_steps
     params.max_polyps = args.max_polyps
 

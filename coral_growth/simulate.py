@@ -4,7 +4,6 @@ from coral_growth.coral import Coral
 import MultiNEAT as NEAT
 
 obj_path = os.getcwd() + '/../data/half_sphere_smooth.obj'
-# obj_path = '/Users/joelsimon/Projects/coral_growth_all/coral_growth_repo/output/YQQV__January_04_2018_22_18/5/0/79.coral.obj'
 
 def export(coral, folder, w_i, s):
     path = os.path.join(folder, str(w_i), '%i.coral.obj'%s)
@@ -36,9 +35,7 @@ def simulate_network(network, net_depth, traits, params, export_folder=None, ver
             if verbose:
                 print('Finished step %i: (%i polyps) (%04f)' % \
                     (s, coral.n_polyps, time.time() - step_start))
-                print('Fitness', coral.fitness(verbose))
-                print('light', sum(coral.polyp_light[:coral.n_polyps]))
-                print('collection', sum(coral.polyp_collection[:coral.n_polyps]))
+                print('Fitness:', coral.fitness(verbose))
                 print()
 
             if coral.n_polyps >= w_config.max_polyps:

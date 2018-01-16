@@ -325,7 +325,6 @@ def parse_coral_file(file):
         elif line.startswith("#coral"):
             header = line.split(' ')[1:]
 
-            # if n_views is None:
             n_views = len(header) - 1
             view_names = ['morphogens'] + header[:-2]
 
@@ -362,15 +361,15 @@ class AnimationViewer(Viewer):
         radius = float(coral_data['polyp_size'])
         self.view_names = view_names
         self.n_views = n_views
-        # print(view_names, n_views)
         self.view_lists = [[] for _ in range(self.n_views)]
 
         # self.n_views = 1
 
         for fi, file in enumerate(files):
             generation = get_generation(file)
-            # voxel_length, voxel_grid = pickle.load(open(file+'.grid.p', 'rb'))
             # voxel_length, flow_directions = pickle.load(open(file+'.flow_directions.p', 'rb'))
+
+            flow_grid = None
             # voxel_length, (flow_grid, min_v) = pickle.load(open(file+'.flow_grid.p', 'rb'))
 
             """ Read the file and store the colors.
@@ -399,16 +398,11 @@ class AnimationViewer(Viewer):
                         color = int_colors[d] if isinstance(d, int) else (d,d,d)
                     mesh['vert_colors'][polyp_idx] = color
 
-                    # glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
-                    # glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
-
-                # Do Drawing
-                # for p in voxel_grid:
-                #     p = np.array(p)
-                #     self.draw_cube(p*voxel_length, voxel_length)
-
                 self.draw_mesh(mesh)
-                # self.draw_flow_grid(voxel_length, flow_grid, min_v)
+
+                if flow_grid is not None:
+                    self.draw_flow_grid(voxel_length, flow_grid, min_v)
+
                 if generation is not None:
                     self.draw_text( 30, 30, 'Generation %i' % generation )
 
@@ -425,10 +419,11 @@ class AnimationViewer(Viewer):
         offset = min_v
 
         vmax = flow_grid.max()
+
         for p, v in np.ndenumerate(flow_grid):
-            if p[1] > 3:
+            if p[1] % 5 == 0:
                 p = np.array(p) + offset
-                color = (v / vmax, 0, 0, .5)
+                color = (v / vmax, 0, 0, .25)
                 self.draw_cube(p*voxel_length, voxel_length, color)
 
     # def draw_flow_grid(self, voxel_length, flow_directions):

@@ -15,12 +15,15 @@ params = Parameters()
 params.addMorphogen()
 params.addMorphogen()
 
-params.max_steps = 30
+
 params.max_polyps = 5000
-params.C = 1
-# params.vc = .5
+params.C = 0.5
+params.max_growth = .2
+params.light_amount = 1.0
+params.max_defect = 1.2
+
 num_inputs = Coral.num_inputs + params.polyp_memory + \
-             params.n_morphogens*(params.morph_thresholds - 1)
+             params.n_morphogens*(params.morphogen_thresholds - 1)
 
 num_outputs = Coral.num_outputs + params.polyp_memory + params.n_morphogens
 
@@ -30,7 +33,7 @@ usig = NEAT.ActivationFunction.UNSIGNED_SIGMOID
 def create_initial_population():
     # Create network size based off coral and parameters.
     num_inputs = Coral.num_inputs + params.polyp_memory + \
-                 params.n_morphogens*(params.morph_thresholds - 1)
+                 params.n_morphogens*(params.morphogen_thresholds - 1)
 
     num_outputs = Coral.num_outputs + params.polyp_memory + params.n_morphogens
 
@@ -80,43 +83,37 @@ class NetworkDummy(object):
         # out = [1 for _ in range(self.NumOutputs())]
         out = [random.random() for _ in range(self.NumOutputs())]
         # out = [0 for _ in range(self.NumOutputs())]
-        out[0] = 1
+        # out[0] = 1
         return out
 
-with TemporaryDirectory() as tmp_dir:
-    pop = create_initial_population()
-    genomes = NEAT.GetGenomeList(pop)
+if __name__ == '__main__':
 
-    # net = NEAT.NeuralNetwork()
-    # traits = genome.GetGenomeTraits()
-    # traits['spring_strength'] = .2
-    genome = genomes[0]
-    traits = genome.GetGenomeTraits()
+    params.max_steps = 25
 
-    # coral = simulate_network(NetworkDummy(), 1, traits, [params],\
-    #                                      export_folder=tmp_dir, verbose=True)[0]
+    if len(sys.argv) > 1:
+        params.max_steps = int(sys.argv[1])
 
-    # coral = simulate_genome(genome, traits, [params], export_folder=None,
-    #                         verbose=False)[0]
-    # print('fitness',coral.fitness())
+    with TemporaryDirectory() as tmp_dir:
+        pop = create_initial_population()
+        genomes = NEAT.GetGenomeList(pop)
 
-    coral = simulate_genome(genome, traits, [params], export_folder=tmp_dir,
-                            verbose=False)[0]
-    # print('fitness',coral.fitness())
+        genome = genomes[0]
+        traits = genome.GetGenomeTraits()
 
-    # coral = simulate_genome(genome, traits, [params], export_folder=None,
-    #                         verbose=False)[0]
-    print('fitness', coral.fitness())
-    print('light', sum(coral.polyp_light[:coral.n_polyps]))
-    print('collection', sum(coral.polyp_collection[:coral.n_polyps]))
-    # total = sum(coral.function_times.values())
-    # for k, v in sorted(coral.function_times.items()):
-    #     print(k, v, v/ total)
-    print()
+        # traits['spring_strength'] = .9
+        coral = simulate_network(NetworkDummy(), NetworkDummy.depth, traits, [params],\
+                                 export_folder=tmp_dir, verbose=True)[0]
 
-    exported = os.path.join(tmp_dir, '0')
-    files = [f for f in os.listdir(exported) if f.endswith('.coral.obj')]
-    files = sorted(files, key=lambda f: int(f.split('.')[0]))
-    files = [os.path.join(exported, f) for f in files]
-    view = AnimationViewer(files, (1400, 1000))
-    view.main_loop()
+        # coral = simulate_genome(genome, traits, [params], export_folder=tmp_dir,
+        #                         verbose=False)[0]
+        total = sum(coral.function_times.values())
+        for k, v in sorted(coral.function_times.items()):
+            print(k, v, v/ total)
+        print()
+
+        exported = os.path.join(tmp_dir, '0')
+        files = [f for f in os.listdir(exported) if f.endswith('.coral.obj')]
+        files = sorted(files, key=lambda f: int(f.split('.')[0]))
+        files = [os.path.join(exported, f) for f in files]
+        view = AnimationViewer(files, (1400, 1000))
+        view.main_loop()

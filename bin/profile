@@ -13,7 +13,7 @@ params.addMorphogen()
 params.addMorphogen()
 
 num_inputs = Coral.num_inputs + params.polyp_memory + \
-             params.n_morphogens*(params.morph_thresholds - 1)
+             params.n_morphogens*(params.morphogen_thresholds - 1)
 
 num_outputs = Coral.num_outputs + params.polyp_memory + params.n_morphogens
 

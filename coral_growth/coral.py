@@ -5,7 +5,7 @@
 # cython: cdivision=True
 
 from __future__ import print_function
-from math import isnan, sqrt, floor
+from math import isnan, sqrt, floor, pi
 import numpy as np
 import time
 import pickle
@@ -24,13 +24,14 @@ from coral_growth.modules.collisions import MeshCollisionManager
 
 
 class Coral(object):
-    num_inputs = 5 # [light, curvature, gravity, collection, extra-bias-bit]
+    num_inputs = 4 # [light, gravity, collection, extra-bias-bit]
     num_outputs = 1
 
     def __init__(self, obj_path, network, net_depth, traits, params):
         self.mesh = Mesh.from_obj(obj_path)
         self.network = network
         self.net_depth = net_depth
+        self.params = params
 
         self.C = params.C
         self.n_memory = params.polyp_memory
@@ -40,7 +41,7 @@ class Coral(object):
         self.morphogen_steps = params.morphogen_steps
         self.light_amount = params.light_amount
         self.n_morphogens = params.n_morphogens
-        self.morph_thresholds = params.morph_thresholds
+        self.morphogen_thresholds = params.morphogen_thresholds
 
         # Some parameters are evolved traits.
         self.spring_strength = traits['spring_strength']
@@ -48,29 +49,35 @@ class Coral(object):
         self.function_times = defaultdict(int)
 
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
-        self.polyp_size = self.target_edge_len * 0.4
-        self.max_edge_len = self.target_edge_len * params.max_face_growth
+        self.polyp_size = self.target_edge_len * 0.3
+        self.max_edge_len = self.target_edge_len * 1.3
         mean_face = np.mean([f.area() for f in self.mesh.faces])
         self.max_face_area = mean_face * params.max_face_growth
 
         self.voxel_length = self.target_edge_len * .6
 
         # Update the input and output for the variable in/outs.
-        self.num_inputs = Coral.num_inputs + self.n_memory + self.n_morphogens * (self.morph_thresholds-1)
+        self.num_inputs = Coral.num_inputs + self.n_memory + \
+                               self.n_morphogens * (self.morphogen_thresholds-1)
         self.num_outputs = Coral.num_outputs + self.n_memory + self.n_morphogens
 
-        assert network.NumInputs() == self.num_inputs
+
+        assert network.NumInputs() == self.num_inputs, (network.NumInputs(), self.num_inputs)
         assert network.NumOutputs() == self.num_outputs
         assert self.n_memory <= 32
         # Data
         self.age = 0
+        self.collection = 0
+        self.light = 0
         self.n_polyps = 0
+        self.start_collection = None
         self.polyp_inputs = np.zeros((self.max_polyps, self.num_inputs))
         self.polyp_verts = [None] * self.max_polyps
         self.polyp_light = np.zeros(self.max_polyps)
         self.polyp_flow = np.zeros(self.max_polyps)
         self.polyp_pos = np.zeros((self.max_polyps, 3))
         self.polyp_pos_next = np.zeros((self.max_polyps, 3))
+        self.polyp_pos_past = np.zeros((self.max_polyps, 3))
         self.polyp_normal = np.zeros((self.max_polyps, 3))
         self.polyp_gravity = np.zeros(self.max_polyps)
         self.polyp_collection = np.zeros(self.max_polyps)
@@ -79,23 +86,45 @@ class Coral(object):
 
         self.collisionManager = MeshCollisionManager(self.mesh, self.polyp_pos,\
                                                      self.polyp_size)
-
         for vert in self.mesh.verts:
             self.createPolyp(vert)
 
-        self.mesh.calculateNormals()
-        self.mesh.calculateCurvature()
         self.updateAttributes()
+        self.start_light = self.light
+        self.start_collection = self.collection
 
     def __str__(self):
         s = 'Coral: {npolyps:%i}' % (len(self.n_polyps))
         return s
 
     def step(self):
-        assert not np.isnan(np.sum(self.polyp_pos[:self.n_polyps])), 'NaN position :\'('
         t1 = time.time()
+        self.morphogens.U[:, :] = 0
+        self.morphogens.V[:, :] = 0
+
         grow_polyps(self)
-        self.function_times['grow_polyps'] += time.time() - t1
+
+        self.polyp_pos_past[:] = self.polyp_pos[:]
+        self.polyp_pos[:] = self.polyp_pos_next[:]
+        self.mesh.calculateDefect()
+        self.polyp_pos[:] = self.polyp_pos_past[:]
+
+        self.function_times['grow_polyps_p1'] += time.time() - t1
+        t1 = time.time()
+
+        for i in range(self.n_polyps):
+            vert = self.mesh.verts[i]
+
+            if self.polyp_pos_next[i, 1] < 0:
+                continue
+
+            if abs(self.polyp_verts[i].defect) > self.params.max_defect:
+                continue
+
+            self.polyp_collided[i] = False
+            successful = self.collisionManager.attemptVertUpdate(vert.id, self.polyp_pos_next[i])
+
+        self.function_times['grow_polyps_p2'] += time.time() - t1
 
         assert not np.isnan(np.sum(self.polyp_pos[:self.n_polyps])), 'NaN position :\'('
 
@@ -108,66 +137,61 @@ class Coral(object):
         self.function_times['polyp_division'] += time.time() - t1
 
         self.updateAttributes()
+        np.nan_to_num(self.polyp_gravity, copy=False)
+        np.nan_to_num(self.polyp_light, copy=False)
 
-        assert not np.isnan(np.sum(self.polyp_gravity)), 'NaN :\'('
-        assert not np.isnan(np.sum(self.polyp_memory)), 'NaN :\'('
-        assert not np.isnan(np.sum(self.polyp_light)), 'NaN :\'('
-        assert not np.isnan(np.sum(self.polyp_collection)), 'NaN :\'('
+        # assert not np.isnan(np.sum(self.polyp_gravity)), 'NaN :\'( gravity'
+        # assert not np.isnan(np.sum(self.polyp_memory)), 'NaN :\'( memory'
+        # assert not np.isnan(np.sum(self.polyp_light)), 'NaN :\'( light'
+        # assert not np.isnan(np.sum(self.polyp_collection)), 'NaN :\'( collection'
 
         self.age += 1
 
-
     def updateAttributes(self):
-
         self.mesh.calculateNormals()
-        self.mesh.calculateCurvature()
-        assert not np.isnan(np.sum(self.polyp_normal)), 'NaN Normal :\'('
+        self.mesh.calculateDefect()
 
         t1 = time.time()
         light.calculate_light(self) # Update the light
+        self.polyp_light[self.polyp_light != 0] -= .5
+        self.polyp_light *= 2 # all light values go from 0-1
+        self.polyp_light *= (self.params.light_bottom + self.polyp_pos[:,1] * self.params.light_increase)
         self.function_times['calculate_light'] += time.time() - t1
 
         t1 = time.time()
-        flow.calculate_collection(self, 2)
+        self.flow_grid = flow.calculate_collection(self, 3)
         self.function_times['calculate_collection'] += time.time() - t1
-
-        self.polyp_light[self.polyp_light != 0] -= .5
-        self.polyp_light *= 2 # all light values go from 0-1
-        # self.polyp_light *= (.2 + self.polyp_pos[:, 1] * .2)
-        # (self.light_bottom + (1-self.light_bottom)*self.polyp_pos[:,1,:] / self.world_depth)
-
-        # assert not np.isnan(np.sum(self.polyp_gravity[:self.n_polyps])), 'NaN position :\'('
-        # assert not np.isnan(np.sum(self.polyp_normal[:self.n_polyps])), 'NaN position :\'('
 
         gravity.calculate_gravity(self)
 
-        # for i in range(self.n_polyps):
-        #     if np.isnan(self.polyp_gravity[i]):
-        #         self.polyp_gravity[i] = 0
-        #     if np.isnan(self.polyp_light[i]):
-        #         self.polyp_light[i] = 0
-                # print(self.polyp_pos[i])
-                # print(self.polyp_normal[i])
-                # assert False
-        # assert not np.isnan(np.sum(self.polyp_gravity[:self.n_polyps])), 'NaN position :\'('
-
         t1 = time.time()
+
         self.morphogens.update(self.morphogen_steps) # Update the morphogens.
         self.function_times['morphogens.update'] += time.time() - t1
 
         self.calculateEnergy()
 
     def calculateEnergy(self):
-        light = 0
-        collection = 0
+        self.light = 0
+        self.collection = 0
+
+        bbox = self.mesh.boundingBox()
+        yz_spread = sqrt((bbox[3]-bbox[2]) * (bbox[5]-bbox[4])) / 20
 
         for face in self.mesh.faces:
             area = face.area()
             vertices = face.vertices()
-            light += area * sum(self.polyp_light[v.id] for v in vertices) / 3
-            collection += area * sum(self.polyp_collection[v.id] for v in vertices) / 3
+            self.light += area * sum(self.polyp_light[v.id] for v in vertices) / 3
+            self.collection += area * sum(self.polyp_collection[v.id] for v in vertices) / 3
 
-        self.energy = light*self.light_amount + collection*(1-self.light_amount)
+        self.collection *= yz_spread
+
+        if self.start_collection:
+            self.collection /= self.start_collection
+            self.light /= self.start_light
+
+        self.energy = self.light*self.light_amount + \
+                      self.collection*(1-self.light_amount)
 
     def createPolyp(self, vert):
         if self.n_polyps == self.max_polyps:
@@ -222,6 +246,11 @@ class Coral(object):
                 self.createPolyp(vert)
 
     def fitness(self, verbose=False):
+        if verbose:
+            print('Light=', self.light)
+            print('Collection=', self.collection)
+            print('Energy=', self.energy)
+
         return self.energy
 
     def export(self, path):
@@ -267,12 +296,16 @@ class Coral(object):
         polyp_attributes = [None] * self.n_polyps
 
         for i in range(self.n_polyps):
+            self.polyp_collided[i] = abs(self.polyp_verts[i].defect) > self.params.max_defect
+
+
+        for i in range(self.n_polyps):
             indx = id_to_indx[self.polyp_verts[i].id]
 
             polyp_attributes[indx] = [ self.polyp_light[i],
                                        self.polyp_collection[i],
                                        self.polyp_gravity[i],
-                                       self.polyp_verts[i].curvature,
+                                       abs(self.polyp_verts[i].defect)/8*pi,
                                        self.polyp_memory[i],
                                        self.polyp_collided[i] ]
 

@@ -23,21 +23,24 @@ params = Parameters()
 params.addMorphogen()
 params.addMorphogen()
 
-params.light_amount = .3
-params.PopulationSize = 50
+params.MinSpecies = 2
+params.PopulationSize = 60
 
-params.polyp_memory = 2
-params.morphogen_thresholds = 3
-
-params.C = .8
-params.max_growth = .5
+params.polyp_memory = 1
+params.morphogen_thresholds = 2
+params.light_bottom  = .2
+params.light_increase = .05
+params.max_defect = 1.2
+params.C = 0.4
+params.max_growth = .3
 params.max_polyps = 10000
 params.max_steps = 70
+params.light_amount = 0.9
 
 def create_initial_population():
     # Create network size based off coral and parameters.
     num_inputs = Coral.num_inputs + params.polyp_memory + \
-                 params.n_morphogens*(params.morph_thresholds - 1)
+                 params.n_morphogens*(params.morphogen_thresholds - 1)
 
     num_outputs = Coral.num_outputs + params.polyp_memory + params.n_morphogens
 
@@ -73,12 +76,12 @@ def evaluate(genome, traits):
     print('.', end='', flush=True)
     return fitness
 
-def simulate_and_save(genome, out_dir, generation, fitness):
+def simulate_and_save(genome, out_dir, generation, fitness, meanf):
     genome.Save(out_dir+'/genome_%i' % generation)
     traits = genome.GetGenomeTraits()
 
     with open(out_dir+'/scores.txt', "a") as f:
-        f.write("%i\t%f\n"%(generation, fitness))
+        f.write("%i\t%f\t%f\n"%(generation, fitness, meanf))
 
     with open(out_dir+'/best_%i_traits.txt' % generation, "w+") as f:
         f.write(str(traits))
@@ -118,8 +121,7 @@ def evolve_neat(params, generations, out_dir, run_id, pool):
             best = pop.GetBestGenome()
             max_ever = maxf
             print('New best fitness.', best.NumNeurons(), best.NumLinks())
-            coral = simulate_and_save(best, out_dir, generation, maxf)[0]
-            print(coral.fitness(), maxf)
+            coral = simulate_and_save(best, out_dir, generation, maxf, meanf)[0]
 
         pop.Epoch()
         print('#'*80)
@@ -129,12 +131,12 @@ def evolve_neat(params, generations, out_dir, run_id, pool):
     pool.join()
 
 def feature_vector(coral):
-    """ Compute a desciptive feature vector for calculating novelty.
+    """ Compute a descriptive feature vector for calculating novelty.
     """
-    features = np.zeros(11)
+    features = np.zeros(11 + params.n_morphogens)
 
     d = np.sqrt(coral.polyp_pos[:, 0]**2 + coral.polyp_pos[:, 2]**2)
-    c = np.array([v.curvature for v in coral.mesh.verts])
+    c = np.array([v.defect for v in coral.mesh.verts])
 
     bbox = coral.mesh.boundingBox()
     bbox_area = (bbox[1]-bbox[0]) * (bbox[3]-bbox[2]) * (bbox[5]-bbox[4])
@@ -143,9 +145,11 @@ def feature_vector(coral):
     features[1] = np.std(d) # Std of dist from center
     features[2] = np.mean(coral.polyp_pos[:, 1]) # Mean height
     features[4] = np.std(coral.polyp_pos[:, 1]) # Std height
-    # features[5] = coral.spring_strength # Spring Strength
     features[5] = bbox_area / coral.mesh.volume() # Density
-    features[6:12] = np.histogram(c, 5, (-.5, .5), normed=True)[0]
+    features[6:11] = np.histogram(c, bins=5, range=None, normed=True)[0]
+
+    for i in range(params.n_morphogens):
+        features[11+i] = np.mean(coral.morphogens.U[i, :coral.n_morphogens])
 
     return features
 
@@ -167,7 +171,6 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
     archive = []
     evals_since_last_archiving = 0
 
-
     def evaluate_genomes(genomes):
         if pool:
             data = [ (g, g.GetGenomeTraits()) for g in genomes ]
@@ -181,6 +184,7 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
             return None, None, feature_list
 
         a, b = np.array(archive), np.array(feature_list)
+        print(a.shape, b.shape)
         tree = KDTree(np.vstack((a, b)))
         dists, _ = tree.query(np.array(feature_list), k=ns_K+1)
         sparseness_list = np.mean(dists[:, 1:], axis=1)
@@ -206,7 +210,6 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
         print('Novelty threshhold', novelty_threshold)
         genomes = NEAT.GetGenomeList(pop)
         sparseness_list, fitness_list, feature_list = evaluate_genomes(genomes)
-
         n_archive_added = 0
 
         for genome, sparseness, feature in zip(genomes, sparseness_list, feature_list):
@@ -231,12 +234,12 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
         elif n_archive_added > 4:
             novelty_threshold *= 1.1
 
-        maxf = max(fitness_list)
+        maxf, meanf = max(fitness_list), sum(fitness_list) / float(len(fitness_list))
         if maxf > max_ever:
             max_ever = maxf
             best = genomes[fitness_list.index(maxf)]
             print('New best fitness.', best.NumNeurons(), best.NumLinks())
-            simulate_and_save(best, out_dir, generation, maxf)
+            simulate_and_save(best, out_dir, generation, maxf, meanf)
         pop.Epoch()
 
 def generate_id(n):
@@ -259,7 +262,7 @@ if __name__ == '__main__':
     pool = None
 
     if args.novelty:
-        params.PopulationSize = 20
+        params.PopulationSize = 5
         dir_name = rid+"__novelty_{:%B_%d_%Y_%H_%M}".format(datetime.now())
     else:
         dir_name = rid+"__{:%B_%d_%Y_%H_%M}".format(datetime.now())

@@ -73,14 +73,14 @@ cdef void flow_particle(int x, int y, int z, double v, double[:,:,:] grid,\
     if y == y2 and z == z2:
         return
 
-    v /= (abs(y2 - y) + abs(z2 - z))
+    v /= (abs(y2 - y) + abs(z2 - z))**2
 
-    while y != y2 and z != z2:
+    while y != y2 or z != z2:
         y += dy
         z += dz
         grid[x, y, z] += v
 
-cdef double[:,:,:] calculate_flow(int[:,:,:] obstacles) except *:
+cpdef double[:,:,:] calculate_flow(int[:,:,:] obstacles) except *:
     cdef int x, y, z
     cdef int nx = obstacles.shape[0]
     cdef int ny = obstacles.shape[1]
@@ -99,7 +99,9 @@ cdef double[:,:,:] calculate_flow(int[:,:,:] obstacles) except *:
 
         for y in range(ny):
             for z in range(nz):
+
                 if not can_flow[x, y, z] and flow[x-1, y, z]:
+
                     v = xm1[y, z]*.25
 
                     if y > 0:
@@ -158,20 +160,20 @@ cpdef calculate_collection(coral, int radius=2):
     # Main calculation
     flow_grid = calculate_flow(voxel_grid)
 
-    # Use flow values to calcualte collection values.
+    # Use flow values to calculate collection values.
     total = float((2*radius+1)**3)
 
     for i in range(n):
-        x = voxel_p[i, 0] - min_v[0]
+        x = voxel_p[i, 0] - min_v[0] + 1
         y = voxel_p[i, 1] - min_v[1]
-        z = voxel_p[i, 2] - min_v[2]
+        z = voxel_p[i, 2] - min_v[2] + 1
 
         seen = 0
         for x2 in range(x-radius, x+radius+1):
             for y2 in range(y-radius, y+radius+1):
                 for z2 in range(z-radius, z+radius+1):
                     if x2 > 0 and y2 > 0 and z2 > 0 and x2 < nx-1 and y2 < ny-1 and z2 < nz-1:
-                        seen += flow_grid[x2+1, y2, z2+1]
+                        seen += flow_grid[x2, y2, z2]
 
         polyp_collection[i] = seen / total
 

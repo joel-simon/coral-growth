@@ -59,7 +59,7 @@ def flow_particle(x, y, z, v, grid, can_flow, dy, dz):
 
     v /= (abs(y2 - y) + abs(z2 - z))
 
-    while y != y2 and z != z2:
+    while y != y2 or z != z2:
         y += dy
         z += dz
         grid[x, y, z] += v
@@ -132,7 +132,7 @@ def calculate_collection(coral, radius=3):
     # Main calculation
     flow_grid = calculate_flow(obstacles=voxel_grid)
 
-    # Use flow values to calcualte collection values.
+    # Use flow values to calculate collection values.
     total = float((2*radius+1)**3)
 
     for i in range(coral.n_polyps):

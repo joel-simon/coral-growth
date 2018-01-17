@@ -319,9 +319,14 @@ def parse_coral_file(file):
 
     for line in open(file, 'r').read().splitlines():
         if line.startswith("#attr"):
-            line = line.split(':')
-            coral_data[line[1]] = line[2]
 
+            try:
+                print(line.split(' '))
+                for attr in line.split(' '):
+                    k, v = attr.split(':')
+                    coral_data[k] = v
+            except:
+                pass
         elif line.startswith("#coral"):
             header = line.split(' ')[1:]
 
@@ -358,7 +363,7 @@ class AnimationViewer(Viewer):
         self.view_lists = None#
 
         coral_data, polyp_data, view_names, n_views = parse_coral_file(files[0])
-        radius = float(coral_data['polyp_size'])
+        # radius = float(coral_data['polyp_size'])
         self.view_names = view_names
         self.n_views = n_views
         self.view_lists = [[] for _ in range(self.n_views)]
@@ -374,7 +379,7 @@ class AnimationViewer(Viewer):
 
             """ Read the file and store the colors.
             """
-            _, polyp_data, _, _ = parse_coral_file(file)
+            coral_data, polyp_data, _, _ = parse_coral_file(file)
             raw_mesh = Mesh.from_obj(file)
             mesh = raw_mesh.export()
             mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
@@ -387,7 +392,6 @@ class AnimationViewer(Viewer):
             for view_idx in range(self.n_views):
                 gl_list = glGenLists(1)
                 glNewList(gl_list, GL_COMPILE)
-
 
                 # Calculate Colors
                 for polyp_idx, data in enumerate(polyp_data):
@@ -413,6 +417,7 @@ class AnimationViewer(Viewer):
 
         self.gl_lists = self.view_lists[ self.view ][ self.frame ]
         print('Finished Loading Animation')
+        print(coral_data)
         print(len(self.view_lists[ 0 ]))
 
     def draw_flow_grid(self, voxel_length, flow_grid, min_v):

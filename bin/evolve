@@ -21,7 +21,7 @@ import dill
 # Run with two morphogens.
 params = Parameters()
 params.addMorphogen()
-params.addMorphogen()
+# params.addMorphogen()
 
 params.MinSpecies = 2
 params.PopulationSize = 60
@@ -29,13 +29,13 @@ params.PopulationSize = 60
 params.polyp_memory = 1
 params.morphogen_thresholds = 2
 params.light_bottom  = .2
-params.light_increase = .05
-params.max_defect = 1.2
-params.C = 0.4
-params.max_growth = .3
+params.light_increase = .01
+params.max_defect = 1.3
+params.C = 0.15
+params.max_growth = .4
 params.max_polyps = 10000
 params.max_steps = 70
-params.light_amount = 0.9
+params.light_amount = 0.5
 
 def create_initial_population():
     # Create network size based off coral and parameters.
@@ -184,7 +184,6 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
             return None, None, feature_list
 
         a, b = np.array(archive), np.array(feature_list)
-        print(a.shape, b.shape)
         tree = KDTree(np.vstack((a, b)))
         dists, _ = tree.query(np.array(feature_list), k=ns_K+1)
         sparseness_list = np.mean(dists[:, 1:], axis=1)

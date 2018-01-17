@@ -49,7 +49,7 @@ class Coral(object):
         self.function_times = defaultdict(int)
 
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
-        self.polyp_size = self.target_edge_len * 0.3
+        self.polyp_size = self.target_edge_len * 0.4
         self.max_edge_len = self.target_edge_len * 1.3
         mean_face = np.mean([f.area() for f in self.mesh.faces])
         self.max_face_area = mean_face * params.max_face_growth
@@ -121,16 +121,16 @@ class Coral(object):
             if abs(self.polyp_verts[i].defect) > self.params.max_defect:
                 continue
 
-            self.polyp_collided[i] = False
-            successful = self.collisionManager.attemptVertUpdate(vert.id, self.polyp_pos_next[i])
+            # self.polyp_collided[i] = False
+            self.polyp_collided[i] = self.collisionManager.attemptVertUpdate(vert.id, self.polyp_pos_next[i])
 
         self.function_times['grow_polyps_p2'] += time.time() - t1
 
         assert not np.isnan(np.sum(self.polyp_pos[:self.n_polyps])), 'NaN position :\'('
 
-        # t1 = time.time()
-        # relax_mesh(self.mesh)
-        # self.function_times['relax_mesh'] += time.time() - t1
+        t1 = time.time()
+        relax_mesh(self.mesh)
+        self.function_times['relax_mesh'] += time.time() - t1
 
         t1 = time.time()
         self.polypDivision() # Divide mesh and create new polyps.
@@ -175,8 +175,8 @@ class Coral(object):
         self.light = 0
         self.collection = 0
 
-        bbox = self.mesh.boundingBox()
-        yz_spread = sqrt((bbox[3]-bbox[2]) * (bbox[5]-bbox[4])) / 20
+        # bbox = self.mesh.boundingBox()
+        # yz_spread = sqrt((bbox[3]-bbox[2]) * (bbox[5]-bbox[4])) / 20
 
         for face in self.mesh.faces:
             area = face.area()
@@ -184,7 +184,7 @@ class Coral(object):
             self.light += area * sum(self.polyp_light[v.id] for v in vertices) / 3
             self.collection += area * sum(self.polyp_collection[v.id] for v in vertices) / 3
 
-        self.collection *= yz_spread
+        # self.collection *= yz_spread
 
         if self.start_collection:
             self.collection /= self.start_collection
@@ -232,8 +232,8 @@ class Coral(object):
             l2 = face.he.next.edge.length()
             l3 = face.he.next.next.edge.length()
 
-            if max(l1, l2, l3) > self.max_edge_len:
-                split(self.mesh, face, max_vertices=self.max_polyps)
+            # if max(l1, l2, l3) > self.max_edge_len:
+            #     split(self.mesh, face, max_vertices=self.max_polyps)
 
             if face.area() > self.max_face_area:
                 split(self.mesh, face, max_vertices=self.max_polyps)
@@ -272,7 +272,9 @@ class Coral(object):
             header.append( 'u%i' % i )
 
         out.write('#Exported from coral_growth\n')
-        out.write('#attr:polyp_size:%f\n' %self.polyp_size)
+        # out.write('#attr:polyp_size:%f\n' %self.polyp_size)
+        out.write('#attr light:%f collection:%f energy:%f\n' % \
+                                     (self.light, self.collection, self.energy))
         out.write('#coral ' + ' '.join(header) + '\n')
 
         mesh_data = self.mesh.export()
@@ -295,8 +297,8 @@ class Coral(object):
 
         polyp_attributes = [None] * self.n_polyps
 
-        for i in range(self.n_polyps):
-            self.polyp_collided[i] = abs(self.polyp_verts[i].defect) > self.params.max_defect
+        # for i in range(self.n_polyps):
+        #     self.polyp_collided[i] = abs(self.polyp_verts[i].defect) > self.params.max_defect
 
 
         for i in range(self.n_polyps):

@@ -175,8 +175,8 @@ class Coral(object):
         self.light = 0
         self.collection = 0
 
-        # bbox = self.mesh.boundingBox()
-        # yz_spread = sqrt((bbox[3]-bbox[2]) * (bbox[5]-bbox[4])) / 20
+        bbox = self.mesh.boundingBox()
+        bbox_vol = (bbox[1]-bbox[0]) * (bbox[3]-bbox[2]) * (bbox[5]-bbox[4])
 
         for face in self.mesh.faces:
             area = face.area()
@@ -184,7 +184,7 @@ class Coral(object):
             self.light += area * sum(self.polyp_light[v.id] for v in vertices) / 3
             self.collection += area * sum(self.polyp_collection[v.id] for v in vertices) / 3
 
-        # self.collection *= yz_spread
+        self.collection *= 1 - (self.mesh.volume() / bbox_vol)
 
         if self.start_collection:
             self.collection /= self.start_collection

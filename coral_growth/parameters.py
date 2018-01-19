@@ -63,11 +63,11 @@ class Parameters(NEAT.Parameters):
         i = self.n_morphogens
         self.addTrait('K%i'%i, (.03, .08))
         self.addTrait('F%i'%i, (.01, .06))
-        # self.addTrait('diffU%i'%i, (.005, .02))
-        # self.addTrait('diffV%i'%i, (.0025, .01))
+        self.addTrait('diffU%i'%i, (.005, .02))
+        self.addTrait('diffV%i'%i, (.0025, .01))
 
-        self.addTrait('diffU%i'%i, (.01, .01))
-        self.addTrait('diffV%i'%i, (.005, .005))
+        # self.addTrait('diffU%i'%i, (.01, .01))
+        # self.addTrait('diffV%i'%i, (.005, .005))
 
         self.n_morphogens += 1
 

@@ -12,3 +12,4 @@ buid/
 *dSYM/
 *.jpg
 *.png
+*.DS_store

@@ -12,10 +12,10 @@ params = Parameters()
 params.addMorphogen()
 params.addMorphogen()
 
-num_inputs = Coral.num_inputs + params.polyp_memory + \
+num_inputs = Coral.num_inputs + params.n_memory + \
              params.n_morphogens*(params.morphogen_thresholds - 1)
 
-num_outputs = Coral.num_outputs + params.polyp_memory + params.n_morphogens
+num_outputs = Coral.num_outputs + params.n_memory + params.n_morphogens
 
 usig = NEAT.ActivationFunction.UNSIGNED_SIGMOID
 genome = NEAT.Genome(0, num_inputs, 0, num_outputs, False, usig, usig, 0, params)

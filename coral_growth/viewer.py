@@ -327,15 +327,15 @@ def parse_coral_file(file):
                     coral_data[k] = v
             except:
                 pass
+
         elif line.startswith("#coral"):
             header = line.split(' ')[1:]
-
-            n_views = len(header) - 1
-            view_names = ['morphogens'] + header[:-2]
+            n_views = len(header)
+            view_names = header
 
         elif line.startswith('c'):
             d = line.split(' ')[1:]
-            for i in range(n_views + 1):
+            for i in range(n_views):
                 d[i] = float(d[i]) if '.' in d[i] else int(d[i])
             polyp_data.append( d )
 
@@ -363,19 +363,16 @@ class AnimationViewer(Viewer):
         self.view_lists = None#
 
         coral_data, polyp_data, view_names, n_views = parse_coral_file(files[0])
-        # radius = float(coral_data['polyp_size'])
         self.view_names = view_names
         self.n_views = n_views
         self.view_lists = [[] for _ in range(self.n_views)]
-
-        # self.n_views = 1
 
         for fi, file in enumerate(files):
             generation = get_generation(file)
             # voxel_length, flow_directions = pickle.load(open(file+'.flow_directions.p', 'rb'))
 
             flow_grid = None
-            # voxel_length, (flow_grid, min_v) = pickle.load(open(file+'.flow_grid.p', 'rb'))
+            # voxel_length, (flow_grid,capture_grid, min_v) = pickle.load(open(file+'.flow_grid.p', 'rb'))
 
             """ Read the file and store the colors.
             """
@@ -395,17 +392,17 @@ class AnimationViewer(Viewer):
 
                 # Calculate Colors
                 for polyp_idx, data in enumerate(polyp_data):
-                    if view_idx == 0: #hardcode in 2 morphogens.
-                        color = ( 0, data[-2], data[-1] )
-                    else:
-                        d = data[ view_idx - 1 ]
-                        color = int_colors[d] if isinstance(d, int) else (d,d,d)
+                    # if view_idx == 0: #hardcode in 2 morphogens.
+                    #     color = ( 0, data[-2], data[-1] )
+                    # else:
+                    d = data[ view_idx ]#- 1 ]
+                    color = int_colors[d] if isinstance(d, int) else (d,d,d)
                     mesh['vert_colors'][polyp_idx] = color
 
                 self.draw_mesh(mesh)
 
                 if flow_grid is not None:
-                    self.draw_flow_grid(voxel_length, flow_grid, min_v)
+                    self.draw_flow_grid(voxel_length, capture_grid, min_v)
 
                 if generation is not None:
                     self.draw_text( 30, 30, 'Generation %i' % generation )
@@ -426,7 +423,8 @@ class AnimationViewer(Viewer):
         vmax = flow_grid.max()
 
         for p, v in np.ndenumerate(flow_grid):
-            if p[1] % 5 == 0:
+            if v > 0:
+            # if p[1] % 5 == 0:
                 p = np.array(p) + offset
                 color = (v / vmax, 0, 0, .25)
                 self.draw_cube(p*voxel_length, voxel_length, color)

@@ -1,9 +1,3 @@
-# cython: boundscheck=False
-# cython: wraparound=True
-# cython: initializedcheck=False
-# cython: nonecheck=False
-# cython: cdivision=True
-
 from __future__ import print_function
 from math import isnan, sqrt, floor, pi
 import numpy as np
@@ -14,14 +8,13 @@ from collections import defaultdict
 from cymesh.mesh import Mesh
 from cymesh.subdivision.sqrt3 import divide_adaptive, split
 from cymesh.collisions.findCollisions import findCollisions
-from cymesh.operators.relax import relax_mesh#, relax_mesh_cotangent, relax_vert_cotangent
+from cymesh.operators.relax import relax_mesh
 
 from coral_growth.grow_polyps import grow_polyps
-from coral_growth.modules import light, gravity #, flow
+from coral_growth.modules import light, gravity
 from coral_growth.modules import flowx as flow
 from coral_growth.modules.morphogens import Morphogens
 from coral_growth.modules.collisions import MeshCollisionManager
-
 
 class Coral(object):
     num_inputs = 4 # [light, gravity, collection, extra-bias-bit]
@@ -32,10 +25,9 @@ class Coral(object):
         self.network = network
         self.net_depth = net_depth
         self.params = params
-
         self.C = params.C
-        self.n_memory = params.n_memory
         self.n_signals = params.n_signals
+        self.n_memory = params.n_memory
         self.max_polyps = params.max_polyps
         self.max_growth = params.max_growth
         self.morphogens = Morphogens(self, traits, params.n_morphogens)
@@ -45,9 +37,12 @@ class Coral(object):
         self.morphogen_thresholds = params.morphogen_thresholds
 
         # Some parameters are evolved traits.
-        self.mem_decay = np.array([ traits['mem_decay%i'%i] \
-                                        for i in range(params.n_memory) ])
+        self.signal_decay = np.array([ traits['signal_decay%i'%i] \
+                                        for i in range(params.n_signals) ])
+        self.signal_range = np.array([ traits['signal_range%i'%i] \
+                                        for i in range(params.n_signals) ], dtype='i')
 
+        # Constants for simulation dependent on start mesh.
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
         self.polyp_size = self.target_edge_len * 0.5
         self.max_edge_len = self.target_edge_len * 1.3
@@ -81,7 +76,7 @@ class Coral(object):
         self.polyp_collection = np.zeros(self.max_polyps)
         self.polyp_collided = np.zeros(self.max_polyps, dtype='uint8')
         # self.polyp_memory = np.zeros((self.max_polyps), dtype='uint32')
-        self.polyp_memory = np.zeros((self.max_polyps, self.n_memory))
+        # self.polyp_memory = np.zeros((self.max_polyps, self.n_memory))
         self.polyp_signals = np.zeros((self.max_polyps, self.params.n_signals))
 
         self.collisionManager = MeshCollisionManager(self.mesh, self.polyp_pos,\
@@ -99,8 +94,8 @@ class Coral(object):
 
     def step(self):
         t1 = time.time()
-        # self.morphogens.U[:, :] = 0
-        # self.morphogens.V[:, :] = 0
+        self.morphogens.U[:, :] = 0
+        self.morphogens.V[:, :] = 0
 
         grow_polyps(self)
         # TODO: clean up this mess below :(
@@ -153,14 +148,14 @@ class Coral(object):
 
         t1 = time.time()
         self.flow_data = flow.calculate_collection(self, radius=3, \
-                                        capture_percent=.2, fluid_diffusion=0.1)
+                                        capture_percent=.05, fluid_diffusion=0.1)
         self.polyp_collection *= 50
         self.function_times['calculate_collection'] += time.time() - t1
 
         gravity.calculate_gravity(self)
+        self.polyp_signals *= self.signal_decay
 
         t1 = time.time()
-
         self.morphogens.update(self.morphogen_steps) # Update the morphogens.
         self.function_times['morphogens.update'] += time.time() - t1
 
@@ -172,7 +167,6 @@ class Coral(object):
 
         boost = self.polyp_pos[:self.n_polyps, 1] ** self.params.height_boost
         np.nan_to_num(boost, copy=False)
-        # sqrt_heights = np.sqrt(self.polyp_pos[:self.n_polyps, 1])
 
         for face in self.mesh.faces:
             area = face.area()
@@ -199,21 +193,11 @@ class Coral(object):
         vert.p = self.polyp_pos[idx]
         self.polyp_verts[idx] = vert
 
-        # Memory majority rule.
-        neighbor_memory = np.zeros(self.n_memory)
         neighbors = vert.neighbors()
-        half = len(neighbors) // 2
         for vert_n in neighbors:
-            if 'polyp' in vert_n.data:
-                memory = self.polyp_memory[vert_n.data['polyp']]
-                for i in range(self.n_memory):
-                    # if memory & (1 << i):
-                    neighbor_memory[i] += memory[i]
-
-        for i in range(self.n_memory):
-            if neighbor_memory[i] > half:
-                # self.polyp_memory[idx] |= (1 << i)
-                self.polyp_memory[idx, i] = 1
+            for i in range(self.n_signals):
+                self.polyp_signals[idx, i] += self.polyp_signals[vert_n.id, i]
+        self.polyp_signals[idx] /= len(neighbors)
 
         self.collisionManager.newVert(vert.id)
 
@@ -223,10 +207,6 @@ class Coral(object):
         """ Update the mesh and create new polyps.
         """
         for face in self.mesh.faces:
-            l1 = face.he.edge.length()
-            l2 = face.he.next.edge.length()
-            l3 = face.he.next.next.edge.length()
-
             if face.area() > self.max_face_area:
                 split(self.mesh, face, max_vertices=self.max_polyps)
 
@@ -266,8 +246,8 @@ class Coral(object):
         for i in range(self.n_signals):
             header.append( 'sig_%i' % i )
 
-        for i in range(self.n_memory):
-            header.append( 'mem_%i' % i )
+        # for i in range(self.n_memory):
+        #     header.append( 'mem_%i' % i )
 
         out.write('#Exported from coral_growth\n')
         out.write('#attr light:%f collection:%f energy:%f\n' % \
@@ -311,7 +291,7 @@ class Coral(object):
                 polyp_attributes[indx].append(self.morphogens.U[j, i])
 
             polyp_attributes[indx].extend(self.polyp_signals[i])
-            polyp_attributes[indx].extend(self.polyp_memory[i])
+            # polyp_attributes[indx].extend(self.polyp_memory[i])
 
             assert len(polyp_attributes[indx]) == len(header)
 

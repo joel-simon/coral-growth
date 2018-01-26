@@ -7,9 +7,19 @@ from __future__ import division, print_function
 import numpy as np
 cimport numpy as np
 from random import shuffle
-# from cyrandom import shuffle
 from libc.math cimport floor, fmin, fmax, fabs
 from cymesh.vector3D cimport inormalized, vadd, vsub, vmultf, vset, dot
+
+cdef double[:,:] spreads = np.array([
+    [1, 0, 0, 0],
+    [0.24522841, 0.12498851, 0, 0],
+    [0.08729082, 0.06935493, 0.03472476, 0],
+    [0.04280001, 0.03837332, 0.02765348, 0.01601401],
+])
+
+# cdef double[:] spread_1 = np.array([0.24522841, 0.12498851])
+# cdef double[:] spread_2 = np.array([0.08729082, 0.06935493, 0.03472476])
+# cdef double[:] spread_3 = np.array([0.04280001, 0.03837332, 0.02765348, 0.01601401])
 
 cpdef void createPolypInputs(object coral) except *:
     """ Map polyp stats to nerual input in [-1, 1] range. """
@@ -22,7 +32,7 @@ cpdef void createPolypInputs(object coral) except *:
     cdef double[:] polyp_collection = coral.polyp_collection
     cdef double[:,:] polyp_signals = coral.polyp_signals
     cdef double[:,:] inputs = coral.polyp_inputs
-    cdef double[:, :] polyp_memory = coral.polyp_memory
+    # cdef double[:, :] polyp_memory = coral.polyp_memory
     cdef int num_inputs = coral.num_inputs
     cdef list neighbors
     cdef double signal_sum
@@ -46,21 +56,9 @@ cpdef void createPolypInputs(object coral) except *:
 
             input_idx += (morphogen_thresholds-1)
 
-        # Memory
-        for mi in range(coral.n_memory):
-            # if polyp_memory[i] & (1 << mi):
-            #     inputs[i, input_idx] = 1
-            if polyp_memory[i, mi] > 0.5:
-                inputs[i, input_idx] = 1
-            input_idx += 1
-
         # Signals
-        neighbors = coral.polyp_verts[i].neighbors()
         for mi in range(coral.n_signals):
-            signal_sum = 0
-            for v in neighbors:
-                signal_sum += polyp_signals[v.id, mi]
-            inputs[i, input_idx] = ((signal_sum / len(neighbors)) > 0.5)
+            inputs[i, input_idx] = polyp_signals[i, mi] > 0.5
             input_idx += 1
 
         inputs[i, input_idx] = 1 # Bias Bit
@@ -68,9 +66,10 @@ cpdef void createPolypInputs(object coral) except *:
         assert input_idx == (num_inputs-1)
 
 cpdef void grow_polyps(object coral) except *:
-    cdef int i, out_idx
+    cdef int i, out_idx, sr
     cdef unsigned int mi
     cdef int n_memory = coral.n_memory
+    cdef int n_signals = coral.n_signals
     cdef int n_morphogens = coral.n_morphogens
     cdef list neighbors
     cdef object output
@@ -78,10 +77,12 @@ cpdef void grow_polyps(object coral) except *:
     cdef double[:,:] polyp_normal = coral.polyp_normal
     cdef double[:,:] pos_next = coral.polyp_pos_next
     cdef double[:,:] morphogensV = coral.morphogens.V
-    cdef double[:, :] polyp_memory = coral.polyp_memory
-    cdef double[:] mem_decay = coral.mem_decay
+    # cdef double[:, :] polyp_memory = coral.polyp_memory
+    cdef double[:] signal_decay = coral.signal_decay
+    cdef int[:] signal_range = coral.signal_range
     cdef double[:] growth = np.zeros(coral.n_polyps)
     cdef double target_edge_len = coral.target_edge_len
+    cdef double[:,:] polyp_signals = coral.polyp_signals
 
     cdef unsigned int net_depth = coral.net_depth
     cdef double max_growth = coral.max_growth
@@ -97,13 +98,11 @@ cpdef void grow_polyps(object coral) except *:
     cdef double old_volume = coral.mesh.volume()
 
     for i in range(coral.n_polyps):
-        coral.polyp_signals[i] = 0
-
-    for i in range(coral.n_polyps):
         # Compute feed-forward network results.
         coral.network.Flush()
         coral.network.Input(coral.polyp_inputs[i])
-        for _ in range(net_depth): coral.network.ActivateFast()
+        for _ in range(net_depth):
+            coral.network.ActivateFast()
         output = coral.network.Output()
 
         # Move in normal direction by growth amount.
@@ -112,28 +111,29 @@ cpdef void grow_polyps(object coral) except *:
         polyp_pos[i, 1] += growth[i] * polyp_normal[i, 1]
         polyp_pos[i, 2] += growth[i] * polyp_normal[i, 2]
 
-        # Output morphogens.
+        # Morphogens.
         out_idx = 1
         for mi in range(n_morphogens):
             if output[out_idx] > 0.5:
-                morphogensV[mi, i] = 1
-            out_idx += 1
-
-        # Memory
-        for mi in range(n_memory):
-            # if output[out_idx] > 0.5:
-            #     polyp_memory[i] |= ( 1 << mi )
-            polyp_memory[i, mi] *= mem_decay[mi]
-            polyp_memory[i, mi] += output[out_idx]
+                morphogensV[mi, i] = 1.0
             out_idx += 1
 
         # Signals
-        for mi in range(coral.n_signals):
-            if output[out_idx] > 0.5:
-                coral.polyp_signals[out_idx, mi] = 1.0
-            else:
-                coral.polyp_signals[out_idx, mi] = 0.0
+        for mi in range(n_signals):
+            sr = signal_range[mi]
+            polyp_signals[i, mi] += spreads[sr, 0]
+            if sr != 0:
+                for d, vert in coral.mesh.getRings(coral.polyp_verts[i], sr):
+                    polyp_signals[vert.id, mi] += spreads[sr, d+1] * output[out_idx]
             out_idx += 1
+
+        # # Signals
+        # for mi in range(coral.n_signals):
+        #     if output[out_idx] > 0.5:
+        #         coral.polyp_signals[out_idx, mi] = 1.0
+        #     else:
+        #         coral.polyp_signals[out_idx, mi] = 0.0
+        #     out_idx += 1
 
     cdef double new_volume = coral.mesh.volume()
     coral.mesh.calculateDefect()

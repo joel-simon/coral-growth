@@ -12,12 +12,9 @@ from coral_growth.viewer import AnimationViewer
 from coral_growth.parameters import Parameters
 
 params = Parameters()
+params.n_signals = 2
 params.n_morphogens = 1
-params.n_memory = 1
-params.n_signals = 1
 params.morphogen_thresholds = 2
-params.light_bottom  = .4
-params.light_increase = .1
 params.max_defect = 1.4
 params.C = 0.2
 params.max_growth = .4
@@ -94,6 +91,7 @@ if __name__ == '__main__':
 
         genome = genomes[0]
         traits = genome.GetGenomeTraits()
+        print(traits)
 
         coral = simulate_network(NetworkDummy(), NetworkDummy.depth, traits, [params],\
                                  export_folder=tmp_dir, verbose=True)[0]

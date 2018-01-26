@@ -6,7 +6,7 @@ class Parameters(NEAT.Parameters):
         self.traits_calculated = False
 
         # Evolution.
-        self.PopulationSize = 60
+        self.PopulationSize = 100
         self.OldAgeTreshold = 10
         self.SpeciesMaxStagnation = 10
         self.MinSpecies = 3
@@ -23,9 +23,9 @@ class Parameters(NEAT.Parameters):
         self.max_defect = 1.0
 
         self.max_face_growth = 1.5
-        self.n_memory = 1
+        # self.n_memory = 1
         self.n_signals = 1
-
+        self.n_memory = 0
         self.n_morphogens = 0
         self.morphogen_thresholds = 3
         self.morphogen_steps = 200
@@ -43,18 +43,22 @@ class Parameters(NEAT.Parameters):
                 if value == 'False': value = '0'
                 setattr(self, key, float(value) if '.' in value else int(value))
 
-    def addTrait(self, name, vrange, type='float'):
+    def addTrait(self, name, vrange, ttype='float'):
         trait = {
             'details': {
                 'max': max(vrange),
                 'min': min(vrange),
-                'mut_power': abs(vrange[1] - vrange[0]) / 4,
+                'mut_power': abs(vrange[1] - vrange[0]) * .1,
                 'mut_replace_prob': 0.1
             },
             'importance_coeff': 1.0,
-            'mutation_prob': 0.3,
-            'type': 'float'
+            'mutation_prob': 0.2,
+            'type': ttype
         }
+
+        if ttype == 'int':
+            trait['details']['mut_power'] = 1
+
         self.SetGenomeTraitParameters(name, trait)
 
     def calculateTraits(self):
@@ -69,5 +73,6 @@ class Parameters(NEAT.Parameters):
             self.addTrait('diffU%i'%i, (.01, .01))
             self.addTrait('diffV%i'%i, (.005, .005))
 
-        for i in range(self.n_memory):
-            self.addTrait('mem_decay%i'%i, (0.0, 1.0))
+        for i in range(self.n_signals):
+            self.addTrait('signal_decay%i'%i, (0.0, 1.0))
+            self.addTrait('signal_range%i'%i, [0, 3], ttype='int')

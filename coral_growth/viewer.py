@@ -396,7 +396,7 @@ class AnimationViewer(Viewer):
                     #     color = ( 0, data[-2], data[-1] )
                     # else:
                     d = data[ view_idx ]#- 1 ]
-                    color = int_colors[d] if isinstance(d, int) else (d,d,d)
+                    color = int_colors[d] if isinstance(d, int) else (.5 ,.5, .1+.9*d)
                     mesh['vert_colors'][polyp_idx] = color
 
                 self.draw_mesh(mesh)
@@ -490,6 +490,12 @@ class AnimationViewer(Viewer):
                     self.view = 5
                 elif e.key == K_7:
                     self.view = 6
+                elif e.key == K_8:
+                    self.view = 7
+                elif e.key == K_9:
+                    self.view = 8
+                elif e.key == K_0:
+                    self.view = 8
 
                 self.view = min(self.view, self.n_views-1)
 

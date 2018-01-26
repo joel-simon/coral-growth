@@ -51,7 +51,8 @@ class Coral(object):
 
         # Update the input and output for the variable in/outs.
         self.num_inputs = Coral.num_inputs + self.n_memory + self.n_signals + \
-                               self.n_morphogens * (self.morphogen_thresholds-1)
+                               self.n_morphogens * (self.morphogen_thresholds-1) + \
+                               (4 * params.use_polar_direction)
         self.num_outputs = Coral.num_outputs + self.n_memory + self.n_signals + self.n_morphogens
 
         self.function_times = defaultdict(int)
@@ -94,8 +95,8 @@ class Coral(object):
 
     def step(self):
         t1 = time.time()
-        self.morphogens.U[:, :] = 0
-        self.morphogens.V[:, :] = 0
+        # self.morphogens.U[:, :] = 0
+        # self.morphogens.V[:, :] = 0
 
         grow_polyps(self)
         # TODO: clean up this mess below :(
@@ -237,8 +238,7 @@ class Coral(object):
                 for each attribute. Ordered the same as the vertices.
         """
         out = open(path, 'w+')
-
-        header = [ 'light', 'collection', 'gravity', 'curvature' ]#, 'memory']
+        header = []
 
         for i in range(self.n_morphogens):
             header.append( 'mu_%i' % i )
@@ -248,6 +248,8 @@ class Coral(object):
 
         # for i in range(self.n_memory):
         #     header.append( 'mem_%i' % i )
+
+        header.extend([ 'light', 'collection', 'gravity', 'curvature' ])
 
         out.write('#Exported from coral_growth\n')
         out.write('#attr light:%f collection:%f energy:%f\n' % \
@@ -279,18 +281,19 @@ class Coral(object):
 
         for i in range(self.n_polyps):
             indx = id_to_indx[self.polyp_verts[i].id]
-
-            polyp_attributes[indx] = [ self.polyp_light[i],
-                                       self.polyp_collection[i],
-                                       self.polyp_gravity[i],
-                                       abs(self.polyp_verts[i].defect)/8*pi,
-                                       # self.polyp_collided[i]
-                                       ]
+            polyp_attributes[indx] = []
 
             for j in range(self.n_morphogens):
                 polyp_attributes[indx].append(self.morphogens.U[j, i])
 
             polyp_attributes[indx].extend(self.polyp_signals[i])
+            polyp_attributes[indx].extend([ self.polyp_light[i],
+                                       self.polyp_collection[i],
+                                       self.polyp_gravity[i],
+                                       abs(self.polyp_verts[i].defect)/8*pi,
+                                       # self.polyp_collided[i]
+                                       ])
+
             # polyp_attributes[indx].extend(self.polyp_memory[i])
 
             assert len(polyp_attributes[indx]) == len(header)

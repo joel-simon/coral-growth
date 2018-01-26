@@ -7,7 +7,7 @@ from __future__ import division, print_function
 import numpy as np
 cimport numpy as np
 from random import shuffle
-from libc.math cimport floor, fmin, fmax, fabs
+from libc.math cimport floor, fmin, fmax, fabs, atan, acos, cos, sin
 from cymesh.vector3D cimport inormalized, vadd, vsub, vmultf, vset, dot
 
 cdef double[:,:] spreads = np.array([
@@ -28,14 +28,15 @@ cpdef void createPolypInputs(object coral) except *:
     cdef int morphogen_thresholds = coral.morphogen_thresholds
     cdef double[:,:] morphogensU = coral.morphogens.U
     cdef double[:] polyp_light = coral.polyp_light
+    cdef double[:,:] polyp_normal = coral.polyp_normal
     cdef double[:] polyp_gravity = coral.polyp_gravity
     cdef double[:] polyp_collection = coral.polyp_collection
     cdef double[:,:] polyp_signals = coral.polyp_signals
     cdef double[:,:] inputs = coral.polyp_inputs
-    # cdef double[:, :] polyp_memory = coral.polyp_memory
+    cdef bint use_polar_direction = coral.params.use_polar_direction
     cdef int num_inputs = coral.num_inputs
     cdef list neighbors
-    cdef double signal_sum
+    cdef double signal_sum, azimuthal_angle, polar_angle
 
     inputs[:, :] = -1
 
@@ -60,6 +61,15 @@ cpdef void createPolypInputs(object coral) except *:
         for mi in range(coral.n_signals):
             inputs[i, input_idx] = polyp_signals[i, mi] > 0.5
             input_idx += 1
+
+        if use_polar_direction:
+            azimuthal_angle = atan(polyp_normal[i, 1] / polyp_normal[i, 0])
+            polar_angle = acos(polyp_normal[i, 2])
+            inputs[input_idx] = cos(azimuthal_angle)
+            inputs[input_idx+1] = sin(azimuthal_angle)
+            inputs[input_idx+2] = cos(polar_angle)
+            inputs[input_idx+3] = sin(polar_angle)
+            input_idx += 4
 
         inputs[i, input_idx] = 1 # Bias Bit
 

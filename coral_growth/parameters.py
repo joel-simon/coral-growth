@@ -30,6 +30,8 @@ class Parameters(NEAT.Parameters):
         self.morphogen_thresholds = 3
         self.morphogen_steps = 200
 
+        self.use_polar_direction = True
+
         self.height_boost = 1
 
         # Coral enviornment
@@ -68,10 +70,10 @@ class Parameters(NEAT.Parameters):
         for i in range(self.n_morphogens):
             self.addTrait('K%i'%i, (.03, .08))
             self.addTrait('F%i'%i, (.01, .06))
-            # self.addTrait('diffU%i'%i, (.005, .02))
-            # self.addTrait('diffV%i'%i, (.0025, .01))
-            self.addTrait('diffU%i'%i, (.01, .01))
-            self.addTrait('diffV%i'%i, (.005, .005))
+            self.addTrait('diffU%i'%i, (.005, .02))
+            self.addTrait('diffV%i'%i, (.0025, .01))
+            # self.addTrait('diffU%i'%i, (.01, .01))
+            # self.addTrait('diffV%i'%i, (.005, .005))
 
         for i in range(self.n_signals):
             self.addTrait('signal_decay%i'%i, (0.0, 1.0))

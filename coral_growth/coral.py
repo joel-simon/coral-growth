@@ -17,7 +17,7 @@ from coral_growth.modules.morphogens import Morphogens
 from coral_growth.modules.collisions import MeshCollisionManager
 
 class Coral(object):
-    num_inputs = 4 # [light, gravity, collection, extra-bias-bit]
+    num_inputs = 3 # [light, collection, extra-bias-bit]
     num_outputs = 1
 
     def __init__(self, obj_path, network, net_depth, traits, params):
@@ -95,33 +95,23 @@ class Coral(object):
 
     def step(self):
         t1 = time.time()
-        # self.morphogens.U[:, :] = 0
-        # self.morphogens.V[:, :] = 0
-
         grow_polyps(self)
         # TODO: clean up this mess below :(
         self.polyp_pos_past[:] = self.polyp_pos[:]
         self.polyp_pos[:] = self.polyp_pos_next[:]
         self.mesh.calculateDefect()
         self.polyp_pos[:] = self.polyp_pos_past[:]
-
         self.function_times['grow_polyps_p1'] += time.time() - t1
-        t1 = time.time()
 
+        t1 = time.time()
         for i in range(self.n_polyps):
             vert = self.mesh.verts[i]
-
             if self.polyp_pos_next[i, 1] < 0:
                 continue
-
             if abs(self.polyp_verts[i].defect) > self.params.max_defect:
                 continue
-
             self.polyp_collided[i] = self.collisionManager.attemptVertUpdate(vert.id, self.polyp_pos_next[i])
-
         self.function_times['grow_polyps_p2'] += time.time() - t1
-
-        assert not np.isnan(np.sum(self.polyp_pos[:self.n_polyps])), 'NaN position :\'('
 
         t1 = time.time()
         relax_mesh(self.mesh)
@@ -157,6 +147,8 @@ class Coral(object):
         self.polyp_signals *= self.signal_decay
 
         t1 = time.time()
+        # self.morphogens.U[:, :] = 0
+        # self.morphogens.V[:, :] = 0
         self.morphogens.update(self.morphogen_steps) # Update the morphogens.
         self.function_times['morphogens.update'] += time.time() - t1
 
@@ -166,14 +158,17 @@ class Coral(object):
         self.light = 0
         self.collection = 0
 
-        boost = self.polyp_pos[:self.n_polyps, 1] ** self.params.height_boost
-        np.nan_to_num(boost, copy=False)
+        com = np.mean(self.polyp_pos[:self.n_polyps], axis=0)
+
+        collection_boost = np.linalg.norm(self.polyp_pos[:self.n_polyps]-com, axis=1) ** self.params.height_boost
+        light_boost = self.polyp_pos[:self.n_polyps, 1] ** self.params.height_boost
+        np.nan_to_num(light_boost, copy=False)
 
         for face in self.mesh.faces:
             area = face.area()
             vertices = face.vertices()
-            self.light += area * sum(self.polyp_light[v.id]*boost[v.id] for v in vertices) / 3
-            self.collection += area * sum(self.polyp_collection[v.id]*boost[v.id] for v in vertices) / 3
+            self.light += area * sum(self.polyp_light[v.id]*light_boost[v.id] for v in vertices) / 3
+            self.collection += area * sum(self.polyp_collection[v.id]*collection_boost[v.id] for v in vertices) / 3
 
         if self.start_collection:
             self.collection /= self.start_collection

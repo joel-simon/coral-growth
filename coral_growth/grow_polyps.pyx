@@ -42,10 +42,10 @@ cpdef void createPolypInputs(object coral) except *:
 
     for i in range(coral.n_polyps):
         inputs[i, 0] = (polyp_light[i] * 2) - 1
-        inputs[i, 1] = (polyp_gravity[i] * 2) - 1
-        inputs[i, 2] = (polyp_collection[i] * 2) - 1
+        # inputs[i, 1] = (polyp_gravity[i] * 2) - 1
+        inputs[i, 1] = (polyp_collection[i] * 2) - 1
 
-        input_idx = 3
+        input_idx = 2
 
         # Morphogens
         for mi in range(n_morphogens):

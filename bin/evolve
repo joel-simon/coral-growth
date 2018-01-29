@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import print_function
-import random, os, sys, string, argparse, time
+import random, os, sys, string, argparse, time, math
 from datetime import datetime
 from multiprocessing import Pool
 from pykdtree.kdtree import KDTree
@@ -22,15 +22,15 @@ params.MinSpecies = 3
 params.PopulationSize = 100
 
 # Simulation params.
-params.n_signals = 1
+params.n_signals = 2
 params.n_morphogens = 1
 params.morphogen_thresholds = 2
-params.height_boost = 0.2
+params.height_boost = 0.25
 params.max_defect = 1.5
-params.C = 0.18
-params.max_growth = .3
+params.C = 0.15
+params.max_growth = .35
 params.max_polyps = 10000
-params.max_steps = 75
+params.max_steps = 80
 params.light_amount = 0.8
 params.calculateTraits()
 
@@ -131,23 +131,26 @@ def evolve_neat(params, generations, out_dir, run_id, pool):
 def feature_vector(coral):
     """ Compute a descriptive feature vector for calculating novelty.
     """
-    features = np.zeros(11 + params.n_morphogens)
+    features = np.zeros(8 + params.n_morphogens)
 
-    d = np.sqrt(coral.polyp_pos[:, 0]**2 + coral.polyp_pos[:, 2]**2)
+    # d = np.sqrt(coral.polyp_pos[:, 0]**2 + coral.polyp_pos[:, 2]**2)
+    # d = np.linalg.norm(self.polyp_pos[:self.n_polyps], axis=1)
+
     c = np.array([v.defect for v in coral.mesh.verts])
-
     bbox = coral.mesh.boundingBox()
     bbox_area = (bbox[1]-bbox[0]) * (bbox[3]-bbox[2]) * (bbox[5]-bbox[4])
 
-    features[0] = np.mean(d) # Mean dist from center
-    features[1] = np.std(d) # Std of dist from center
-    features[2] = np.mean(coral.polyp_pos[:, 1]) # Mean height
-    features[4] = np.std(coral.polyp_pos[:, 1]) # Std height
-    features[5] = coral.mesh.volume() / bbox_area  # Density
-    features[6:11] = np.histogram(c, bins=5, range=None, normed=True)[0]
+    features[0] = coral.light
+    features[1] = coral.collection
+    # features[0] = np.mean(d) # Mean dist from center
+    # features[1] = np.std(d) # Std of dist from center
+    # features[2] = np.mean(coral.polyp_pos[:, 1]) # Mean height
+    # features[4] = np.std(coral.polyp_pos[:, 1]) # Std height
+    features[2] = coral.mesh.volume() / bbox_area  # Density
+    features[3:8] = np.histogram(c, bins=5, range=None, normed=True)[0]
 
     for i in range(params.n_morphogens):
-        features[11+i] = np.mean(coral.morphogens.U[i, :coral.n_morphogens])
+        features[8+i] = np.mean(coral.morphogens.U[i, :coral.n_polyps])
 
     return features
 
@@ -163,9 +166,9 @@ def evaluate_novelty(genome, traits):
         fitness = 0
         return 0, np.zeros(11)
 
-def evolve_novelty(params, generations, out_dir, run_id, pool, \
-                   novelty_threshold=.8, archive_stagnation=4, ns_K=5):
-    max_ever = -99999999999
+def evolve_novelty(params, generations, out_dir, run_id, pool, ls50=True, \
+                   novelty_threshold=4.0, archive_stagnation=4, ns_K=10):
+    max_ever = None
     archive = []
     evals_since_last_archiving = 0
 
@@ -182,7 +185,6 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
             return None, None, feature_list
 
         a, b = np.array(archive), np.array(feature_list)
-        print(a.shape, b.shape)
         tree = KDTree(np.vstack((a, b)))
 
         dists, _ = tree.query(np.array(feature_list), k=ns_K+1)
@@ -194,7 +196,7 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
 
         return sparseness_list, fitness_list, feature_list
 
-    print('Creating intitial archive.')
+    print('Creating initial archive.')
     pop = create_initial_population()
 
     # Create Initial Archive.
@@ -207,20 +209,24 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
         print('\n'+'#'*80)
         print(run_id, 'Starting generation %i' % generation)
         print('Novelty threshold', novelty_threshold)
+
         genomes = NEAT.GetGenomeList(pop)
         sparseness_list, fitness_list, feature_list = evaluate_genomes(genomes)
         n_archive_added = 0
 
-        for genome, sparseness, feature in zip(genomes, sparseness_list, feature_list):
-            genome.SetFitness( sparseness )
+        for genome, sparseness, fitness, feature in zip(genomes, sparseness_list, fitness_list, feature_list):
+            if ls50:
+                genome.SetFitness( math.sqrt(sparseness * fitness) )
+            else:
+                genome.SetFitness( sparseness )
             genome.SetEvaluated()
 
             if sparseness > novelty_threshold:
                 archive.append(feature)
                 n_archive_added += 1
 
-        print('Added %i to archive', n_archive_added)
-        print('Archive size', len(archive))
+        print('Added %i to archive' % n_archive_added)
+        print('Archive size is', len(archive))
 
         if not n_archive_added:
             evals_since_last_archiving += 1
@@ -234,11 +240,12 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, \
             novelty_threshold *= 1.1
 
         maxf, meanf = max(fitness_list), sum(fitness_list) / float(len(fitness_list))
-        if maxf > max_ever:
+        if max_ever is None or maxf > max_ever:
             max_ever = maxf
             best = genomes[fitness_list.index(maxf)]
             print('New best fitness.', best.NumNeurons(), best.NumLinks())
             simulate_and_save(best, out_dir, generation, maxf, meanf)
+
         pop.Epoch()
 
 def generate_id(n):

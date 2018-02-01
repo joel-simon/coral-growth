@@ -1,167 +1,150 @@
 import math
 import numpy as np
-from collections import defaultdict
 
-def calc_can_flow(obstacles):
-    nx = obstacles.shape[0]
-    ny = obstacles.shape[1]
-    nz = obstacles.shape[2]
+from minheap import MinHeap
 
-    can_flow = np.zeros_like(obstacles)
-    can_flow[-1] = 1
+def neighbors(grid, x, y, z):
+    result = []
+    if x > 0: result.append((x-1, y, z))
+    if x < grid.shape[0]-1: result.append((x+1, y, z))
+    if y > 0: result.append((x, y-1, z))
+    if y < grid.shape[1]-1: result.append((x, y+1, z))
+    if z > 0: result.append((x, y, z-1))
+    if z < grid.shape[2]-1: result.append((x, y, z+1))
+    return result
 
-    for x in range(nx-2, -1, -1):
-        can_flow[x] = np.logical_and(can_flow[x+1], np.logical_not(obstacles[x]))
+def reconstruct_path(came_from, start, goal):
+    current = goal
+    path = []
+    while current != start:
+        path.append(current)
+        current = tuple(came_from[current[0], current[1], current[2]])
+    path.reverse()
+    return path
 
-        # FLOOD FILL
-        seen = np.zeros((ny, nz))
-        opens = []
+def dijkstra_search(grid, cost_grid, startx):
+    nx = grid.shape[0]
+    ny = grid.shape[1]
+    nz = grid.shape[2]
+    nynz = ny*nz
+    frontier = MinHeap()
+    came_from = np.zeros((nx, ny, nz, 3), dtype='int32')
+    cost_so_far = np.zeros_like(grid, dtype='float32')
 
+    for y in range(grid.shape[1]):
+        for z in range(grid.shape[2]):
+            pid = startx*nynz + y*nz + z
+            frontier.push({"id": pid, "price": 0})
+            came_from[startx, y, z, 0] = -1
+            came_from[startx, y, z, 1] = -1
+            came_from[startx, y, z, 2] = -1
+            cost_so_far[startx, y, z] = 1.0
+
+    while True:
+        try:
+            item = frontier.pop()
+            x = item['id'] // (nynz)
+            y = (item['id']-x*(nynz)) // nz
+            z = item['id'] % nz
+
+        except IndexError:
+            break
+
+        for x2, y2, z2 in neighbors(grid, x, y, z):
+            if grid[x2, y2, z2] == 1:
+                continue
+            new_cost = cost_so_far[x, y, z] + cost_grid[x2, y2, z2]
+            if cost_so_far[x2, y2, z2] == 0 or new_cost < cost_so_far[x2, y2, z2]:
+                cost_so_far[x2, y2, z2] = new_cost
+                frontier.push({"id":(x2*nynz)+(y2*nz)+z2, "price": new_cost})
+                came_from[x2, y2, z2, 0] = x
+                came_from[x2, y2, z2, 1] = y
+                came_from[x2, y2, z2, 2] = z
+
+    return came_from, cost_so_far
+
+def calculate_flow(grid, n_iters):
+    nx = grid.shape[0]
+    ny = grid.shape[1]
+    nz = grid.shape[2]
+
+    cost_grid = np.ones_like(grid, dtype='f')
+    travel_sum = np.zeros_like(grid, dtype='f')
+
+    for i in range(n_iters):
+        travel_avg = travel_sum/(i+1)
+        came_from, cost_so_far = dijkstra_search(grid, cost_grid+travel_avg, startx=0)
+
+        paths = []
         for y in range(ny):
             for z in range(nz):
-                if can_flow[x, y, z]:
-                    opens.append((y, z))
+                path = reconstruct_path(came_from, (-1, -1, -1), (nx-1, y, z))
+                paths.append(path)
 
-        while opens:
-            y, z = opens.pop()
-            if z > 0 and not seen[y, z-1] and not obstacles[x, y, z-1]:
-                can_flow[x, y, z-1] = 1
-                opens.append((y, z-1))
-                seen[y, z-1] = 1
-            if z < nz -1 and not seen[y, z+1] and not obstacles[x, y, z+1]:
-                can_flow[x, y, z+1] = 1
-                opens.append((y, z+1))
-                seen[y, z+1] = 1
-            if y > 0 and not seen[y-1, z] and not obstacles[x, y-1, z]:
-                can_flow[x, y-1, z] = 1
-                opens.append((y-1, z))
-                seen[y-1, z] = 1
-            if y < ny -1 and not seen[y+1, z] and not obstacles[x, y+1, z]:
-                can_flow[x, y+1, z] = 1
-                opens.append((y+1, z))
-                seen[y+1, z] = 1
+                for pi, (x, y, z) in enumerate(path):
+                    travel_sum[x, y, z] += .5 / (i+1)
 
-    return can_flow
+    travel_avg = travel_sum / (i+1)
+    return travel_avg, came_from, paths
 
-def flow_particle(x, y, z, v, grid, can_flow, dy, dz):
-    y2 = y
-    z2 = z
-
-    while not can_flow[x+1, y2, z2]:
-        if can_flow[x, y2+dy, z2+dz]:
-            y2 += dy
-            z2 += dz
-        else:
-            return
-
-    if y == y2 and z == z2:
-        return
-
-    while y != y2 or z != z2:
-        y += dy
-        z += dz
-
-        grid[x, y, z] += v
-
-def calculate_flow(obstacles, capture_percent):
-
-    flow = np.zeros_like(obstacles, dtype='f')
-    collection = np.zeros_like(obstacles, dtype='f')
-    # particles = np.zeros_like(obstacles, dtype='f')
-    can_flow = calc_can_flow(obstacles)
-
-    nx = flow.shape[0]
-    ny = flow.shape[1]
-    nz = flow.shape[2]
-
-    flow[0] = 1
-
-    for x in range(1, nx):
-        xm1 = flow[x-1].copy()
-
-        # First, flow the particles that cannot go straight.
-        for y in range(ny):
-            for z in range(nz):
-                if not can_flow[x, y, z] and flow[x-1, y, z]:
-                    v = xm1[y, z]*.25
-
-                    if y > 0:
-                        flow_particle(x-1, y, z, v, flow, can_flow, -1, 0)
-                    if y < ny - 1:
-                        flow_particle(x-1, y, z, v, flow, can_flow, 1, 0)
-                    if z > 0:
-                        flow_particle(x-1, y, z, v, flow, can_flow, 0, -1)
-                    if z < nz - 1:
-                        flow_particle(x-1, y, z, v, flow, can_flow, 0, 1)
-
-        # Move all forward with diffusion.
-        for y in range(ny):
-            for z in range(nz):
-                if can_flow[x, y, z]:
-                    f = flow[x-1, y, z]
-                    y_down = flow[x-1, y-1, z] if y > 0 and not obstacles[x,y-1,z] else f
-                    y_up = flow[x-1, y+1, z] if y < ny-1 and not obstacles[x,y+1,z] else f
-                    z_down = flow[x-1, y, z-1] if z > 0 and not obstacles[x, y, z-1] else f
-                    z_up = flow[x-1, y, z+1] if z < nz-1 and not obstacles[x, y, z+1] else f
-                    flow[x, y, z] = .5*f + .125*(y_up + y_down + z_up + z_down)
-
-
-                    # Polyps slow the flow around them, collecting resources
-                    df = f * capture_percent * .25
-                    if y > 0 and obstacles[x,y-1,z]:
-                        collection[x, y-1, z] += df
-                        flow[x, y, z] -=  df
-                    if y < ny-1 and obstacles[x,y+1,z]:
-                        collection[x, y+1, z] += df
-                        flow[x, y, z] -= df
-                    if z > 0 and obstacles[x, y, z-1]:
-                        collection[x, y, z-1] += df
-                        flow[x, y, z] -= df
-                    if z < nz-1 and obstacles[x, y, z+1]:
-                        collection[x, y, z+1] += df
-                        flow[x, y, z] -= df
-
-    return flow, collection
-
-
-def calculate_collection(coral, radius=3, capture_percent=.1):
-    voxel_p = np.zeros((coral.n_polyps, 3), dtype='i')
+def update_voxels(coral):
+    polyp_voxel = np.zeros((coral.n_polyps, 3), dtype='i')
 
     for i in range(coral.n_polyps):
         p = coral.polyp_pos[i]
-        voxel_p[i, 0] = int(round(p[0] / coral.voxel_length))
-        voxel_p[i, 1] = int(round(p[1] / coral.voxel_length))
-        voxel_p[i, 2] = int(round(p[2] / coral.voxel_length))
+        polyp_voxel[i, 0] = int(round(p[0] / coral.voxel_length))
+        polyp_voxel[i, 1] = int(round(p[1] / coral.voxel_length))
+        polyp_voxel[i, 2] = int(round(p[2] / coral.voxel_length))
 
-    min_v = voxel_p.min(axis=0)
-    max_v = voxel_p.max(axis=0)
+    min_v = polyp_voxel.min(axis=0)
+    max_v = polyp_voxel.max(axis=0)
 
-    nx = max_v[0] - min_v[0] + 3
-    ny = max_v[1] - min_v[1] + 2
-    nz = max_v[2] - min_v[2] + 3
+    padding = np.array([4, 2, 4])
+    offset = padding - 2
 
-    voxel_grid = np.zeros((nx, ny, nz))
+    voxel_grid = np.zeros(max_v - min_v + padding + [2, 1, 2])
+
+    polyp_voxel -= min_v
+    polyp_voxel += offset
 
     for i in range(coral.n_polyps):
-        vox = voxel_p[i] - min_v
-        voxel_grid[vox[0]+1, vox[1], vox[2]+1] = 1
+        vox = polyp_voxel[i]
+        voxel_grid[ vox[0], vox[1], vox[2] ] = 1
 
-    # Main calculation
-    flow_grid, collection_grid = calculate_flow(voxel_grid, capture_percent)
+    for face in coral.mesh.faces:
+        p = face.midpoint()
+        vx = int(round(p[0] / coral.voxel_length)) - min_v[0] + offset[0]
+        vy = int(round(p[1] / coral.voxel_length)) - min_v[1] + offset[1]
+        vz = int(round(p[2] / coral.voxel_length)) - min_v[2] + offset[2]
+        voxel_grid[vx, vy, vz] = 1
 
-    # Use flow values to calculate collection values.
+    return polyp_voxel, voxel_grid, (min_v - offset)
+
+def calculate_collection(coral):
+    polyp_voxel, voxel_grid, min_v = update_voxels(coral)
+
+    nx = voxel_grid.shape[0]
+    ny = voxel_grid.shape[1]
+    nz = voxel_grid.shape[2]
+
+    flow_grid, came_from, paths = calculate_flow(voxel_grid, n_iters=1)
+
+    radius = 1
     total = float((2*radius+1)**3)
 
+    # coral.polyp_collection[:] = 0
     for i in range(coral.n_polyps):
-        x, y, z = voxel_p[i] - min_v
+        x, y, z = polyp_voxel[i]
+        # for x2, y2, z2 in neighbors(flow_grid, x, y, z):
+        #     coral.polyp_collection[i] += flow_grid[x2, y2, z2]
 
         seen = 0
         for dx in range(x-radius, x+radius+1):
             for dy in range(y-radius, y+radius+1):
                 for dz in range(z-radius, z+radius+1):
                     if dx > 0 and dy > 0 and dz > 0 and dx < nx-1 and dy < ny-1 and dz < nz-1:
-                        seen += flow_grid[dx+1, dy, dz+1]
+                        seen += flow_grid[dx, dy, dz]
 
         coral.polyp_collection[i] = seen / total
 
-    return flow_grid, min_v-1
+    return voxel_grid, flow_grid, min_v, paths

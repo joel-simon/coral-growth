@@ -366,13 +366,10 @@ class AnimationViewer(Viewer):
         self.view_names = view_names
         self.n_views = n_views
         self.view_lists = [[] for _ in range(self.n_views)]
+        self.view_list_common = []
 
         for fi, file in enumerate(files):
             generation = get_generation(file)
-            # voxel_length, flow_directions = pickle.load(open(file+'.flow_directions.p', 'rb'))
-
-            flow_grid = None
-            # voxel_length, (flow_grid,capture_grid, min_v) = pickle.load(open(file+'.flow_grid.p', 'rb'))
 
             """ Read the file and store the colors.
             """
@@ -383,7 +380,6 @@ class AnimationViewer(Viewer):
 
             """ Now compile mesh for each view given color data and mesh data.
             """
-
             int_colors = [hsv_to_rgb((i/float(8)), 1.0, 1.0) for i in range(8)]
 
             for view_idx in range(self.n_views):
@@ -392,59 +388,72 @@ class AnimationViewer(Viewer):
 
                 # Calculate Colors
                 for polyp_idx, data in enumerate(polyp_data):
-                    # if view_idx == 0: #hardcode in 2 morphogens.
-                    #     color = ( 0, data[-2], data[-1] )
-                    # else:
-                    d = data[ view_idx ]#- 1 ]
+                    d = data[ view_idx ]
                     color = int_colors[d] if isinstance(d, int) else (.1 , d, .1)
                     mesh['vert_colors'][polyp_idx] = color
 
                 self.draw_mesh(mesh)
-
-                if flow_grid is not None:
-                    self.draw_flow_grid(voxel_length, capture_grid, min_v)
-
-                if generation is not None:
-                    self.draw_text( 30, 30, 'Generation %i' % generation )
-
                 self.view_lists[ view_idx ].append([ gl_list ])
                 glEndList()
 
+            """ Draw things common to all views at a timestep.
+            """
+            flow_data = None
+            voxel_length, flow_data = pickle.load(open(file+'.flow_grid.p', 'rb'))
+            gl_list = glGenLists(1)
+            glNewList(gl_list, GL_COMPILE)
+            # print()
+            if flow_data is not None:
+                self.draw_flow_grid(voxel_length, flow_data)
+            if generation is not None:
+                self.draw_text( 30, 30, 'Generation %i' % generation )
+            self.view_list_common.append([ gl_list ])
+            glEndList()
+
             print(fi, 'n_verts=', len(mesh['vertices']))
 
-        self.gl_lists = self.view_lists[ self.view ][ self.frame ]
         print('Finished Loading Animation')
         print(coral_data)
         print(len(self.view_lists[ 0 ]))
 
-    def draw_flow_grid(self, voxel_length, flow_grid, min_v):
-        offset = min_v
-
+    def draw_flow_grid(self, voxel_length, flow_data):
+        voxel_grid, flow_grid, offset, paths = flow_data
         vmax = flow_grid.max()
 
-        for p, v in np.ndenumerate(flow_grid):
-            if v > 0:
-            # if p[1] % 5 == 0:
-                p = np.array(p) + offset
-                color = (v / vmax, 0, 0, .25)
-                self.draw_cube(p*voxel_length, voxel_length, color)
+        # for p, v in np.ndenumerate(voxel_grid):
+        #     if v:
+        #         p = np.array(p) + offset
+        #         color = (.5, .5, .5, 1)
+        #         self.draw_cube(p*voxel_length, voxel_length, color)
 
-    # def draw_flow_grid(self, voxel_length, flow_directions):
-    #     # print(flow_directions)
-    #     for (x,y,z), directions in flow_directions.items():
-    #         for dx, dy, dz in directions:
-    #             x *= voxel_length
-    #             y *= voxel_length
-    #             z *= voxel_length
-    #             if dx:
-    #                 self.draw_lines([((x,y,z),(x+voxel_length, y, z))], width=2, color=(0, 0, 1.0))
-    #             if dy:
-    #                 self.draw_lines([((x,y,z),(x, y+voxel_length, z))], width=2, color=(0, 0, 1.0))
-    #             if dz:
-    #                 self.draw_lines([((x,y,z),(x, y, z+voxel_length))], width=2, color=(0, 0, 1.0))
+
+        # for p, v in np.ndenumerate(flow_grid):
+        #     if v > 0:
+        #         p = np.array(p) + offset
+        #         color = (v / vmax, 0, 0, .25)
+        #         self.draw_cube(p*voxel_length, voxel_length, color)
+
+        for path in paths:
+            glLineWidth(2)
+            glColor3f(*(0,0,0))
+            glBegin(GL_LINES)
+
+            for i in range(1, len(path)):
+                x1, y1, z1 = path[i-1]
+                x2, y2, z2 = path[i]
+                glVertex3f((x1+offset[0])*voxel_length, (y1+offset[1])*voxel_length, (z1+offset[2])*voxel_length)
+                glVertex3f((x2+offset[0])*voxel_length, (y2+offset[1])*voxel_length, (z2+offset[2])*voxel_length)
+
+            glEnd()
 
     def draw_step(self):
         self.draw_text( 30, 60, 'View: '+self.view_names[self.view])
+
+        for gl_list in self.view_lists[self.view][self.frame]:
+            glCallList(gl_list)
+
+        for gl_list in self.view_list_common[self.frame]:
+            glCallList(gl_list)
 
     def handle_input(self, e):
         super(AnimationViewer, self).handle_input(e)
@@ -453,16 +462,13 @@ class AnimationViewer(Viewer):
             if e.key == K_RIGHT:
                 if self.frame < self.n_frames - 1:
                     self.frame += 1
-                    self.gl_lists = self.view_lists[self.view][self.frame]
 
             elif e.key == K_LEFT:
                 if self.frame > 0:
                     self.frame -= 1
-                    self.gl_lists = self.view_lists[self.view][self.frame]
 
             elif e.key == K_r:
                 self.frame = 0
-                self.gl_lists = self.view_lists[self.view][self.frame]
 
             elif e.key == K_s:
                 self.save(rand_string(4)+'.jpg')
@@ -498,16 +504,13 @@ class AnimationViewer(Viewer):
                     self.view = 8
 
                 self.view = min(self.view, self.n_views-1)
-
                 print('switched to view', self.view_names[self.view])
-                self.gl_lists = self.view_lists[self.view][self.frame]
 
     def step(self, i):
         if self.animation_playing:
             # Do two rotation steps for every growth step.
             if self.frame < self.n_frames - 1:
                 self.frame += 1
-                self.gl_lists = self.view_lists[self.view][self.frame]
 
             if self.saving:
                 self.save('tmp/%04d.jpg'%i)

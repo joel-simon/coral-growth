@@ -14,7 +14,7 @@ from cymesh.operators.relax import relax_mesh
 
 from coral_growth.grow_polyps import grow_polyps
 from coral_growth.modules import light, gravity
-from coral_growth.modules import flowx as flow
+from coral_growth.modules import flow as flow
 from coral_growth.modules.morphogens import Morphogens
 from coral_growth.modules.collisions import MeshCollisionManager
 
@@ -78,8 +78,6 @@ class Coral(object):
         self.polyp_gravity = np.zeros(self.max_polyps)
         self.polyp_collection = np.zeros(self.max_polyps)
         self.polyp_collided = np.zeros(self.max_polyps, dtype='uint8')
-        # self.polyp_memory = np.zeros((self.max_polyps), dtype='uint32')
-        # self.polyp_memory = np.zeros((self.max_polyps, self.n_memory))
         self.polyp_signals = np.zeros((self.max_polyps, self.params.n_signals))
 
         self.collisionManager = MeshCollisionManager(self.mesh, self.polyp_pos,\
@@ -140,9 +138,8 @@ class Coral(object):
         self.function_times['calculate_light'] += time.time() - t1
 
         t1 = time.time()
-        self.flow_data = flow.calculate_collection(self, radius=2, \
-                                        capture_percent=.05, fluid_diffusion=0.1)
-        self.polyp_collection *= 100
+        self.flow_data = flow.calculate_collection(self)
+        # self.polyp_collection *= 100
         self.function_times['calculate_collection'] += time.time() - t1
 
         gravity.calculate_gravity(self)
@@ -162,9 +159,10 @@ class Coral(object):
         self.light = 0
         self.collection = 0
 
-        tree = KDTree(self.polyp_pos[:self.n_polyps], leafsize=16)
-        d, indx = tree.query(self.polyp_pos[:self.n_polyps], k=20)
-        collection_boost = np.mean(d, axis=1) ** self.params.height_boost
+        # tree = KDTree(self.polyp_pos[:self.n_polyps], leafsize=16)
+        # d, indx = tree.query(self.polyp_pos[:self.n_polyps], k=15)
+        # print('avg d', np.mean(d), np.mean(self.polyp_pos[:self.n_polyps, 1]))
+        # collection_boost = (self.polyp_pos[:self.n_polyps, 1] + .1 * np.mean(d, axis=1)) ** self.params.height_boost
         light_boost = self.polyp_pos[:self.n_polyps, 1] ** self.params.height_boost
         np.nan_to_num(light_boost, copy=False)
 
@@ -176,9 +174,14 @@ class Coral(object):
             self.light += area / 3 * (self.polyp_light[v1.id]*light_boost[v1.id] + \
                                       self.polyp_light[v2.id]*light_boost[v2.id] +
                                       self.polyp_light[v2.id]*light_boost[v3.id])
-            self.collection += area / 3 * (self.polyp_collection[v1.id]*collection_boost[v1.id] + \
-                                           self.polyp_collection[v2.id]*collection_boost[v2.id] +
-                                           self.polyp_collection[v2.id]*collection_boost[v3.id])
+
+            self.collection += area / 3 * (self.polyp_collection[v1.id] + \
+                                           self.polyp_collection[v2.id] +
+                                           self.polyp_collection[v2.id])
+
+            # self.collection += area / 3 * (self.polyp_collection[v1.id]*collection_boost[v1.id] + \
+            #                                self.polyp_collection[v2.id]*collection_boost[v2.id] +
+            #                                self.polyp_collection[v2.id]*collection_boost[v3.id])
 
         if self.start_collection:
             self.collection /= self.start_collection
@@ -200,10 +203,13 @@ class Coral(object):
         self.polyp_verts[idx] = vert
 
         neighbors = vert.neighbors()
+        n = 0
         for vert_n in neighbors:
-            for i in range(self.n_signals):
-                self.polyp_signals[idx, i] += self.polyp_signals[vert_n.id, i]
-        self.polyp_signals[idx] /= len(neighbors)
+            if self.polyp_signals[vert_n.id].sum() != 0:
+                for i in range(self.n_signals):
+                    self.polyp_signals[idx, i] += self.polyp_signals[vert_n.id, i]
+            n += 1
+        self.polyp_signals[idx] /= n
 
         self.collisionManager.newVert(vert.id)
 
@@ -284,7 +290,7 @@ class Coral(object):
         # for i in range(self.n_polyps):
         #     self.polyp_collided[i] = abs(self.polyp_verts[i].defect) > self.params.max_defect
 
-        print(self.polyp_collection[:self.n_polyps].max())
+        # print(self.polyp_collection[:self.n_polyps].max())
 
         for i in range(self.n_polyps):
             indx = id_to_indx[self.polyp_verts[i].id]
@@ -301,8 +307,6 @@ class Coral(object):
                                        # self.polyp_collided[i]
                                        ])
 
-            # polyp_attributes[indx].extend(self.polyp_memory[i])
-
             assert len(polyp_attributes[indx]) == len(header)
 
         for attributes in polyp_attributes:
@@ -317,6 +321,6 @@ class Coral(object):
         # pickle.dump((self.voxel_length, self.voxel_grid), f)
         # f.close()
 
-        # f = open(path+'.flow_grid.p', 'wb')
-        # pickle.dump((self.voxel_length, self.flow_data), f)
-        # f.close()
+        f = open(path+'.flow_grid.p', 'wb')
+        pickle.dump((self.voxel_length, self.flow_data), f)
+        f.close()

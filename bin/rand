@@ -78,7 +78,7 @@ class NetworkDummy(object):
         # out = [1 for _ in range(self.NumOutputs())]
         out = [random.random() for _ in range(self.NumOutputs())]
         # out = [0 for _ in range(self.NumOutputs())]
-        # out[0] = 1
+        out[0] = 1
         return out
 
 if __name__ == '__main__':
@@ -92,13 +92,14 @@ if __name__ == '__main__':
 
         genome = genomes[0]
         traits = genome.GetGenomeTraits()
-        print(traits)
+        # print(traits)
 
-        coral = simulate_network(NetworkDummy(), NetworkDummy.depth, traits, [params],\
-                                 export_folder=tmp_dir, verbose=True)[0]
+        # coral = simulate_network(NetworkDummy(), NetworkDummy.depth, traits, [params],\
+        #                          export_folder=tmp_dir, verbose=True)[0]
 
-        # coral = simulate_genome(genome, traits, [params], export_folder=tmp_dir,
-        #                         verbose=False)[0]
+        coral = simulate_genome(genome, traits, [params], export_folder=tmp_dir,
+                                verbose=False)[0]
+
         total = sum(coral.function_times.values())
         for k, v in sorted(coral.function_times.items()):
             print(k, v, v/ total)

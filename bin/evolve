@@ -1,252 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import print_function
-import random, os, sys, string, argparse, time, math
+import random, os, sys, string, argparse, time
 from datetime import datetime
 from multiprocessing import Pool
-from pykdtree.kdtree import KDTree
 import numpy as np
 sys.path.append(os.path.abspath('..'))
-from tempfile import TemporaryDirectory
 import MultiNEAT as NEAT
-from coral_growth.simulate import simulate_network
 
-from coral_growth.coral import Coral
-from coral_growth.simulate import simulate_genome
 from coral_growth.parameters import Parameters
-import dill
-
-params = Parameters()
-
-# Neat params
-params.MinSpecies = 3
-params.PopulationSize = 60
-
-# Simulation params.
-params.n_signals = 2
-params.n_morphogens = 1
-params.morphogen_thresholds = 2
-params.height_boost = 0.25
-params.max_defect = 1.5
-params.C = 0.15
-params.max_growth = .35
-params.max_polyps = 10000
-params.max_steps = 70
-params.light_amount = 0.8
-params.calculateTraits()
-
-def create_initial_population():
-    # Create network size based off coral and parameters.
-    num_inputs = Coral.num_inputs + params.n_memory + params.n_signals +\
-                 params.n_morphogens*(params.morphogen_thresholds - 1) + \
-                 (4 * params.use_polar_direction)
-
-    num_outputs = Coral.num_outputs + params.n_memory + params.n_signals + params.n_morphogens
-
-    genome_prototype = NEAT.Genome(
-        0, # ID
-        num_inputs,
-        0, # NUM_HIDDEN
-        num_outputs,
-        False, # FS_NEAT
-        NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
-        NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
-        0, # Seed type, must be 1 to have hidden nodes.
-        params,
-        0,
-    )
-
-    pop = NEAT.Population(
-        genome_prototype, # Seed genome.
-        params,
-        True, # Randomize weights.
-        1.0, # Random Range.
-        int(time.time()) # Random number generator seed.
-    )
-    return pop
-
-def evaluate(genome, traits):
-    try:
-        coral = simulate_genome(genome, traits, [params])[0]
-        fitness = coral.fitness()
-    except AssertionError as e:
-        print('Exception:', e)
-        fitness = 0
-    print('.', end='', flush=True)
-    return fitness
-
-def simulate_and_save(genome, out_dir, generation, fitness, meanf):
-    genome.Save(out_dir+'/genome_%i' % generation)
-    traits = genome.GetGenomeTraits()
-
-    with open(out_dir+'/scores.txt', "a") as f:
-        f.write("%i\t%f\t%f\n"%(generation, fitness, meanf))
-
-    with open(out_dir+'/best_%i_traits.txt' % generation, "w+") as f:
-        f.write(str(traits))
-
-    export_folder = os.path.join(out_dir, str(generation))
-    os.mkdir(export_folder)
-    return simulate_genome(genome, traits, [params], export_folder=export_folder)
-
-def evolve_neat(params, generations, out_dir, run_id, pool):
-    pop = create_initial_population()
-    max_ever = 0.0
-    t = time.time()
-
-    for generation in range(generations):
-        print(run_id, 'Starting generation', generation)
-        genomes = NEAT.GetGenomeList(pop)
-
-        if pool:
-            data = [ (g, g.GetGenomeTraits()) for g in genomes ]
-            fitnesses = pool.starmap(evaluate, data)
-        else:
-            fitnesses = [ evaluate(g, g.GetGenomeTraits()) for g in genomes ]
-
-        for genome, fitness in zip(genomes, fitnesses):
-            genome.SetFitness(fitness)
-            genome.SetEvaluated()
-
-        maxf, meanf = max(fitnesses), sum(fitnesses) / float(len(fitnesses))
-        runtime = time.time() - t
-        t = time.time()
-        print('\nGeneration %i ran in %f, %f per coral' % \
-              (generation, runtime, runtime/len(genomes)))
-        print('Max fitness:', maxf, 'Mean fitness:', meanf)
-        print(pop.GetBestGenome().GetFitness())
-
-        if maxf > max_ever:
-            best = pop.GetBestGenome()
-            max_ever = maxf
-            print('New best fitness.', best.NumNeurons(), best.NumLinks())
-            coral = simulate_and_save(best, out_dir, generation, maxf, meanf)[0]
-
-        pop.Epoch()
-        print('#'*80)
-
-    print('Run Complete.')
-    pool.close()
-    pool.join()
-
-def feature_vector(coral):
-    """ Compute a descriptive feature vector for calculating novelty.
-    """
-    features = np.zeros(8 + params.n_morphogens)
-
-    # d = np.sqrt(coral.polyp_pos[:, 0]**2 + coral.polyp_pos[:, 2]**2)
-    # d = np.linalg.norm(self.polyp_pos[:self.n_polyps], axis=1)
-
-    c = np.array([v.defect for v in coral.mesh.verts])
-    bbox = coral.mesh.boundingBox()
-    bbox_area = (bbox[1]-bbox[0]) * (bbox[3]-bbox[2]) * (bbox[5]-bbox[4])
-
-    features[0] = coral.light
-    features[1] = coral.collection
-    # features[0] = np.mean(d) # Mean dist from center
-    # features[1] = np.std(d) # Std of dist from center
-    # features[2] = np.mean(coral.polyp_pos[:, 1]) # Mean height
-    # features[4] = np.std(coral.polyp_pos[:, 1]) # Std height
-    features[2] = coral.mesh.volume() / bbox_area  # Density
-    features[3:8] = np.histogram(c, bins=5, range=None, normed=True)[0]
-
-    for i in range(params.n_morphogens):
-        features[8+i] = np.mean(coral.morphogens.U[i, :coral.n_polyps])
-
-    return features
-
-def evaluate_novelty(genome, traits):
-    try:
-        coral = simulate_genome(genome, traits, [params])[0]
-        fitness = coral.fitness()
-        print('.', end='', flush=True)
-        return fitness, feature_vector(coral)
-
-    except AssertionError as e:
-        print('AssertionError:', e)
-        fitness = 0
-        return 0, np.zeros(11)
-
-def evolve_novelty(params, generations, out_dir, run_id, pool, ls50=True, \
-                   novelty_threshold=4.0, archive_stagnation=4, ns_K=10):
-    max_ever = None
-    archive = []
-    evals_since_last_archiving = 0
-
-    def evaluate_genomes(genomes):
-        if pool:
-            data = [ (g, g.GetGenomeTraits()) for g in genomes ]
-            ff = pool.starmap(evaluate_novelty, data)
-        else:
-            ff = [ evaluate_novelty(g, g.GetGenomeTraits()) for g in genomes ]
-
-        fitness_list, feature_list = zip(*ff)
-
-        if not len(archive):
-            return None, None, feature_list
-
-        a, b = np.array(archive), np.array(feature_list)
-        tree = KDTree(np.vstack((a, b)))
-
-        dists, _ = tree.query(np.array(feature_list), k=ns_K+1)
-        sparseness_list = np.mean(dists[:, 1:], axis=1)
-
-        print()
-        print('Novelty - avg: %f, max:%f' % (np.mean(sparseness_list), max(sparseness_list)))
-        print('Fitness - avg: %f, max:%f' % (np.mean(fitness_list), max(fitness_list)))
-
-        return sparseness_list, fitness_list, feature_list
-
-    print('Creating initial archive.')
-    pop = create_initial_population()
-
-    # Create Initial Archive.
-    genomes = NEAT.GetGenomeList(pop)
-    _, _, feature_list = evaluate_genomes(genomes)
-    archive.extend(feature_list)
-
-    # Main loop
-    for generation in range(generations):
-        print('\n'+'#'*80)
-        print(run_id, 'Starting generation %i' % generation)
-        print('Novelty threshold', novelty_threshold)
-
-        genomes = NEAT.GetGenomeList(pop)
-        sparseness_list, fitness_list, feature_list = evaluate_genomes(genomes)
-        n_archive_added = 0
-
-        for genome, sparseness, fitness, feature in zip(genomes, sparseness_list, fitness_list, feature_list):
-            if ls50:
-                genome.SetFitness( math.sqrt(sparseness * fitness) )
-            else:
-                genome.SetFitness( sparseness )
-            genome.SetEvaluated()
-
-            if sparseness > novelty_threshold:
-                archive.append(feature)
-                n_archive_added += 1
-
-        print('Added %i to archive' % n_archive_added)
-        print('Archive size is', len(archive))
-
-        if not n_archive_added:
-            evals_since_last_archiving += 1
-        else:
-            evals_since_last_archiving = 0
-
-        # Dynamic novelty_threshold
-        if evals_since_last_archiving > archive_stagnation:
-            novelty_threshold *= .9
-        elif n_archive_added > 4:
-            novelty_threshold *= 1.1
-
-        maxf, meanf = max(fitness_list), sum(fitness_list) / float(len(fitness_list))
-        if max_ever is None or maxf > max_ever:
-            max_ever = maxf
-            best = genomes[fitness_list.index(maxf)]
-            print('New best fitness.', best.NumNeurons(), best.NumLinks())
-            simulate_and_save(best, out_dir, generation, maxf, meanf)
-
-        pop.Epoch()
+from coral_growth.evolve_neat import evolve_neat
+from coral_growth.evolve_novelty import evolve_novelty
 
 def generate_id(n):
     options = string.ascii_uppercase + string.digits
@@ -260,15 +23,31 @@ if __name__ == '__main__':
     parser.add_argument('--novelty', action='store_true')
 
     args = parser.parse_args()
-    rid = generate_id(4)
-
     print(args)
+    rid = generate_id(4)
     print('Run ID: ', rid)
+
+    params = Parameters()
+    # Neat parameters.
+    params.neat.MinSpecies = 3
+    params.neat.PopulationSize = 60
+    # Simulation parameters.
+    params.n_signals = 2
+    params.n_morphogens = 1
+    params.morphogen_thresholds = 2
+    params.height_boost = 0.25
+    params.max_defect = 1.5
+    params.C = 0.15
+    params.max_growth = .35
+    params.max_polyps = 10000
+    params.max_steps = 70
+    params.light_amount = 0.8
+    params.calculateTraits()
 
     pool = None
 
     if args.novelty:
-        params.PopulationSize = 20
+        params.neat.PopulationSize = params.neat.PopulationSize // 4
         dir_name = rid+"__novelty_{:%B_%d_%Y_%H_%M}".format(datetime.now())
     else:
         dir_name = rid+"__{:%B_%d_%Y_%H_%M}".format(datetime.now())
@@ -287,3 +66,8 @@ if __name__ == '__main__':
         evolve_novelty(params, args.gens, dir_path, rid, pool)
     else:
         evolve_neat(params, args.gens, dir_path, rid, pool)
+
+    if pool is not None:
+        pool.close()
+        pool.join()
+

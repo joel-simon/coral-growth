@@ -17,10 +17,6 @@ cdef double[:,:] spreads = np.array([
     [0.04280001, 0.03837332, 0.02765348, 0.01601401],
 ])
 
-# cdef double[:] spread_1 = np.array([0.24522841, 0.12498851])
-# cdef double[:] spread_2 = np.array([0.08729082, 0.06935493, 0.03472476])
-# cdef double[:] spread_3 = np.array([0.04280001, 0.03837332, 0.02765348, 0.01601401])
-
 cpdef void createPolypInputs(object coral) except *:
     """ Map polyp stats to nerual input in [-1, 1] range. """
     cdef int input_idx, i, mi, mbin
@@ -42,7 +38,6 @@ cpdef void createPolypInputs(object coral) except *:
 
     for i in range(coral.n_polyps):
         inputs[i, 0] = (polyp_light[i] * 2) - 1
-        # inputs[i, 1] = (polyp_gravity[i] * 2) - 1
         inputs[i, 1] = (polyp_collection[i] * 2) - 1
 
         input_idx = 2
@@ -87,7 +82,6 @@ cpdef void grow_polyps(object coral) except *:
     cdef double[:,:] polyp_normal = coral.polyp_normal
     cdef double[:,:] pos_next = coral.polyp_pos_next
     cdef double[:,:] morphogensV = coral.morphogens.V
-    # cdef double[:, :] polyp_memory = coral.polyp_memory
     cdef double[:] signal_decay = coral.signal_decay
     cdef int[:] signal_range = coral.signal_range
     cdef double[:] growth = np.zeros(coral.n_polyps)
@@ -137,14 +131,6 @@ cpdef void grow_polyps(object coral) except *:
                     polyp_signals[vert.id, mi] += spreads[sr, d+1] * output[out_idx]
             out_idx += 1
 
-        # # Signals
-        # for mi in range(coral.n_signals):
-        #     if output[out_idx] > 0.5:
-        #         coral.polyp_signals[out_idx, mi] = 1.0
-        #     else:
-        #         coral.polyp_signals[out_idx, mi] = 0.0
-        #     out_idx += 1
-
     cdef double new_volume = coral.mesh.volume()
     coral.mesh.calculateDefect()
 
@@ -163,55 +149,3 @@ cpdef void grow_polyps(object coral) except *:
         pos_next[i, 0] = polyp_pos[i, 0] + g * polyp_normal[i, 0]
         pos_next[i, 1] = polyp_pos[i, 1] + g * polyp_normal[i, 1]
         pos_next[i, 2] = polyp_pos[i, 2] + g * polyp_normal[i, 2]
-
-    # ordering = list(range(coral.n_polyps))
-    # shuffle(ordering)
-
-    # cdef double[:] AB = np.zeros(3)
-
-    # # for i in ordering:
-    # for i in range(coral.n_polyps):
-    #     vert = coral.mesh.verts[i]
-
-    #     neighbors = vert.neighbors()
-
-    #     # Calculate a spring target based off neighbors positions.
-    #     vmultf(spring_target, spring_target, 0.0)
-    #     for neighbor in neighbors:
-    #         # spring_target += target_edge_len * normed(neighbor.p - vert.p)
-    #         vsub(temp, polyp_pos[neighbor.id], vert.p)
-    #         inormalized(temp)
-    #         vmultf(temp, temp, coral.target_edge_len)
-    #         vadd(spring_target, spring_target, temp)
-
-    #     vmultf(spring_target, spring_target, 1.0 / len(neighbors))
-    #     vadd(spring_target, spring_target, vert.p)
-
-    #     # Calculate the smoothed target position.
-    #     temp[0] = (1-spring_strength) * pos_next[i, 0] + spring_strength * spring_target[0]
-    #     temp[1] = (1-spring_strength) * pos_next[i, 1] + spring_strength * spring_target[1]
-    #     temp[2] = (1-spring_strength) * pos_next[i, 2] + spring_strength * spring_target[2]
-
-    #     # Check if the smoothed position is actually behind where we are
-    #     # currently. If so, don't include smoothing term.
-    #     vsub(AB, temp, vert.p)
-    #     if dot(AB, vert.normal) < 0:
-    #         temp[:] = pos_next[i,:]
-
-    #     if temp[1] < 0:
-    #         temp[1] = 0
-
-    #     pos_next[i, :] = temp
-
-    # for i in range(coral.n_polyps):
-    #     vert = coral.mesh.verts[i]
-    #     if pos_next[i, 1] < 0:
-    #         continue
-
-    #     if abs(coral.polyp_verts[i].defect) > coral.params.max_defect:
-    #         coral.polyp_collided[i] = True
-    #         continue
-
-    #     coral.polyp_collided[i] = False
-    #     successful = coral.collisionManager.attemptVertUpdate(vert.id, pos_next[i])
-    #     # coral.polyp_collided[i] = not successful

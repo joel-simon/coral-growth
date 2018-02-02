@@ -59,7 +59,8 @@ class Coral(object):
 
         self.function_times = defaultdict(int)
 
-        assert network.NumInputs() == self.num_inputs, (network.NumInputs(), self.num_inputs)
+        assert network.NumInputs() == self.num_inputs, \
+                   ("Inputs do not match", network.NumInputs(), self.num_inputs)
         assert network.NumOutputs() == self.num_outputs
 
         # Data

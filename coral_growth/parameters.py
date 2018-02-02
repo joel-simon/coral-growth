@@ -1,41 +1,34 @@
 import MultiNEAT as NEAT
 
-class Parameters(NEAT.Parameters):
+class Parameters(object):
     def __init__(self, path=None):
-        super(Parameters, self).__init__()
         self.traits_calculated = False
 
         # Evolution.
-        self.PopulationSize = 100
-        self.OldAgeTreshold = 10
-        self.SpeciesMaxStagnation = 10
-        self.MinSpecies = 3
-        self.MaxSpecies = 8
-        self.OverallMutationRate = 0.6
-        self.MutateAddNeuronProb = 0.05
-        self.MutateAddLinkProb = 0.05
-        self.AllowLoops = False
+        self.neat = NEAT.Parameters()
+        self.neat.PopulationSize = 100
+        self.neat.OldAgeTreshold = 10
+        self.neat.SpeciesMaxStagnation = 10
+        self.neat.MinSpecies = 3
+        self.neat.MaxSpecies = 8
+        self.neat.OverallMutationRate = 0.6
+        self.neat.MutateAddNeuronProb = 0.05
+        self.neat.MutateAddLinkProb = 0.05
+        self.neat.AllowLoops = False
 
         # Coral Growth.
         self.max_polyps = 10000
         self.max_steps = 40
         self.max_growth = .5
         self.max_defect = 1.0
-
         self.max_face_growth = 1.5
-        # self.n_memory = 1
         self.n_signals = 1
         self.n_memory = 0
         self.n_morphogens = 0
         self.morphogen_thresholds = 3
         self.morphogen_steps = 200
-
         self.use_polar_direction = True
-
         self.height_boost = 1
-
-        # Coral enviornment
-        self.light_amount = 0.5
         self.C = 10
 
         if path:
@@ -61,7 +54,7 @@ class Parameters(NEAT.Parameters):
         if ttype == 'int':
             trait['details']['mut_power'] = 1
 
-        self.SetGenomeTraitParameters(name, trait)
+        self.neat.SetGenomeTraitParameters(name, trait)
 
     def calculateTraits(self):
         assert not self.traits_calculated

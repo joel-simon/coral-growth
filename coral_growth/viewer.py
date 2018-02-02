@@ -398,13 +398,13 @@ class AnimationViewer(Viewer):
 
             """ Draw things common to all views at a timestep.
             """
-            flow_data = None
-            voxel_length, flow_data = pickle.load(open(file+'.flow_grid.p', 'rb'))
             gl_list = glGenLists(1)
             glNewList(gl_list, GL_COMPILE)
-            # print()
-            if flow_data is not None:
+            try:
+                voxel_length, flow_data = pickle.load(open(file+'.flow_grid.p', 'rb'))
                 self.draw_flow_grid(voxel_length, flow_data)
+            except FileNotFoundError:
+                pass
             if generation is not None:
                 self.draw_text( 30, 30, 'Generation %i' % generation )
             self.view_list_common.append([ gl_list ])

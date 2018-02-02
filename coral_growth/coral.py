@@ -22,18 +22,18 @@ class Coral(object):
     num_inputs = 3 # [light, collection, extra-bias-bit]
     num_outputs = 1
 
-    def __init__(self, obj_path, network, net_depth, traits, params):
+    def __init__(self, obj_path, network, net_depth, traits, params, save_flow_data=False):
         self.mesh = Mesh.from_obj(obj_path)
         self.network = network
         self.net_depth = net_depth
         self.params = params
+        self.save_flow_data = save_flow_data
         self.C = params.C
         self.n_signals = params.n_signals
         self.n_memory = params.n_memory
         self.max_polyps = params.max_polyps
         self.max_growth = params.max_growth
         self.morphogens = Morphogens(self, traits, params.n_morphogens)
-        self.morphogen_steps = params.morphogen_steps
         self.light_amount = params.light_amount
         self.n_morphogens = params.n_morphogens
         self.morphogen_thresholds = params.morphogen_thresholds
@@ -58,6 +58,7 @@ class Coral(object):
         self.num_outputs = Coral.num_outputs + self.n_memory + self.n_signals + self.n_morphogens
 
         self.function_times = defaultdict(int)
+
         assert network.NumInputs() == self.num_inputs, (network.NumInputs(), self.num_inputs)
         assert network.NumOutputs() == self.num_outputs
 
@@ -113,18 +114,11 @@ class Coral(object):
             self.polyp_collided[i] = self.collisionManager.attemptVertUpdate(vert.id, self.polyp_pos_next[i])
         self.function_times['grow_polyps_p2'] += time.time() - t1
 
-        t1 = time.time()
         relax_mesh(self.mesh)
-        self.function_times['relax_mesh'] += time.time() - t1
-
-        t1 = time.time()
         self.polypDivision() # Divide mesh and create new polyps.
-        self.function_times['polyp_division'] += time.time() - t1
-
         self.updateAttributes()
         np.nan_to_num(self.polyp_gravity, copy=False)
         np.nan_to_num(self.polyp_light, copy=False)
-
         self.age += 1
 
     def updateAttributes(self):
@@ -138,17 +132,14 @@ class Coral(object):
         self.function_times['calculate_light'] += time.time() - t1
 
         t1 = time.time()
-        self.flow_data = flow.calculate_collection(self)
-        # self.polyp_collection *= 100
+        self.flow_data = flow.calculate_collection(self, export=self.save_flow_data)
         self.function_times['calculate_collection'] += time.time() - t1
 
         gravity.calculate_gravity(self)
         self.polyp_signals *= self.signal_decay
 
         t1 = time.time()
-        # self.morphogens.U[:, :] = 0
-        # self.morphogens.V[:, :] = 0
-        self.morphogens.update(self.morphogen_steps) # Update the morphogens.
+        self.morphogens.update(self.params.morphogen_steps)
         self.function_times['morphogens.update'] += time.time() - t1
 
         t1 = time.time()
@@ -158,37 +149,23 @@ class Coral(object):
     def calculateEnergy(self):
         self.light = 0
         self.collection = 0
-
-        # tree = KDTree(self.polyp_pos[:self.n_polyps], leafsize=16)
-        # d, indx = tree.query(self.polyp_pos[:self.n_polyps], k=15)
-        # print('avg d', np.mean(d), np.mean(self.polyp_pos[:self.n_polyps, 1]))
-        # collection_boost = (self.polyp_pos[:self.n_polyps, 1] + .1 * np.mean(d, axis=1)) ** self.params.height_boost
-        light_boost = self.polyp_pos[:self.n_polyps, 1] ** self.params.height_boost
-        np.nan_to_num(light_boost, copy=False)
+        boost = self.polyp_pos[:self.n_polyps, 1] ** self.params.height_boost
+        np.nan_to_num(boost, copy=False)
 
         for face in self.mesh.faces:
             area = face.area()
-
             v1, v2, v3 = face.vertices()
-
-            self.light += area / 3 * (self.polyp_light[v1.id]*light_boost[v1.id] + \
-                                      self.polyp_light[v2.id]*light_boost[v2.id] +
-                                      self.polyp_light[v2.id]*light_boost[v3.id])
-
-            self.collection += area / 3 * (self.polyp_collection[v1.id] + \
-                                           self.polyp_collection[v2.id] +
-                                           self.polyp_collection[v2.id])
-
-            # self.collection += area / 3 * (self.polyp_collection[v1.id]*collection_boost[v1.id] + \
-            #                                self.polyp_collection[v2.id]*collection_boost[v2.id] +
-            #                                self.polyp_collection[v2.id]*collection_boost[v3.id])
-
+            self.light += area / 3 * (self.polyp_light[v1.id]*boost[v1.id] + \
+                                      self.polyp_light[v2.id]*boost[v2.id] +
+                                      self.polyp_light[v2.id]*boost[v3.id])
+            self.collection += area / 3 * (self.polyp_collection[v1.id]*boost[v1.id] + \
+                                           self.polyp_collection[v2.id]*boost[v2.id] +
+                                           self.polyp_collection[v2.id]*boost[v2.id])
         if self.start_collection:
             self.collection /= self.start_collection
             self.light /= self.start_light
 
-        self.energy = self.light*self.light_amount + \
-                      self.collection*(1-self.light_amount)
+        self.energy = self.light*self.light_amount + self.collection*(1-self.light_amount)
 
     def createPolyp(self, vert):
         if self.n_polyps == self.max_polyps:
@@ -253,74 +230,54 @@ class Coral(object):
 
         for i in range(self.n_morphogens):
             header.append( 'mu_%i' % i )
-
         for i in range(self.n_signals):
             header.append( 'sig_%i' % i )
-
         # for i in range(self.n_memory):
         #     header.append( 'mem_%i' % i )
 
         header.extend([ 'light', 'collection', 'curvature' ])
-
         out.write('#Exported from coral_growth\n')
         out.write('#attr light:%f collection:%f energy:%f\n' % \
                                      (self.light, self.collection, self.energy))
         out.write('#coral ' + ' '.join(header) + '\n')
-
         mesh_data = self.mesh.export()
-
         id_to_indx = dict()
 
+        # Write vertices (position and color)
         for i, vert in enumerate(self.mesh.verts):
             r, g, b = 0, 0, 0
-
             if self.n_morphogens > 0:
                 g = self.morphogens.U[0, i]
-
             if self.n_morphogens > 1:
                 b = self.morphogens.U[1, i]
-
             out.write('v %f %f %f %f %f %f\n' % (tuple(vert.p)+(r, g, b)))
             id_to_indx[vert.id] = i
-
         out.write('\n\n')
 
-        polyp_attributes = [None] * self.n_polyps
-
-        # for i in range(self.n_polyps):
-        #     self.polyp_collided[i] = abs(self.polyp_verts[i].defect) > self.params.max_defect
-
-        # print(self.polyp_collection[:self.n_polyps].max())
-
+        # Write coral data lines.
+        p_attributes = [None] * self.n_polyps
         for i in range(self.n_polyps):
             indx = id_to_indx[self.polyp_verts[i].id]
-            polyp_attributes[indx] = []
+            p_attributes[indx] = []
 
             for j in range(self.n_morphogens):
-                polyp_attributes[indx].append(self.morphogens.U[j, i])
+                p_attributes[indx].append(self.morphogens.U[j, i])
 
-            polyp_attributes[indx].extend(self.polyp_signals[i])
-            polyp_attributes[indx].extend([ self.polyp_light[i],
-                                       self.polyp_collection[i],
-                                       # self.polyp_gravity[i],
-                                       abs(self.polyp_verts[i].defect)/8*pi,
-                                       # self.polyp_collided[i]
-                                       ])
+            p_attributes[indx].extend(self.polyp_signals[i])
+            p_attributes[indx].extend([ self.polyp_light[i], self.polyp_collection[i],
+                                        abs(self.polyp_verts[i].defect)/8*pi ])
 
-            assert len(polyp_attributes[indx]) == len(header)
+            assert len(p_attributes[indx]) == len(header)
 
-        for attributes in polyp_attributes:
+        for attributes in p_attributes:
             out.write('c ' + ' '.join(map(str, attributes)) + '\n')
 
+        # Write Faces/
         out.write('\n')
-
         for face in mesh_data['faces']:
             out.write('f %i %i %i\n' % tuple(face + 1))
 
-        # f = open(path+'.grid.p', 'wb')
-        # pickle.dump((self.voxel_length, self.voxel_grid), f)
-        # f.close()
-
-        f = open(path+'.flow_grid.p', 'wb')
-        pickle.dump((self.voxel_length, self.flow_data), f)
-        f.close()
+        if self.save_flow_data:
+            f = open(path+'.flow_grid.p', 'wb')
+            pickle.dump((self.voxel_length, self.flow_data), f)
+            f.close()

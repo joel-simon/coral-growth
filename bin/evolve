@@ -19,7 +19,7 @@ params = Parameters()
 
 # Neat params
 params.MinSpecies = 3
-params.PopulationSize = 100
+params.PopulationSize = 60
 
 # Simulation params.
 params.n_signals = 2
@@ -30,7 +30,7 @@ params.max_defect = 1.5
 params.C = 0.15
 params.max_growth = .35
 params.max_polyps = 10000
-params.max_steps = 80
+params.max_steps = 70
 params.light_amount = 0.8
 params.calculateTraits()
 

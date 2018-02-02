@@ -1,214 +1,197 @@
-# # cython: boundscheck=True
-# # cython: wraparound=False
-# # cython: initializedcheck=False
-# # cython: nonecheck=False
-# # cython: cdivision=True
-# import math
-# from libc.math cimport round
-# import numpy as np
-# cimport numpy as np
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: initializedcheck=False
+# cython: nonecheck=False
+# cython: cdivision=True
+import math
+from libc.math cimport round
+import numpy as np
+cimport numpy as np
 
-# cdef int[:,:,:] calc_can_flow(int[:,:,:] obstacles) except *:
-#     cdef int x, y, z
-#     cdef list opens
-#     cdef int nx = obstacles.shape[0]
-#     cdef int ny = obstacles.shape[1]
-#     cdef int nz = obstacles.shape[2]
-#     cdef int[:,:,:] can_flow = np.zeros_like(obstacles)
-#     can_flow[nx-1,:,:] = 1
+from minheap import MinHeap
 
-#     cdef int[:,:] seen = np.zeros((ny, nz), dtype='i')
+cdef int[:,:] neighbors = np.array([[-1, 0, 0], [1, 0, 0], [0, 1, 0],
+                                    [0, -1, 0], [0, 0, -1], [0, 0, 1]], dtype='int32')
 
-#     for x in range(nx-2, -1, -1):
-#         for y in range(ny):
-#             for z in range(nz):
-#                 can_flow[x, y, z] = can_flow[x+1, y, z] and not obstacles[x, y, z]
+cdef list reconstruct_path(int[:,:,:,:] came_from, int[:] start, int[:] goal):
+    cdef int cx = goal[0]
+    cdef int cy = goal[1]
+    cdef int cz = goal[2]
+    cdef list path = []
+    cdef int cx2, cy2, cz2
+    while cx != start[0] and cy != start[1] and cz != start[2]:
+        path.append((cx, cy, cz))
+        cx2 = came_from[cx, cy, cz, 0]
+        cy2 = came_from[cx, cy, cz, 1]
+        cz2 = came_from[cx, cy, cz, 2]
+        cx, cy, cz = cx2, cy2, cz2
+    path.reverse()
+    return path
 
-#         # FLOOD FILL
-#         seen[:,:] = 0
-#         opens = []
+cdef void add_to_path(float[:,:,:] grid, float value, int[:,:,:,:] came_from, \
+                      int[:] start, int[:] goal) except *:
+    cdef int cx = goal[0]
+    cdef int cy = goal[1]
+    cdef int cz = goal[2]
+    cdef int cx2, cy2, cz2
+    while cx != start[0] and cy != start[1] and cz != start[2]:
+        grid[cx, cy, cz] += value
+        cx2 = came_from[cx, cy, cz, 0]
+        cy2 = came_from[cx, cy, cz, 1]
+        cz2 = came_from[cx, cy, cz, 2]
+        cx, cy, cz = cx2, cy2, cz2
 
-#         for y in range(ny):
-#             for z in range(nz):
-#                 if can_flow[x, y, z]:
-#                     opens.append((y, z))
+cpdef tuple calculate_flow(int[:,:,:] grid, int n_iters, bint export=False):
+    cdef int i, x, y, z
+    cdef int nx = grid.shape[0]
+    cdef int ny = grid.shape[1]
+    cdef int nz = grid.shape[2]
+    cdef float[:,:,:] travel_sum = np.zeros_like(grid, dtype='float32')
+    cdef float[:,:,:] cost_grid = np.zeros_like(grid, dtype='float32')
+    cdef list paths = None
+    cdef int[:] path_start = np.array([-1, -1, -1], dtype='i')
+    cdef int[:] path_end = np.zeros(3, dtype='i')
+    cdef int[:,:,:,:] came_from
+    cdef float[:,:,:] cost_so_far
 
-#         while opens:
-#             y, z = opens.pop()
-#             if z > 0 and not seen[y, z-1] and not obstacles[x, y, z-1]:
-#                 can_flow[x, y, z-1] = 1
-#                 opens.append((y, z-1))
-#                 seen[y, z-1] = 1
-#             if z < nz -1 and not seen[y, z+1] and not obstacles[x, y, z+1]:
-#                 can_flow[x, y, z+1] = 1
-#                 opens.append((y, z+1))
-#                 seen[y, z+1] = 1
-#             if y > 0 and not seen[y-1, z] and not obstacles[x, y-1, z]:
-#                 can_flow[x, y-1, z] = 1
-#                 opens.append((y-1, z))
-#                 seen[y-1, z] = 1
-#             if y < ny -1 and not seen[y+1, z] and not obstacles[x, y+1, z]:
-#                 can_flow[x, y+1, z] = 1
-#                 opens.append((y+1, z))
-#                 seen[y+1, z] = 1
+    for i in range(n_iters):
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    cost_grid[x, y, z] = 1 + (travel_sum[x, y, z] / (i+1))
 
-#     return can_flow
+        came_from, cost_so_far = dijkstra_search(grid, cost_grid, 0)
+        for y in range(ny):
+            for z in range(nz):
+                path_end[0] = nx-1
+                path_end[1] = y
+                path_end[2] = z
+                add_to_path(travel_sum, .5 / (i+1), came_from, path_start, path_end)
 
-# cdef void flow_particle(int x, int y, int z, float v, float[:,:,:] grid,\
-#                         int[:,:,:] can_flow, int dy, int dz) except *:
-#     cdef int y2 = y
-#     cdef int z2 = z
-#     cdef int ny = can_flow.shape[1]
-#     cdef int nz = can_flow.shape[2]
+    travel_avg = np.array(travel_sum) / (i+1)
 
-#     while not can_flow[x+1, y2, z2]:
-#         if y2+dy < 0 or z2+dz < 0 or y2+dy > ny-1 or z2+dz > nz-1:
-#             return
-#         elif can_flow[x, y2+dy, z2+dz]:
-#             y2 += dy
-#             z2 += dz
-#         else:
-#             return
+    if export:
+        paths = []
+        for y in range(ny):
+            for z in range(nz):
+                path_end[0] = nx-1
+                path_end[1] = y
+                path_end[2] = z
+                paths.append(reconstruct_path(came_from, path_start, path_end))
+        return travel_avg, paths
+    else:
+        return travel_avg, None
 
-#     if y == y2 and z == z2:
-#         return
+cpdef tuple dijkstra_search(int[:,:,:] grid, float[:,:,:] cost_grid, int startx):
+    cdef int pid
+    cdef float new_cost
+    cdef int x, y, z, x2, y2, z2
+    cdef int nx = grid.shape[0]
+    cdef int ny = grid.shape[1]
+    cdef int nz = grid.shape[2]
+    cdef int nynz = ny*nz
 
-#     v /= (abs(y2 - y) + abs(z2 - z))**2
+    frontier = MinHeap()
+    cdef int[:,:,:,:] came_from = np.zeros((nx, ny, nz, 3), dtype='int32')
+    cdef float[:,:,:] cost_so_far = np.zeros_like(grid, dtype='float32')
 
-#     while y != y2 or z != z2:
-#         y += dy
-#         z += dz
-#         grid[x, y, z] += v
+    for y in range(ny):
+        for z in range(nz):
+            pid = startx*nynz + y*nz + z
+            frontier.push({"id": pid, "price": 0})
+            came_from[startx, y, z, 0] = -1
+            came_from[startx, y, z, 1] = -1
+            came_from[startx, y, z, 2] = -1
+            cost_so_far[startx, y, z] = 1.0
 
-# cpdef tuple calculate_flow(int[:,:,:] obstacles, float capture_percent,
-#                            float fluid_diffusion):
-#     cdef int x, y, z
-#     cdef int nx = obstacles.shape[0]
-#     cdef int ny = obstacles.shape[1]
-#     cdef int nz = obstacles.shape[2]
-#     cdef float v, f, y_down, y_up, z_down, z_up, df
-#     cdef float[:, :] xm1 = np.zeros((ny, nz), dtype='float32')
-#     cdef float[:,:,:] flow = np.zeros_like(obstacles, dtype='float32')
-#     cdef float[:,:,:] collection = np.zeros_like(obstacles, dtype='float32')
-#     cdef int[:,:,:] can_flow = calc_can_flow(obstacles)
+    while True:
+        try:
+            pid = frontier.pop()['id']
+            x = pid // (nynz)
+            y = (pid-x*(nynz)) // nz
+            z = pid % nz
 
-#     flow[0,:,:] = 1
+        except IndexError:
+            break
 
-#     for x in range(1, nx):
-#         xm1[:, :] = flow[x-1, :, :]
-#         for y in range(ny):
-#             for z in range(nz):
-#                 # First flow the positions that cannot go directly straight.
-#                 if not can_flow[x, y, z] and flow[x-1, y, z]:
-#                     # Split evenly in four direction.
-#                     v = xm1[y, z]*.25
+        for i in range(6):
+            x2 = x + neighbors[i, 0]
+            y2 = y + neighbors[i, 1]
+            z2 = z + neighbors[i, 2]
 
-#                     if y > 0:
-#                         flow_particle(x-1, y, z, v, flow, can_flow, -1, 0)
-#                     if y < ny - 1:
-#                         flow_particle(x-1, y, z, v, flow, can_flow, 1, 0)
-#                     if z > 0:
-#                         flow_particle(x-1, y, z, v, flow, can_flow, 0, -1)
-#                     if z < nz - 1:
-#                         flow_particle(x-1, y, z, v, flow, can_flow, 0, 1)
+            if x2<0 or y2<0 or z2<0 or x2>nx-1 or y2>ny-1 or z2>nz-1:
+                continue
 
-#         # Step all forward and apply diffusion
-#         for y in range(ny):
-#             for z in range(nz):
-#                 if can_flow[x, y, z]:
-#                     # Update flow
-#                     f = flow[x-1, y, z]
-#                     y_down = flow[x-1, y-1, z] if y > 0 and not obstacles[x,y-1,z] else f
-#                     y_up = flow[x-1, y+1, z] if y < ny-1 and not obstacles[x,y+1,z] else f
-#                     z_down = flow[x-1, y, z-1] if z > 0 and not obstacles[x, y, z-1] else f
-#                     z_up = flow[x-1, y, z+1] if z < nz-1 and not obstacles[x, y, z+1] else f
+            if grid[x2, y2, z2] == 1:
+                continue
 
-#                     flow[x, y, z] = (1-fluid_diffusion)*f + (fluid_diffusion*.25)*(y_up + y_down + z_up + z_down)
+            new_cost = cost_so_far[x, y, z] + cost_grid[x2, y2, z2]
+            if cost_so_far[x2, y2, z2] == 0 or new_cost < cost_so_far[x2, y2, z2]:
+                cost_so_far[x2, y2, z2] = new_cost
+                frontier.push({"id":(x2*nynz)+(y2*nz)+z2, "price": new_cost})
+                came_from[x2, y2, z2, 0] = x
+                came_from[x2, y2, z2, 1] = y
+                came_from[x2, y2, z2, 2] = z
 
-#                     # Polyps slow the flow around them, collecting resources
-#                     df = f * capture_percent * .25
-#                     if y > 0 and obstacles[x,y-1,z]:
-#                         collection[x, y-1, z] += df
-#                         flow[x, y, z] -=  df
-#                     if y < ny-1 and obstacles[x,y+1,z]:
-#                         collection[x, y+1, z] += df
-#                         flow[x, y, z] -= df
-#                     if z > 0 and obstacles[x, y, z-1]:
-#                         collection[x, y, z-1] += df
-#                         flow[x, y, z] -= df
-#                     if z < nz-1 and obstacles[x, y, z+1]:
-#                         collection[x, y, z+1] += df
-#                         flow[x, y, z] -= df
+    return came_from, cost_so_far
 
-#     return flow, collection
+cpdef tuple create_voxel_grid(coral):
+    cdef int i, vx, vy, vz
+    cpdef double[:] p
 
-# cpdef calculate_collection(coral, int radius=2, float capture_percent=.1,
-#                            float fluid_diffusion=.5):
-#     cdef int i, x, y, z, n, nx, ny, nz, x2, y2, z2
-#     cdef float total, capture
-#     cdef float voxel_length = coral.voxel_length
-#     cdef double [:] polyp_collection = coral.polyp_collection
-#     cdef double[:,:] polyp_pos = coral.polyp_pos
-#     cdef float[:,:,:] flow_grid
-#     cdef float[:,:,:] capture_grid
-#     cdef int[:,:] voxel_p = np.zeros((coral.n_polyps, 3), dtype='i')
-#     cdef int[:, :, :] voxel_grid
-#     n = coral.n_polyps
+    # Cast coral objects for fast access.
+    cdef double voxel_length = coral.voxel_length
+    cdef double[:,:] polyp_pos = coral.polyp_pos
 
-#     ############################################################################
-#     # Calculate voxel position and grid size for each polyp.
-#     for i in range(n):
-#         voxel_p[i, 0] = <int>(round(polyp_pos[i,0] / voxel_length))
-#         voxel_p[i, 1] = <int>(round(polyp_pos[i,1] / voxel_length))
-#         voxel_p[i, 2] = <int>(round(polyp_pos[i,2] / voxel_length))
+    # Map each polyp to its voxel positions. This contains negatives at first.
+    cdef int [:,:] polyp_voxel = np.zeros((coral.n_polyps, 3), dtype='int32')
+    for i in range(coral.n_polyps):
+        polyp_voxel[i, 0] = <int>(round(polyp_pos[i, 0] / voxel_length))
+        polyp_voxel[i, 1] = <int>(round(polyp_pos[i, 1] / voxel_length))
+        polyp_voxel[i, 2] = <int>(round(polyp_pos[i, 2] / voxel_length))
 
-#     cdef int[:] min_v = np.min(voxel_p, axis=0)
-#     cdef int[:] max_v = np.max(voxel_p, axis=0)
+    # Calculate the size of the grid.
+    cdef int[:] min_v = np.min(polyp_voxel, axis=0)
+    cdef int[:] max_v = np.max(polyp_voxel, axis=0)
+    padding = np.array([4, 2, 4], dtype='int32')
+    cdef int[:] offset = padding - 2
+    cdef int[:,:,:] voxel_grid = np.zeros(padding + max_v - min_v + [2, 1, 2], dtype='int32')
 
-#     # Have an offset on either side for fluid to flow around.
-#     nx = max_v[0] - min_v[0] + 3
-#     ny = max_v[1] - min_v[1] + 2
-#     nz = max_v[2] - min_v[2] + 3
+    for i in range(polyp_voxel.shape[0]):
+        polyp_voxel[i, 0] += offset[0] - min_v[0]
+        polyp_voxel[i, 1] += offset[1] - min_v[1]
+        polyp_voxel[i, 2] += offset[2] - min_v[2]
 
-#     ############################################################################
-#     # Build a voxel grid based off of polyp positions.
-#     voxel_grid = np.zeros((nx, ny, nz), dtype='i')
-#     voxel_grid_rev = np.zeros((nx, ny, nz), dtype='i')
+    for i in range(coral.n_polyps):
+        voxel_grid[polyp_voxel[i,0], polyp_voxel[i,1], polyp_voxel[i,2]] = 1
 
-#     for i in range(n):
-#         x = (voxel_p[i, 0] - min_v[0] + 1)
-#         y = voxel_p[i, 1] - min_v[1]
-#         z = voxel_p[i, 2] - min_v[2] + 1
-#         voxel_grid[x, y, z] = 1
-#         voxel_grid_rev[nx-x, y, z] = 1
+    for face in coral.mesh.faces:
+        p = face.midpoint()
+        vx = <int>(round(p[0] / voxel_length)) - min_v[0] + offset[0]
+        vy = <int>(round(p[1] / voxel_length)) - min_v[1] + offset[1]
+        vz = <int>(round(p[2] / voxel_length)) - min_v[2] + offset[2]
+        voxel_grid[vx, vy, vz] = 1
 
-#     ############################################################################
+    return polyp_voxel, voxel_grid, (np.array(min_v) - offset)
 
-#     # Main calculation
-#     # Very Hacky method to flow both directions.
-#     flow_grid1, capture_grid1 = calculate_flow(voxel_grid, capture_percent,
-#                                              fluid_diffusion)
-#     flow_grid2, capture_grid2 = calculate_flow(voxel_grid_rev, capture_percent,
-#                                              fluid_diffusion)
-#     # flow_grid = (np.asarray(flow_grid1) + np.asarray(flow_grid2)) * .5
-#     # capture_grid = (np.asarray(capture_grid1) + np.asarray(capture_grid2)) * .5
+cpdef void calculate_collection_from_flow(double[:] collection, int[:,:] voxels,\
+                                          float[:,:,:] flow_grid, int radius=1) except *:
+    cdef int i, x, y, z, dx, dy, dz
+    cdef float seen
+    cdef float total = float((2*radius+1)**3)
+    cdef int nx = flow_grid.shape[0]
+    cdef int ny = flow_grid.shape[1]
+    cdef int nz = flow_grid.shape[2]
 
-#     # Use flow values to calculate collection values. Simple neighbor average.
-#     total = float((2*radius+1)**3)
+    for i in range(voxels.shape[0]):
+        x = voxels[i, 0]
+        y = voxels[i, 1]
+        z = voxels[i, 2]
+        seen = 0
+        for dx in range(x-radius, x+radius+1):
+            for dy in range(y-radius, y+radius+1):
+                for dz in range(z-radius, z+radius+1):
+                    if dx>0 and dy>0 and dz>0 and dx<nx-1 and dy<ny-1 and dz<nz-1:
+                        seen += flow_grid[dx, dy, dz]
 
-#     for i in range(n):
-#         x = voxel_p[i, 0] - min_v[0] + 1
-#         y = voxel_p[i, 1] - min_v[1]
-#         z = voxel_p[i, 2] - min_v[2] + 1
-
-#         capture = 0
-#         for x2 in range(x-radius, x+radius+1):
-#             for y2 in range(y-radius, y+radius+1):
-#                 for z2 in range(z-radius, z+radius+1):
-#                     if x2 > 0 and y2 > 0 and z2 > 0 and x2 < nx-1 and y2 < ny-1 and z2 < nz-1:
-#                         capture += capture_grid1[x2, y2, z2]
-#                         capture += capture_grid2[nx-x2, y2, z2]
-
-#         polyp_collection[i] = capture / (2*total)
-
-#     return np.asarray(flow_grid1), np.asarray(capture_grid1), np.asarray(min_v)-1
+        collection[i] = seen / total

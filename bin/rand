@@ -43,13 +43,13 @@ def create_initial_population():
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
         0, # Seed type, must be 1 to have hidden nodes.
-        params,
+        params.neat,
         0,
     )
 
     pop = NEAT.Population(
         genome_prototype, # Seed genome.
-        params,
+        params.neat,
         True, # Randomize weights.
         1.0, # Random Range.
         int(time.time()) # Random number generator seed.

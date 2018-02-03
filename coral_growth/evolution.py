@@ -11,7 +11,8 @@ def create_initial_population(params):
                  params.n_morphogens*(params.morphogen_thresholds - 1) + \
                  (4 * params.use_polar_direction)
 
-    num_outputs = Coral.num_outputs + params.n_memory + params.n_signals + params.n_morphogens
+    num_outputs = Coral.num_outputs + params.n_memory + params.n_signals + \
+                  params.n_morphogens
 
     genome_prototype = NEAT.Genome(
         0, # ID
@@ -23,9 +24,8 @@ def create_initial_population(params):
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
         0, # Seed type, must be 1 to have hidden nodes.
         params.neat,
-        0,
+        0
     )
-
     pop = NEAT.Population(
         genome_prototype, # Seed genome.
         params.neat,

@@ -277,6 +277,7 @@ class Coral(object):
         out.write('\n')
         for face in mesh_data['faces']:
             out.write('f %i %i %i\n' % tuple(face + 1))
+        out.close()
 
         if self.save_flow_data:
             f = open(path+'.flow_grid.p', 'wb')

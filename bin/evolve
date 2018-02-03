@@ -10,6 +10,7 @@ import MultiNEAT as NEAT
 from coral_growth.parameters import Parameters
 from coral_growth.evolve_neat import evolve_neat
 from coral_growth.evolve_novelty import evolve_novelty
+from coral_growth.evolve_local import evolve_local
 
 def generate_id(n):
     options = string.ascii_uppercase + string.digits
@@ -20,9 +21,16 @@ if __name__ == '__main__':
     parser.add_argument("--gens", default=100, help="Generations.", type=int)
     parser.add_argument("--out", default='../output', help="Output dir.")
     parser.add_argument("--cores", default=1, help="Number of cores.", type=int)
-    parser.add_argument('--novelty', action='store_true')
-
+    parser.add_argument('--method', default='neat')
     args = parser.parse_args()
+
+    methods = ['neat', 'novelty', 'local']
+
+    if args.method not in methods:
+        print('Error: method not recognized', args.method)
+        print('Method must be one of', methods)
+        exit()
+
     print(args)
     rid = generate_id(4)
     print('Run ID: ', rid)
@@ -35,9 +43,9 @@ if __name__ == '__main__':
     params.n_signals = 2
     params.n_morphogens = 1
     params.morphogen_thresholds = 2
-    params.height_boost = 0.25
+    params.height_boost = 0.0
     params.max_defect = 1.5
-    params.C = 0.15
+    params.C = .15
     params.max_growth = .35
     params.max_polyps = 10000
     params.max_steps = 70
@@ -46,9 +54,12 @@ if __name__ == '__main__':
 
     pool = None
 
-    if args.novelty:
-        params.neat.PopulationSize = params.neat.PopulationSize // 4
+    if args.method == "novelty":
+        params.neat.PopulationSize = 24
         dir_name = rid+"__novelty_{:%B_%d_%Y_%H_%M}".format(datetime.now())
+    elif args.method == "local":
+        params.neat.PopulationSize = 24
+        dir_name = rid+"__local_{:%B_%d_%Y_%H_%M}".format(datetime.now())
     else:
         dir_name = rid+"__{:%B_%d_%Y_%H_%M}".format(datetime.now())
 
@@ -62,8 +73,10 @@ if __name__ == '__main__':
     if args.cores > 1:
         pool = Pool(processes=args.cores)
 
-    if args.novelty:
+    if args.method == "novelty":
         evolve_novelty(params, args.gens, dir_path, rid, pool)
+    elif args.method == "local":
+        evolve_local(params, args.gens, dir_path, rid, pool)
     else:
         evolve_neat(params, args.gens, dir_path, rid, pool)
 

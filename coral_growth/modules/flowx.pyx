@@ -41,7 +41,7 @@ cdef void add_to_path(float[:,:,:] grid, float value, int[:,:,:,:] came_from, \
         cz2 = came_from[cx, cy, cz, 2]
         cx, cy, cz = cx2, cy2, cz2
 
-cpdef tuple calculate_flow(int[:,:,:] grid, int n_iters, bint export=False):
+cpdef tuple calculate_flow(int[:,:,:] grid, int n_iters, bint reverse=False, bint export=False):
     cdef int i, x, y, z
     cdef int nx = grid.shape[0]
     cdef int ny = grid.shape[1]
@@ -54,16 +54,18 @@ cpdef tuple calculate_flow(int[:,:,:] grid, int n_iters, bint export=False):
     cdef int[:,:,:,:] came_from
     cdef float[:,:,:] cost_so_far
 
+    cdef int startx = (nx-1 if reverse else 0)
+
     for i in range(n_iters):
         for x in range(nx):
             for y in range(ny):
                 for z in range(nz):
                     cost_grid[x, y, z] = 1 + (travel_sum[x, y, z] / (i+1))
 
-        came_from, cost_so_far = dijkstra_search(grid, cost_grid, 0)
+        came_from, cost_so_far = dijkstra_search(grid, cost_grid, startx)
         for y in range(ny):
             for z in range(nz):
-                path_end[0] = nx-1
+                path_end[0] = 0 if reverse else nx-1
                 path_end[1] = y
                 path_end[2] = z
                 add_to_path(travel_sum, .5 / (i+1), came_from, path_start, path_end)
@@ -74,7 +76,7 @@ cpdef tuple calculate_flow(int[:,:,:] grid, int n_iters, bint export=False):
         paths = []
         for y in range(ny):
             for z in range(nz):
-                path_end[0] = nx-1
+                path_end[0] = 0 if reverse else nx-1
                 path_end[1] = y
                 path_end[2] = z
                 paths.append(reconstruct_path(came_from, path_start, path_end))

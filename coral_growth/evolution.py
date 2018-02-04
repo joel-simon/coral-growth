@@ -19,7 +19,7 @@ def create_initial_population(params):
         num_inputs,
         0, # NUM_HIDDEN
         num_outputs,
-        False, # FS_NEAT
+        True, # FS_NEAT
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
         0, # Seed type, must be 1 to have hidden nodes.

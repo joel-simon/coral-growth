@@ -69,6 +69,7 @@ class Coral(object):
         self.light = 0
         self.n_polyps = 0
         self.start_collection = None
+        self.volume = None
         self.polyp_inputs = np.zeros((self.max_polyps, self.num_inputs))
         self.polyp_verts = [None] * self.max_polyps
         self.polyp_light = np.zeros(self.max_polyps)
@@ -147,6 +148,8 @@ class Coral(object):
         self.calculateEnergy()
         self.function_times['calculateEnergy'] += time.time() - t1
 
+        self.volume = self.mesh.volume()
+
     def calculateEnergy(self):
         self.light = 0
         self.collection = 0
@@ -199,9 +202,8 @@ class Coral(object):
         for face in self.mesh.faces:
             if face.area() > self.max_face_area:
                 split(self.mesh, face, max_vertices=self.max_polyps)
-
-            if self.n_polyps == self.max_polyps:
-                break
+                if self.n_polyps == self.max_polyps:
+                    break
 
         for vert in self.mesh.verts:
             if 'polyp' not in vert.data:
@@ -209,9 +211,11 @@ class Coral(object):
 
     def fitness(self, verbose=False):
         if verbose:
+            print('n_polyps=',self.n_polyps)
             print('Light=', self.light)
             print('Collection=', self.collection)
             print('Energy=', self.energy)
+            print('Volume=', self.volume)
 
         return self.energy
 

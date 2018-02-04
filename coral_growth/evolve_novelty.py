@@ -30,6 +30,11 @@ def feature_vector(coral):
     # features[3:8] = np.histogram(c, bins=5, range=None, normed=True)[0]
     # for i in range(params.n_morphogens):
     #     features[8+i] = np.mean(coral.morphogens.U[i, :coral.n_polyps])
+    # for i in range(coral.n_morphogens):
+        # features.append(np.mean(coral.morphogens.U[i, :coral.n_polyps]))
+    # for i in range(coral.n_signals):
+        # features.append(np.mean(coral.polyp_signals[:coral.n_polyps, i]))
+    # return features
 
 def evaluate_novelty(genome, traits, params):
     try:

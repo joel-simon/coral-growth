@@ -60,10 +60,10 @@ cpdef void createPolypInputs(object coral) except *:
         if use_polar_direction:
             azimuthal_angle = atan(polyp_normal[i, 1] / polyp_normal[i, 0])
             polar_angle = acos(polyp_normal[i, 2])
-            inputs[input_idx] = cos(azimuthal_angle)
-            inputs[input_idx+1] = sin(azimuthal_angle)
-            inputs[input_idx+2] = cos(polar_angle)
-            inputs[input_idx+3] = sin(polar_angle)
+            inputs[i, input_idx] = cos(azimuthal_angle)
+            inputs[i, input_idx+1] = sin(azimuthal_angle)
+            inputs[i, input_idx+2] = cos(polar_angle)
+            inputs[i, input_idx+3] = sin(polar_angle)
             input_idx += 4
 
         inputs[i, input_idx] = 1 # Bias Bit
@@ -136,8 +136,8 @@ cpdef void grow_polyps(object coral) except *:
 
     polyp_pos[:coral.n_polyps, :] = polyp_pos_past[:coral.n_polyps,:]
 
+    # growth_scalar = coral.C
     total_growth = new_volume - old_volume
-
     if total_growth == 0:
         growth_scalar = 0.0
     else:

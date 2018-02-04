@@ -18,6 +18,7 @@ class Parameters(object):
 
         # Coral Growth.
         self.max_polyps = 10000
+        self.max_volume = 40.0
         self.max_steps = 40
         self.max_growth = .5
         self.max_defect = 1.0

@@ -99,29 +99,25 @@ class Coral(object):
     def step(self):
         t1 = time.time()
         grow_polyps(self)
-        # TODO: clean up this mess below :(
-        self.polyp_pos_past[:] = self.polyp_pos[:]
-        self.polyp_pos[:] = self.polyp_pos_next[:]
-        self.mesh.calculateDefect()
-        self.polyp_pos[:] = self.polyp_pos_past[:]
-        self.function_times['grow_polyps_p1'] += time.time() - t1
-
-        t1 = time.time()
-        for i in range(self.n_polyps):
-            vert = self.mesh.verts[i]
-            if self.polyp_pos_next[i, 1] < 0:
-                continue
-            if abs(self.polyp_verts[i].defect) > self.params.max_defect:
-                continue
-            self.polyp_collided[i] = self.collisionManager.attemptVertUpdate(vert.id, self.polyp_pos_next[i])
-        self.function_times['grow_polyps_p2'] += time.time() - t1
-
+        self.smoothSharp()
+        self.function_times['grow_polyps_p1'] += time.time()-t1
         relax_mesh(self.mesh)
         self.polypDivision() # Divide mesh and create new polyps.
         self.updateAttributes()
-        np.nan_to_num(self.polyp_gravity, copy=False)
-        np.nan_to_num(self.polyp_light, copy=False)
         self.age += 1
+
+    def smoothSharp(self):
+        self.mesh.calculateDefect()
+        for vert in self.mesh.verts:
+            if abs(vert.defect) > self.params.max_defect:
+                avg = np.zeros(3)
+                neighbors = vert.neighbors()
+                for vert2 in neighbors:
+                    avg += vert2.p
+                vert.p += avg / len(neighbors)
+                vert.p[0] *= .5
+                vert.p[1] *= .5
+                vert.p[2] *= .5
 
     def updateAttributes(self):
         self.mesh.calculateNormals()
@@ -129,7 +125,7 @@ class Coral(object):
 
         t1 = time.time()
         light.calculate_light(self) # Update the light
-        self.polyp_light[self.polyp_light != 0] -= .5
+        self.polyp_light[self. polyp_light!= 0] -= .5
         self.polyp_light *= 2 # all light values go from 0-1
 
         below = self.polyp_pos[:, 1] < self.params.gradient_height
@@ -155,6 +151,8 @@ class Coral(object):
         self.function_times['calculateEnergy'] += time.time() - t1
 
         self.volume = self.mesh.volume()
+        np.nan_to_num(self.polyp_gravity, copy=False)
+        np.nan_to_num(self.polyp_light, copy=False)
 
     def calculateEnergy(self):
         self.light = 0

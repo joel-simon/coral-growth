@@ -3,7 +3,7 @@ import time
 from coral_growth.coral import Coral
 import MultiNEAT as NEAT
 
-obj_path = os.getcwd() + '/../data/half_sphere_smooth4.obj'
+obj_path = os.getcwd() + '/../data/half_sphere_smooth.obj'
 
 def export(coral, folder, w_i, s):
     path = os.path.join(folder, str(w_i), '%i.coral.obj'%s)

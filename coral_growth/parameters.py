@@ -72,4 +72,4 @@ class Parameters(object):
 
         for i in range(self.n_signals):
             self.addTrait('signal_decay%i'%i, (0.0, .5))
-            self.addTrait('signal_range%i'%i, [0, 1], ttype='int')
+            self.addTrait('signal_range%i'%i, [0, 2], ttype='int')

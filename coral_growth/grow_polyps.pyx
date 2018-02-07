@@ -87,15 +87,16 @@ cpdef void grow_polyps(object coral) except *:
     cdef double[:] growth = np.zeros(coral.n_polyps)
     cdef double target_edge_len = coral.target_edge_len
     cdef double[:,:] polyp_signals = coral.polyp_signals
-
     cdef unsigned int net_depth = coral.net_depth
     cdef double max_growth = coral.max_growth
-    cdef double growth_scalar, g
-    cdef double total_growth = 0
-
+    cdef double g
     cdef double[:,:] polyp_pos_past = coral.polyp_pos_past
 
-    polyp_pos_past[:coral.n_polyps,:] = polyp_pos[:coral.n_polyps, :]
+    # Save old positions.
+    for i in range(coral.n_polyps):
+        polyp_pos_past[i, 0] = polyp_pos[i, 0]
+        polyp_pos_past[i, 1] = polyp_pos[i, 1]
+        polyp_pos_past[i, 2] = polyp_pos[i, 2]
 
     createPolypInputs(coral)
 
@@ -124,32 +125,41 @@ cpdef void grow_polyps(object coral) except *:
 
         # Signals
         for mi in range(n_signals):
-            sr = signal_range[mi]
-            polyp_signals[i, mi] += spreads[sr, 0]
+            if output[out_idx] > .5:
+                sr = signal_range[mi]
+                polyp_signals[i, mi] += spreads[sr, 0]
 
-            if sr == 1:
-                for vert in coral.polyp_verts[i].neighbors():
-                    polyp_signals[vert.id, mi] += spreads[sr, 1] * output[out_idx]
-            elif sr != 0:
-                for d, vert in coral.mesh.getRings(coral.polyp_verts[i], sr):
-                    polyp_signals[vert.id, mi] += spreads[sr, d+1] * output[out_idx]
+                if sr == 1:
+                    for vert in coral.polyp_verts[i].neighbors():
+                        polyp_signals[vert.id, mi] += spreads[sr, 1] #* output[out_idx]
+                elif sr != 0:
+                    for d, vert in coral.mesh.getRings(coral.polyp_verts[i], sr):
+                        polyp_signals[vert.id, mi] += spreads[sr, d+1] #* output[out_idx]
             out_idx += 1
 
-    cdef double new_volume = coral.mesh.volume()
-    coral.mesh.calculateDefect()
+    # Calculate the desired volume and then scale it.
+    cdef double desired_volume = coral.mesh.volume()
 
-    polyp_pos[:coral.n_polyps, :] = polyp_pos_past[:coral.n_polyps,:]
+    # Reset to old position
+    for i in range(coral.n_polyps):
+        polyp_pos[i, 0] = polyp_pos_past[i, 0]
+        polyp_pos[i, 1] = polyp_pos_past[i, 1]
+        polyp_pos[i, 2] = polyp_pos_past[i, 2]
 
-    # growth_scalar = coral.C
-    total_growth = new_volume - old_volume
-    if total_growth == 0:
-        growth_scalar = 0.0
-    else:
-        growth_scalar = coral.C * coral.energy / total_growth
+    # Cap growth by amount of energy.
+    cdef double desired_growth = desired_volume - old_volume
+    cdef double allowed_growth = coral.C * coral.energy
+    cdef double growth_scalar = min(1.0, desired_growth, allowed_growth)
 
     for i in range(coral.n_polyps):
         g = min(growth[i] * growth_scalar, max_growth)
-
         pos_next[i, 0] = polyp_pos[i, 0] + g * polyp_normal[i, 0]
-        pos_next[i, 1] = polyp_pos[i, 1] + g * polyp_normal[i, 1]
+        pos_next[i, 1] = max(0, polyp_pos[i, 1] + g * polyp_normal[i, 1])
         pos_next[i, 2] = polyp_pos[i, 2] + g * polyp_normal[i, 2]
+
+    # for i in range(coral.n_polyps):
+        vert = coral.mesh.verts[ i ]
+        # if abs(coral.polyp_verts[ i ].defect) > coral.params.max_defect:
+        #     continue
+        coral.polyp_collided[i] = coral.collisionManager.attemptVertUpdate(vert.id, pos_next[i])
+    # self.function_times['grow_polyps_p2'] += time.time() - t1

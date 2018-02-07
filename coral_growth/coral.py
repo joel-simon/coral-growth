@@ -131,10 +131,15 @@ class Coral(object):
         light.calculate_light(self) # Update the light
         self.polyp_light[self.polyp_light != 0] -= .5
         self.polyp_light *= 2 # all light values go from 0-1
+
+        below = self.polyp_pos[:, 1] < self.params.gradient_height
+        height_scale = (self.polyp_pos[below, 1] / self.params.gradient_height)
+        self.polyp_light[below] *= height_scale
         self.function_times['calculate_light'] += time.time() - t1
 
         t1 = time.time()
         self.flow_data = flow.calculate_collection(self, export=self.save_flow_data)
+        self.polyp_collection[below] *= height_scale
         self.function_times['calculate_collection'] += time.time() - t1
 
         gravity.calculate_gravity(self)
@@ -153,18 +158,16 @@ class Coral(object):
     def calculateEnergy(self):
         self.light = 0
         self.collection = 0
-        boost = self.polyp_pos[:self.n_polyps, 1] ** self.params.height_boost
-        np.nan_to_num(boost, copy=False)
 
         for face in self.mesh.faces:
             area = face.area()
             v1, v2, v3 = face.vertices()
-            self.light += area / 3 * (self.polyp_light[v1.id]*boost[v1.id] + \
-                                      self.polyp_light[v2.id]*boost[v2.id] +
-                                      self.polyp_light[v2.id]*boost[v3.id])
-            self.collection += area / 3 * (self.polyp_collection[v1.id]*boost[v1.id] + \
-                                           self.polyp_collection[v2.id]*boost[v2.id] +
-                                           self.polyp_collection[v2.id]*boost[v2.id])
+            self.light += area / 3 * (self.polyp_light[v1.id] + \
+                                      self.polyp_light[v2.id] +
+                                      self.polyp_light[v2.id])
+            self.collection += area / 3 * (self.polyp_collection[v1.id] + \
+                                           self.polyp_collection[v2.id] +
+                                           self.polyp_collection[v2.id])
         if self.start_collection:
             self.collection /= self.start_collection
             self.light /= self.start_light
@@ -246,18 +249,7 @@ class Coral(object):
                                      (self.light, self.collection, self.energy))
         out.write('#coral ' + ' '.join(header) + '\n')
         mesh_data = self.mesh.export()
-        id_to_indx = dict()
-
-        # Write vertices (position and color)
-        for i, vert in enumerate(self.mesh.verts):
-            r, g, b = 0, 0, 0
-            if self.n_morphogens > 0:
-                g = self.morphogens.U[0, i]
-            if self.n_morphogens > 1:
-                b = self.morphogens.U[1, i]
-            out.write('v %f %f %f %f %f %f\n' % (tuple(vert.p)+(r, g, b)))
-            id_to_indx[vert.id] = i
-        out.write('\n\n')
+        id_to_indx = { vert.id:i for i, vert in enumerate(self.mesh.verts) }
 
         # Write coral data lines.
         p_attributes = [None] * self.n_polyps
@@ -273,6 +265,19 @@ class Coral(object):
                                         abs(self.polyp_verts[i].defect)/8*pi ])
 
             assert len(p_attributes[indx]) == len(header)
+
+
+        # Write vertices (position and color)
+        for i, vert in enumerate(self.mesh.verts):
+            r, g, b = p_attributes[i][:3]
+            # r, g, b = 0, 0, 0
+            # if self.n_morphogens > 0:
+            #     g = self.morphogens.U[0, i]
+            # if self.n_morphogens > 1:
+            #     b = self.morphogens.U[1, i]
+            out.write('v %f %f %f %f %f %f\n' % (tuple(vert.p)+(r, g, b)))
+            id_to_indx[vert.id] = i
+        out.write('\n\n')
 
         for attributes in p_attributes:
             out.write('c ' + ' '.join(map(str, attributes)) + '\n')

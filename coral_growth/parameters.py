@@ -29,7 +29,8 @@ class Parameters(object):
         self.morphogen_thresholds = 3
         self.morphogen_steps = 200
         self.use_polar_direction = True
-        self.height_boost = 1
+        # self.height_boost = 1
+        self.gradient_height = 4.0
         self.C = 10
 
         if path:
@@ -70,5 +71,5 @@ class Parameters(object):
             # self.addTrait('diffV%i'%i, (.005, .005))
 
         for i in range(self.n_signals):
-            self.addTrait('signal_decay%i'%i, (0.0, 1.0))
-            self.addTrait('signal_range%i'%i, [0, 3], ttype='int')
+            self.addTrait('signal_decay%i'%i, (0.0, .5))
+            self.addTrait('signal_range%i'%i, [0, 1], ttype='int')

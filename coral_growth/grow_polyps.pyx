@@ -126,7 +126,11 @@ cpdef void grow_polyps(object coral) except *:
         for mi in range(n_signals):
             sr = signal_range[mi]
             polyp_signals[i, mi] += spreads[sr, 0]
-            if sr != 0:
+
+            if sr == 1:
+                for vert in coral.polyp_verts[i].neighbors():
+                    polyp_signals[vert.id, mi] += spreads[sr, 1] * output[out_idx]
+            elif sr != 0:
                 for d, vert in coral.mesh.getRings(coral.polyp_verts[i], sr):
                     polyp_signals[vert.id, mi] += spreads[sr, d+1] * output[out_idx]
             out_idx += 1

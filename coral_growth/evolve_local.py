@@ -12,8 +12,25 @@ from coral_growth.evolution import create_initial_population, evaluate, simulate
 def feature_vector(coral):
     """ Compute a descriptive feature vector for calculating novelty.
     """
-    height = np.mean( coral.polyp_pos[:, 1] )
-    return [ coral.light, coral.collection, height ]
+    height = np.mean( coral.polyp_pos[:coral.n_polyps, 1] )
+
+    bbox = coral.mesh.boundingBox()
+    bbox_area = (bbox[1]-bbox[0]) * (bbox[3]-bbox[2]) * (bbox[5]-bbox[4])
+    density = coral.mesh.volume() / bbox_area
+
+    # c = np.array([v.defect for v in coral.mesh.verts])
+    # curves = np.histogram(c, bins=5, range=None, normed=True)[0]
+
+    features = [height, density]
+
+    # features.extend(curves)
+
+    for i in range(coral.n_morphogens):
+        features.append(np.mean(coral.morphogens.U[i, :coral.n_polyps]))
+    for i in range(coral.n_signals):
+        features.append(np.mean(coral.polyp_signals[:coral.n_polyps, i]))
+    print(features)
+    return np.array(features)
 
 def evaluate(genome, traits, params):
     """ Run the simulation and return the fitness and feature vector.
@@ -26,7 +43,7 @@ def evaluate(genome, traits, params):
     except AssertionError as e:
         print('AssertionError:', e)
         fitness = 0
-        return 0, [0, 0, 0]
+        return 0, [0] * (2 + params.n_morphogens + params.n_signals)
 
 def evaluate_genomes(genomes, params, pool):
     """ Evaluate all (parallel / serial wrapper """
@@ -57,7 +74,9 @@ class Archive(object):
             local_fitness = 0
             for j in range(self.k):
                 neighbor_fitness = self.fitnesses[neighbors[i, j+1]]
-                local_fitness += (fitness - neighbor_fitness) / (1+dists[i, j+1])
+                if fitness > neighbor_fitness:
+                    local_fitness += 1.0/self.k
+                # local_fitness += (fitness - neighbor_fitness) / (1+dists[i, j+1])
             assert not np.isnan(local_fitness)
             self.local_fitnesses.append(local_fitness)
 
@@ -74,6 +93,7 @@ class Archive(object):
         self.fitnesses = [f for i,f in enumerate(self.fitnesses) if i not in to_delete]
         self.features = [f for i,f in enumerate(self.features) if i not in to_delete]
         self.local_fitnesses = [f for i,f in enumerate(self.local_fitnesses) if i not in to_delete]
+
         assert len(self.genomes) <= self.max_size
         assert len(self.genomes) == len(self.fitnesses)
         assert len(self.genomes) == len(self.features)

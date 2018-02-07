@@ -13,15 +13,18 @@ from coral_growth.parameters import Parameters
 
 params = Parameters()
 params.n_signals = 2
-params.n_morphogens = 1
+params.n_morphogens = 2
 params.morphogen_thresholds = 2
-params.height_boost = 1.0
-params.max_defect = 1.5
+params.height_boost = 0.0
+params.max_defect = 1.4
 params.C = .3
-params.max_growth = .4
-params.max_polyps = 9000
-params.max_steps = 70
-params.light_amount = 0.8
+params.max_growth = .2
+params.max_polyps = 10000
+params.max_steps = 100
+params.max_volume = 75.0
+params.light_amount = 0.6
+params.max_face_growth = 1.4
+params.use_polar_direction = False
 params.calculateTraits()
 
 num_inputs = Coral.num_inputs + params.n_memory + params.n_signals + \
@@ -40,7 +43,7 @@ def create_initial_population():
         num_inputs,
         0, # NUM_HIDDEN
         num_outputs,
-        True, # FS_NEAT
+        False, # FS_NEAT
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
         0, # Seed type, must be 1 to have hidden nodes.
@@ -77,9 +80,9 @@ class NetworkDummy(object):
 
     def Output(self):
         # out = [1 for _ in range(self.NumOutputs())]
-        # out = [random.random() for _ in range(self.NumOutputs())]
-        out = [0 for _ in range(self.NumOutputs())]
-        out[0] = 1
+        out = [random.random() for _ in range(self.NumOutputs())]
+        # out = [0 for _ in range(self.NumOutputs())]
+        # out[0] = 1
         return out
 
 if __name__ == '__main__':

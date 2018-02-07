@@ -30,7 +30,7 @@ class Parameters(object):
         self.morphogen_steps = 200
         self.use_polar_direction = True
         # self.height_boost = 1
-        self.gradient_height = 4.0
+        self.gradient_height = 1.0
         self.C = 10
 
         if path:

@@ -143,7 +143,8 @@ class Coral(object):
         self.function_times['calculate_collection'] += time.time() - t1
 
         gravity.calculate_gravity(self)
-        self.polyp_signals *= self.signal_decay
+        self.polyp_signals *= (1 - self.signal_decay)
+        np.clip(self.polyp_signals, 0, 1, out=self.polyp_signals)
 
         t1 = time.time()
         self.morphogens.update(self.params.morphogen_steps)

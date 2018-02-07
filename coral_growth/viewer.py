@@ -334,9 +334,16 @@ def parse_coral_file(file):
             view_names = header
 
         elif line.startswith('c'):
+            assert view_names
+
             d = line.split(' ')[1:]
+
             for i in range(n_views):
-                d[i] = float(d[i]) if '.' in d[i] else int(d[i])
+                if view_names[i][:3] == 'sig':
+                    d[i] = float(d[i]) > 0.5
+                else:
+                    d[i] = float(d[i]) if '.' in d[i] else int(d[i])
+
             polyp_data.append( d )
 
     return coral_data, polyp_data, view_names, n_views

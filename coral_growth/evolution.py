@@ -17,12 +17,12 @@ def create_initial_population(params):
     genome_prototype = NEAT.Genome(
         0, # ID
         num_inputs,
-        10, # NUM_HIDDEN
+        0, # NUM_HIDDEN
         num_outputs,
-        True, # FS_NEAT
+        False, # FS_NEAT
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
-        1, # Seed type, must be 1 to have hidden nodes.
+        0, # Seed type, must be 1 to have hidden nodes.
         params.neat,
         0
     )

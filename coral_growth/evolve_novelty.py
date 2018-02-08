@@ -7,46 +7,19 @@ from pykdtree.kdtree import KDTree
 
 from coral_growth.simulate import simulate_genome
 from coral_growth.evolution import create_initial_population, evaluate, simulate_and_save
-
-def feature_vector(coral):
-    """ Compute a descriptive feature vector for calculating novelty.
-    """
-    features = np.zeros(3)
-    features[0] = coral.light
-    features[1] = coral.collection
-    features[2] = np.mean(coral.polyp_pos[:, 1]) # Mean height
-    return features
-
-    # d = np.sqrt(coral.polyp_pos[:coral.n_polyps, 0]**2 + coral.polyp_pos[:coral.n_polyps, 2]**2)
-    # d = np.linalg.norm(self.polyp_pos[:self.n_polyps], axis=1)
-    # c = np.array([v.defect for v in coral.mesh.verts])
-    # bbox = coral.mesh.boundingBox()
-    # bbox_area = (bbox[1]-bbox[0]) * (bbox[3]-bbox[2]) * (bbox[5]-bbox[4])
-    # features[0] = np.mean(d) # Mean dist from center
-    # features[1] = np.std(d) # Std of dist from center
-    # features[2] = np.mean(coral.polyp_pos[:, 1]) # Mean height
-    # features[4] = np.std(coral.polyp_pos[:, 1]) # Std height
-    # features[2] = coral.mesh.volume() / bbox_area  # Density
-    # features[3:8] = np.histogram(c, bins=5, range=None, normed=True)[0]
-    # for i in range(params.n_morphogens):
-    #     features[8+i] = np.mean(coral.morphogens.U[i, :coral.n_polyps])
-    # for i in range(coral.n_morphogens):
-        # features.append(np.mean(coral.morphogens.U[i, :coral.n_polyps]))
-    # for i in range(coral.n_signals):
-        # features.append(np.mean(coral.polyp_signals[:coral.n_polyps, i]))
-    # return features
+from coral_growth.shape_features import d2_features
 
 def evaluate_novelty(genome, traits, params):
     try:
         coral = simulate_genome(genome, traits, [params])[0]
         fitness = coral.fitness()
         print('.', end='', flush=True)
-        return fitness, feature_vector(coral)
+        return fitness, np.array(d2_features(coral.mesh, bins=64))
 
     except AssertionError as e:
         print('AssertionError:', e)
         fitness = 0
-        return 0, np.zeros(3)
+        return 0, np.zeros(64)
 
 def evaluate_genomes(genomes, params, pool):
     if pool:
@@ -66,7 +39,7 @@ def calculate_sparseness(archive, feature_list, k):
     return sparseness_list
 
 def evolve_novelty(params, generations, out_dir, run_id, pool, ls50=True, \
-                   novelty_threshold=4.0, archive_stagnation=4, ns_K=10):
+                   novelty_threshold=0.4, archive_stagnation=4, ns_K=10):
     max_ever = None
     archive = []
     evals_since_last_archiving = 0

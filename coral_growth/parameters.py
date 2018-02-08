@@ -71,5 +71,5 @@ class Parameters(object):
             # self.addTrait('diffV%i'%i, (.005, .005))
 
         for i in range(self.n_signals):
-            self.addTrait('signal_decay%i'%i, (0.0, .5))
-            self.addTrait('signal_range%i'%i, [0, 2], ttype='int')
+            self.addTrait('signal_decay%i'%i, (0.0, .8))
+            self.addTrait('signal_range%i'%i, [0, 3], ttype='int')

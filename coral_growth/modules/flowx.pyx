@@ -185,6 +185,17 @@ cpdef void calculate_collection_from_flow(double[:] collection, int[:,:] voxels,
     cdef int ny = flow_grid.shape[1]
     cdef int nz = flow_grid.shape[2]
 
+    cdef unsigned int[:,:,:] counts = np.zeros_like(flow_grid, dtype='uint32')
+    for i in range(voxels.shape[0]):
+        x = voxels[i, 0]
+        y = voxels[i, 1]
+        z = voxels[i, 2]
+        for dx in range(x-radius, x+radius+1):
+            for dy in range(y-radius, y+radius+1):
+                for dz in range(z-radius, z+radius+1):
+                    if dx>0 and dy>0 and dz>0 and dx<nx-1 and dy<ny-1 and dz<nz-1:
+                        counts[dx, dy, dz] += 1
+
     for i in range(voxels.shape[0]):
         x = voxels[i, 0]
         y = voxels[i, 1]
@@ -194,6 +205,6 @@ cpdef void calculate_collection_from_flow(double[:] collection, int[:,:] voxels,
             for dy in range(y-radius, y+radius+1):
                 for dz in range(z-radius, z+radius+1):
                     if dx>0 and dy>0 and dz>0 and dx<nx-1 and dy<ny-1 and dz<nz-1:
-                        seen += flow_grid[dx, dy, dz]
+                        seen += flow_grid[dx, dy, dz] / counts[dx, dy, dz]
 
         collection[i] = seen / total

@@ -73,3 +73,10 @@ class Parameters(object):
         for i in range(self.n_signals):
             self.addTrait('signal_decay%i'%i, (0.0, .8))
             self.addTrait('signal_range%i'%i, [0, 3], ttype='int')
+
+    def write(self, neat_path, sim_path):
+        self.neat.Save(neat_path)
+        with open(sim_path, 'w') as out:
+            for key, value in sorted(vars(self).items()):
+                if key != 'neat':
+                    out.write(key+'\t'+str(value)+'\n')

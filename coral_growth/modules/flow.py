@@ -17,8 +17,11 @@ def calculate_collection(coral, export=False):
     # flow_grid4 = np.swapaxes(flow_grid4, 0, 2)
     flow_grid = np.asarray(flow_grid1) + flow_grid2# + flow_grid3 + flow_grid4
 
-    calculate_collection_from_flow(coral.polyp_collection, polyp_voxel, flow_grid, 1)
+    calculate_collection_from_flow(coral.polyp_collection, polyp_voxel, flow_grid, 2)
     # np.clip(coral.polyp_collection, 0, 1, out=coral.polyp_collection)
+
+    coral.polyp_collection *= 5
+    # print(coral.polyp_collection[:coral.n_polyps].max())
 
     if export:
         voxel_grid = np.swapaxes(voxel_grid, 0, 2)

@@ -6,31 +6,9 @@ import numpy as np
 import MultiNEAT as NEAT
 from pykdtree.kdtree import KDTree
 
+from coral_growth.shape_features import d2_features
 from coral_growth.simulate import simulate_genome
 from coral_growth.evolution import create_initial_population, evaluate, simulate_and_save
-
-def feature_vector(coral):
-    """ Compute a descriptive feature vector for calculating novelty.
-    """
-    height = np.mean( coral.polyp_pos[:coral.n_polyps, 1] )
-
-    bbox = coral.mesh.boundingBox()
-    bbox_area = (bbox[1]-bbox[0]) * (bbox[3]-bbox[2]) * (bbox[5]-bbox[4])
-    density = coral.mesh.volume() / bbox_area
-
-    # c = np.array([v.defect for v in coral.mesh.verts])
-    # curves = np.histogram(c, bins=5, range=None, normed=True)[0]
-
-    features = [height, density]
-
-    # features.extend(curves)
-
-    for i in range(coral.n_morphogens):
-        features.append(np.mean(coral.morphogens.U[i, :coral.n_polyps]))
-    for i in range(coral.n_signals):
-        features.append(np.mean(coral.polyp_signals[:coral.n_polyps, i]))
-    print(features)
-    return np.array(features)
 
 def evaluate(genome, traits, params):
     """ Run the simulation and return the fitness and feature vector.
@@ -39,11 +17,11 @@ def evaluate(genome, traits, params):
         coral = simulate_genome(genome, traits, [params])[0]
         fitness = coral.fitness()
         print('.', end='', flush=True)
-        return fitness, feature_vector(coral)
+        return fitness, d2_features(coral.mesh, bins=64)
     except AssertionError as e:
         print('AssertionError:', e)
         fitness = 0
-        return 0, [0] * (2 + params.n_morphogens + params.n_signals)
+        return 0, [0] * (64)
 
 def evaluate_genomes(genomes, params, pool):
     """ Evaluate all (parallel / serial wrapper """
@@ -69,15 +47,16 @@ class Archive(object):
         feature_arr = np.array(self.features)
         tree = KDTree( feature_arr )
         dists, neighbors = tree.query(feature_arr, k=self.k+1)
+
         for i in range(len(self.genomes)):
             fitness = self.fitnesses[i]
             local_fitness = 0
-            for j in range(self.k):
-                neighbor_fitness = self.fitnesses[neighbors[i, j+1]]
+            for j in range(1, self.k+1):
+                neighbor_fitness = self.fitnesses[neighbors[i, j]]
                 if fitness > neighbor_fitness:
-                    local_fitness += 1.0/self.k
-                # local_fitness += (fitness - neighbor_fitness) / (1+dists[i, j+1])
-            assert not np.isnan(local_fitness)
+                    local_fitness += 1.0 / self.k
+
+            local_fitness *= np.mean( dists[ i, 1: ] )
             self.local_fitnesses.append(local_fitness)
 
     def __cullArchive(self):
@@ -133,7 +112,10 @@ def evolve_local( params, generations, out_dir, run_id, pool, max_size=50, K=10)
         print('Local Fitness - avg: %f, max:%f' % (np.mean(local_fitness_list), max(local_fitness_list)))
         print('Top 10 Local Fitness', sorted(archive.local_fitnesses, reverse=True)[:10])
 
-        root =  os.path.join(out_dir, str(generation))
+        np.save(os.path.join(out_dir, "local_fitnesses_%i"%generation), \
+                                              np.array(archive.local_fitnesses))
+
+        root = os.path.join(out_dir, str(generation))
         os.mkdir(root)
 
         for i, (local_fitness, genome) in enumerate(archive.topNGenomes(3)):

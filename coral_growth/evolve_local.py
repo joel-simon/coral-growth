@@ -17,7 +17,7 @@ def evaluate(genome, traits, params):
         coral = simulate_genome(genome, traits, [params])[0]
         fitness = coral.fitness()
         print('.', end='', flush=True)
-        return fitness, d2_features(coral.mesh, bins=64)
+        return fitness, np.array(d2_features(coral.mesh, bins=64))
     except AssertionError as e:
         print('AssertionError:', e)
         fitness = 0
@@ -79,7 +79,7 @@ class Archive(object):
         assert len(self.genomes) == len(self.local_fitnesses)
 
     def calcLocalFitnessAndUpdate(self, genomes, fitnesses, features):
-        self.genomes.extend(genomes)
+        self.genomes.extend([g.GetID() for g in genomes])
         self.fitnesses.extend(fitnesses)
         self.features.extend(features)
         self.__calculateLocalFitness()
@@ -96,6 +96,8 @@ def evolve_local( params, generations, out_dir, run_id, pool, max_size=50, K=10)
     archive = Archive(max_size, K)
     pop = create_initial_population(params)
 
+    seen_genomes = set()
+
     # Main loop
     for generation in range(generations):
         print('\n'+'#'*80)
@@ -106,28 +108,34 @@ def evolve_local( params, generations, out_dir, run_id, pool, max_size=50, K=10)
         local_fitness_list = archive.calcLocalFitnessAndUpdate(genomes, fitness_list, feature_list)
         NEAT.ZipFitness(genomes, local_fitness_list)
 
+        current = {g.GetID(): g for g in genomes}
+
         print()
         maxf, meanf = max(fitness_list), sum(fitness_list) / float(len(fitness_list))
         print('Fitness - avg: %f, max:%f' % (meanf, maxf))
         print('Local Fitness - avg: %f, max:%f' % (np.mean(local_fitness_list), max(local_fitness_list)))
-        print('Top 10 Local Fitness', sorted(archive.local_fitnesses, reverse=True)[:10])
+        print('Top 5 Local Fitness', sorted(archive.local_fitnesses, reverse=True)[:5])
 
-        np.save(os.path.join(out_dir, "local_fitnesses_%i"%generation), \
+        root = os.path.join(out_dir, 'gen_'+str(generation))
+        os.mkdir(root)
+        
+        np.save(os.path.join(root, "local_fitnesses_%i"%generation), \
                                               np.array(archive.local_fitnesses))
 
-        root = os.path.join(out_dir, str(generation))
-        os.mkdir(root)
+        for i, (local_fitness, genome_id) in enumerate(archive.topNGenomes(5)):
+            if genome_id in current:
+                genome = current[genome_id]
+                genome.Save(root+'/genome_%i_%i' % (i, genome.GetID()))
+                traits = genome.GetGenomeTraits()
+                export_folder = os.path.join(root, str(i)+'_'+str(genome.GetID()))
+                os.mkdir(export_folder)
+                simulate_genome(genome, traits, [params], export_folder=export_folder)
+            else:
+                out_path = root+'/gid_%i_%i'%(i, genome_id)
+                with open(out_path, 'w+') as out:
+                    pass
 
-        for i, (local_fitness, genome) in enumerate(archive.topNGenomes(3)):
-            export_folder = os.path.join(root, str(i))
-            os.mkdir(export_folder)
-            print('1')
-            traits = genome.GetGenomeTraits()
-            print('2')
-            simulate_genome(genome, traits, [params], export_folder=export_folder)
-            print('3')
             # simulate_and_save(genome, params, out_dir2, generation, maxf, meanf)
-
         # if max_ever is None or maxf > max_ever:
         #     max_ever = maxf
         #     best = genomes[fitness_list.index(maxf)]

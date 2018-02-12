@@ -128,14 +128,16 @@ class Coral(object):
         self.polyp_light[self. polyp_light!= 0] -= .5
         self.polyp_light *= 2 # all light values go from 0-1
 
-        below = self.polyp_pos[:, 1] < self.params.gradient_height
-        height_scale = (self.polyp_pos[below, 1] / self.params.gradient_height)
-        self.polyp_light[below] *= height_scale
+        if self.params.gradient_height > 0:
+            below = self.polyp_pos[:, 1] < self.params.gradient_height
+            height_scale = (self.polyp_pos[below, 1] / self.params.gradient_height)
+            self.polyp_light[below] *= height_scale
         self.function_times['calculate_light'] += time.time() - t1
 
         t1 = time.time()
         self.flow_data = flow.calculate_collection(self, export=self.save_flow_data)
-        self.polyp_collection[below] *= height_scale
+        if self.params.gradient_height > 0:
+            self.polyp_collection[below] *= height_scale
         self.function_times['calculate_collection'] += time.time() - t1
 
         gravity.calculate_gravity(self)

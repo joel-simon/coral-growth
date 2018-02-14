@@ -19,7 +19,7 @@ from coral_growth.modules.morphogens import Morphogens
 from coral_growth.modules.collisions import MeshCollisionManager
 
 class Coral(object):
-    num_inputs = 3 # [light, collection, extra-bias-bit]
+    num_inputs = 4 # [light, collection, energy, extra-bias-bit]
     num_outputs = 1
 
     def __init__(self, obj_path, network, net_depth, traits, params, save_flow_data=False):
@@ -39,8 +39,11 @@ class Coral(object):
         self.morphogen_thresholds = params.morphogen_thresholds
 
         # Some parameters are evolved traits.
+        self.diffuse_steps = traits['diffuse_steps']
         self.signal_decay = np.array([ traits['signal_decay%i'%i] \
                                         for i in range(params.n_signals) ])
+        # self.signal_has_decay = np.array([ traits['signal_has_decay%i'%i] \
+        #                                    for i in range(params.n_signals) ])
         self.signal_range = np.array([ traits['signal_range%i'%i] \
                                         for i in range(params.n_signals) ], dtype='i')
 
@@ -132,12 +135,15 @@ class Coral(object):
             below = self.polyp_pos[:, 1] < self.params.gradient_height
             height_scale = (self.polyp_pos[below, 1] / self.params.gradient_height)
             self.polyp_light[below] *= height_scale
+
         self.function_times['calculate_light'] += time.time() - t1
 
         t1 = time.time()
         self.flow_data = flow.calculate_collection(self, export=self.save_flow_data)
+
         if self.params.gradient_height > 0:
             self.polyp_collection[below] *= height_scale
+
         self.function_times['calculate_collection'] += time.time() - t1
 
         gravity.calculate_gravity(self)
@@ -148,32 +154,33 @@ class Coral(object):
         self.morphogens.update(self.params.morphogen_steps)
         self.function_times['morphogens.update'] += time.time() - t1
 
-        t1 = time.time()
         self.calculateEnergy()
-        self.function_times['calculateEnergy'] += time.time() - t1
+        self.diffuseEnergy()
 
         self.volume = self.mesh.volume()
         np.nan_to_num(self.polyp_gravity, copy=False)
         np.nan_to_num(self.polyp_light, copy=False)
 
     def calculateEnergy(self):
-        self.light = 0
-        self.collection = 0
+        self.polyp_energy = self.light_amount*self.polyp_light + \
+                            (1-self.light_amount)*self.polyp_collection
+        self.energy = self.polyp_energy.sum()
 
-        for face in self.mesh.faces:
-            area = face.area()
-            v1, v2, v3 = face.vertices()
-            self.light += area / 3 * (self.polyp_light[v1.id] + \
-                                      self.polyp_light[v2.id] +
-                                      self.polyp_light[v2.id])
-            self.collection += area / 3 * (self.polyp_collection[v1.id] + \
-                                           self.polyp_collection[v2.id] +
-                                           self.polyp_collection[v2.id])
-        if self.start_collection:
-            self.collection /= self.start_collection
-            self.light /= self.start_light
+    def diffuseEnergy(self):
+        energy = np.zeros(self.n_polyps)
+        diff = .25
+        neighbors = [ v.neighbors() for v in self.mesh.verts ]
 
-        self.energy = self.light*self.light_amount + self.collection*(1-self.light_amount)
+        for _ in range(self.diffuse_steps):
+            for i in range(self.n_polyps):
+                esum = 0
+                for vert in neighbors[i]:
+                    esum += self.polyp_energy[vert.id]
+
+                energy[i] = (1-diff)*self.polyp_energy[i] + diff*esum / len(neighbors[i])
+
+            for i in range(self.n_polyps):
+                self.polyp_energy[i] = energy[i]
 
     def createPolyp(self, vert):
         if self.n_polyps == self.max_polyps:
@@ -244,7 +251,7 @@ class Coral(object):
         # for i in range(self.n_memory):
         #     header.append( 'mem_%i' % i )
 
-        header.extend([ 'light', 'collection', 'curvature' ])
+        header.extend([ 'light', 'collection', 'energy' ]) #'curvature'
         out.write('#Exported from coral_growth\n')
         out.write('#attr light:%f collection:%f energy:%f\n' % \
                                      (self.light, self.collection, self.energy))
@@ -262,8 +269,11 @@ class Coral(object):
                 p_attributes[indx].append(self.morphogens.U[j, i])
 
             p_attributes[indx].extend(self.polyp_signals[i])
-            p_attributes[indx].extend([ self.polyp_light[i], self.polyp_collection[i],
-                                        abs(self.polyp_verts[i].defect)/8*pi ])
+            p_attributes[indx].extend([ self.polyp_light[i],
+                                        self.polyp_collection[i],
+                                        self.polyp_energy[i]
+                                        ])
+                                        # abs(self.polyp_verts[i].defect)/8*pi
 
             assert len(p_attributes[indx]) == len(header)
 
@@ -271,11 +281,6 @@ class Coral(object):
         # Write vertices (position and color)
         for i, vert in enumerate(self.mesh.verts):
             r, g, b = p_attributes[i][:3]
-            # r, g, b = 0, 0, 0
-            # if self.n_morphogens > 0:
-            #     g = self.morphogens.U[0, i]
-            # if self.n_morphogens > 1:
-            #     b = self.morphogens.U[1, i]
             out.write('v %f %f %f %f %f %f\n' % (tuple(vert.p)+(r, g, b)))
             id_to_indx[vert.id] = i
         out.write('\n\n')

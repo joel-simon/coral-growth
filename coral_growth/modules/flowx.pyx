@@ -13,76 +13,62 @@ from minheap import MinHeap
 cdef int[:,:] neighbors = np.array([[-1, 0, 0], [1, 0, 0], [0, 1, 0],
                                     [0, -1, 0], [0, 0, -1], [0, 0, 1]], dtype='int32')
 
-cdef list reconstruct_path(int[:,:,:,:] came_from, int[:] start, int[:] goal):
-    cdef int cx = goal[0]
-    cdef int cy = goal[1]
-    cdef int cz = goal[2]
-    cdef list path = []
-    cdef int cx2, cy2, cz2
-    while cx != start[0] and cy != start[1] and cz != start[2]:
-        path.append((cx, cy, cz))
-        cx2 = came_from[cx, cy, cz, 0]
-        cy2 = came_from[cx, cy, cz, 1]
-        cz2 = came_from[cx, cy, cz, 2]
-        cx, cy, cz = cx2, cy2, cz2
-    path.reverse()
-    return path
 
-cdef void add_to_path(float[:,:,:] grid, float value, int[:,:,:,:] came_from, \
+cdef void add_to_path(int[:,:,:] grid, float[:,:,:] flow, float[:,:,:] collection,
+                      float collection_rate, float value, int[:,:,:,:] came_from,
                       int[:] start, int[:] goal) except *:
-    cdef int cx = goal[0]
-    cdef int cy = goal[1]
-    cdef int cz = goal[2]
-    cdef int cx2, cy2, cz2
-    while cx != start[0] and cy != start[1] and cz != start[2]:
-        grid[cx, cy, cz] += value
-        cx2 = came_from[cx, cy, cz, 0]
-        cy2 = came_from[cx, cy, cz, 1]
-        cz2 = came_from[cx, cy, cz, 2]
-        cx, cy, cz = cx2, cy2, cz2
-
-cpdef tuple calculate_flow(int[:,:,:] grid, int n_iters, bint reverse=False, bint export=False):
-    cdef int i, x, y, z
+    """ The result of dijkstra is a
+    """
     cdef int nx = grid.shape[0]
     cdef int ny = grid.shape[1]
     cdef int nz = grid.shape[2]
-    cdef float[:,:,:] travel_sum = np.zeros_like(grid, dtype='float32')
-    cdef float[:,:,:] cost_grid = np.zeros_like(grid, dtype='float32')
-    cdef list paths = None
-    cdef int[:] path_start = np.array([-1, -1, -1], dtype='i')
-    cdef int[:] path_end = np.zeros(3, dtype='i')
-    cdef int[:,:,:,:] came_from
-    cdef float[:,:,:] cost_so_far
+    cdef int x = goal[0]
+    cdef int y = goal[1]
+    cdef int z = goal[2]
+    cdef int x2, y2, z2
+    cdef double resources = 1.0
 
-    cdef int startx = (nx-1 if reverse else 0)
+    while x != start[0] and y != start[1] and z != start[2]:
+        flow[x, y, z] += value
 
-    for i in range(n_iters):
-        for x in range(nx):
-            for y in range(ny):
-                for z in range(nz):
-                    cost_grid[x, y, z] = 1 + (travel_sum[x, y, z] / (i+1))
+        if x > 0 and grid[x-1, y, z] and resources > collection_rate:
+            collection[x-1, y, z] += collection_rate
+            resources -= collection_rate
+        if x < nx -1 and grid[x+1, y, z] and resources > collection_rate:
+            collection[x+1, y, z] += collection_rate
+            resources -= collection_rate
+        if y > 0 and grid[x, y-1, z] and resources > collection_rate:
+            collection[x, y-1, z] += collection_rate
+            resources -= collection_rate
+        if y < ny-1 and grid[x, y+1, z] and resources > collection_rate:
+            collection[x, y+1, z] += collection_rate
+            resources -= collection_rate
+        if z > 0 and grid[x, y, z-1] and resources > collection_rate:
+            collection[x, y, z-1] += collection_rate
+            resources -= collection_rate
+        if z < nz-1 and grid[x, y, z+1] and resources > collection_rate:
+            collection[x, y, z+1] += collection_rate
+            resources -= collection_rate
 
-        came_from, cost_so_far = dijkstra_search(grid, cost_grid, startx)
-        for y in range(ny):
-            for z in range(nz):
-                path_end[0] = 0 if reverse else nx-1
-                path_end[1] = y
-                path_end[2] = z
-                add_to_path(travel_sum, .5 / (i+1), came_from, path_start, path_end)
+        x2 = came_from[x, y, z, 0]
+        y2 = came_from[x, y, z, 1]
+        z2 = came_from[x, y, z, 2]
+        x, y, z = x2, y2, z2
 
-    travel_avg = np.array(travel_sum) / (i+1)
-
-    if export:
-        paths = []
-        for y in range(ny):
-            for z in range(nz):
-                path_end[0] = 0 if reverse else nx-1
-                path_end[1] = y
-                path_end[2] = z
-                paths.append(reconstruct_path(came_from, path_start, path_end))
-        return travel_avg, paths
-    else:
-        return travel_avg, None
+cdef list reconstruct_path(int[:,:,:,:] came_from, int[:] start, int[:] goal):
+    cdef int x = goal[0]
+    cdef int y = goal[1]
+    cdef int z = goal[2]
+    cdef int x2, y2, z2
+    cdef list path = []
+    while x != start[0] and y != start[1] and z != start[2]:
+        path.append((x, y, z))
+        x2 = came_from[x, y, z, 0]
+        y2 = came_from[x, y, z, 1]
+        z2 = came_from[x, y, z, 2]
+        x, y, z = x2, y2, z2
+    path.reverse()
+    return path
 
 cpdef tuple dijkstra_search(int[:,:,:] grid, float[:,:,:] cost_grid, int startx):
     cdef int pid
@@ -176,7 +162,72 @@ cpdef tuple create_voxel_grid(coral):
 
     return polyp_voxel, voxel_grid, (np.array(min_v) - offset)
 
-cpdef void calculate_collection_from_flow(double[:] collection, int[:,:] voxels,\
+cpdef void diffuse(float[:,:,:] collection, int steps=1):
+    cdef int i, x, y, z
+    cdef float[:,:,:] temp = np.zeros_like(collection)
+    for i in range(steps):
+        for x in range(1, collection.shape[0]-1):
+            for y in range(1, collection.shape[1]-1):
+                for z in range(1, collection.shape[2]-1):
+                    temp[x, y, z] = .5*collection[x, y, z] + \
+                                    .0833*(collection[x-1, y, z] +\
+                                          collection[x+1, y, z] +\
+                                          collection[x, y-1, z] +\
+                                          collection[x, y+1, z] +\
+                                          collection[x, y, z-1] +\
+                                          collection[x, y, z+1])
+        collection, temp = temp, collection
+    # return collection
+
+cpdef tuple calculate_collectionx(int[:,:,:] grid, int n_iters, float collection_rate, bint reverse=False, bint export=False):
+    cdef int i, x, y, z
+    cdef int nx = grid.shape[0]
+    cdef int ny = grid.shape[1]
+    cdef int nz = grid.shape[2]
+    cdef float[:,:,:] travel_sum = np.zeros_like(grid, dtype='float32')
+    cdef float[:,:,:] collection = np.zeros_like(grid, dtype='float32')
+    cdef float[:,:,:] cost = np.zeros_like(grid, dtype='float32')
+    cdef list paths = None
+    cdef int[:] path_start = np.array([-1, -1, -1], dtype='i')
+    cdef int[:] path_end = np.zeros(3, dtype='i')
+    cdef int[:,:,:,:] came_from
+    cdef float[:,:,:] cost_so_far
+
+    cdef int startx = (nx-1 if reverse else 0)
+
+    for i in range(n_iters):
+        # Create new grid travel costs by past travel rates.
+        for x in range(nx):
+            for y in range(ny):
+                for z in range(nz):
+                    cost[x, y, z] = 1 + (travel_sum[x, y, z] / (i+1))
+
+        came_from, cost_so_far = dijkstra_search(grid, cost, startx)
+
+        # Go along the paths and calculate flow and resources
+        for y in range(ny):
+            for z in range(nz):
+                path_end[0] = 0 if reverse else nx-1
+                path_end[1] = y
+                path_end[2] = z
+                add_to_path(grid, travel_sum, collection, collection_rate, .5, \
+                            came_from, path_start, path_end)
+
+    travel_avg = np.array(travel_sum) / (i+1)
+
+    if export:
+        paths = []
+        for y in range(ny):
+            for z in range(nz):
+                path_end[0] = 0 if reverse else nx-1
+                path_end[1] = y
+                path_end[2] = z
+                paths.append(reconstruct_path(came_from, path_start, path_end))
+        return collection, travel_avg, paths
+    else:
+        return collection, travel_avg, None
+
+cpdef void calculate_collectionx_from_flow(double[:] collection, int[:,:] voxels,\
                                           float[:,:,:] flow_grid, int radius=1) except *:
     cdef int i, x, y, z, dx, dy, dz
     cdef float seen

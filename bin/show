@@ -10,7 +10,6 @@ if __name__ == '__main__':
     height = 1000
 
     directories = sys.argv[1:]
-    print(directories)
 
     if sys.argv[1].isdigit():
         width = int(sys.argv[1])

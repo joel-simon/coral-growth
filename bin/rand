@@ -16,8 +16,8 @@ params.n_signals = 2
 params.n_morphogens = 2
 params.morphogen_thresholds = 2
 params.height_boost = 0.0
-params.max_defect = 1.4
-params.C = .12
+# params.max_defect = 1.4
+params.C = .10
 params.max_growth = .25
 params.max_polyps = 15000
 params.max_steps = 150
@@ -100,6 +100,9 @@ if __name__ == '__main__':
         genome = genomes[0]
         traits = genome.GetGenomeTraits()
 
+        for k, v in traits.items():
+            print(k,'\t', v)
+
         export_folder = None
         if args.show:
             export_folder = tmp_dir
@@ -107,7 +110,7 @@ if __name__ == '__main__':
         # coral = simulate_network(NetworkDummy(), NetworkDummy.depth, traits, [params],\
         #                          export_folder=export_folder, verbose=True)[0]
         coral = simulate_genome(genome, traits, [params], export_folder=export_folder,
-                                verbose=True)[0]
+                                verbose=False)[0]
 
         total = sum(coral.function_times.values())
         for k, v in sorted(coral.function_times.items()):

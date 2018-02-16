@@ -21,7 +21,7 @@ class Parameters(object):
         self.max_volume = 40.0
         self.max_steps = 40
         self.max_growth = .5
-        self.max_defect = 1.0
+        self.max_defect = 1.4
         self.max_face_growth = 1.5
         self.n_signals = 1
         self.n_memory = 0
@@ -29,9 +29,12 @@ class Parameters(object):
         self.morphogen_thresholds = 3
         self.morphogen_steps = 200
         self.use_polar_direction = True
-        # self.height_boost = 1
+
         self.gradient_height = 1.0
+        self.gradient_bottom = 0.5
         self.C = 10
+
+        self.addTrait('diffuse_steps', (0, 16), 'int')
 
         if path:
             for line in open(path).readlines():
@@ -73,6 +76,7 @@ class Parameters(object):
         for i in range(self.n_signals):
             self.addTrait('signal_decay%i'%i, (0.0, .8))
             self.addTrait('signal_range%i'%i, [0, 3], ttype='int')
+            # self.addTrait('signal_has_decay%i'%i, [0, 1], ttype='int')
 
     def write(self, neat_path, sim_path):
         self.neat.Save(neat_path)

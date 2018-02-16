@@ -39,11 +39,12 @@ class Coral(object):
         self.morphogen_thresholds = params.morphogen_thresholds
 
         # Some parameters are evolved traits.
-        self.diffuse_steps = traits['diffuse_steps']
+        self.traits = traits
+        # self.energy_diffuse_steps = traits['energy_diffuse_steps']
         self.signal_decay = np.array([ traits['signal_decay%i'%i] \
-                                        for i in range(params.n_signals) ])
-        self.signal_range = np.array([ traits['signal_range%i'%i] \
-                                        for i in range(params.n_signals) ], dtype='i')
+                                       for i in range(params.n_signals) ])
+        # self.signal_diffuse_steps = np.array([ traits['signal_diffuse_steps%i'%i] \
+        #                                        for i in range(params.n_signals) ], dtype='i')
 
         # Constants for simulation dependent on start mesh.
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
@@ -77,12 +78,12 @@ class Coral(object):
         self.polyp_flow = np.zeros(self.max_polyps)
         self.polyp_pos = np.zeros((self.max_polyps, 3))
         self.polyp_pos_next = np.zeros((self.max_polyps, 3))
-        self.polyp_pos_past = np.zeros((self.max_polyps, 3))
         self.polyp_normal = np.zeros((self.max_polyps, 3))
         self.polyp_gravity = np.zeros(self.max_polyps)
         self.polyp_collection = np.zeros(self.max_polyps)
         self.polyp_collided = np.zeros(self.max_polyps, dtype='uint8')
         self.polyp_signals = np.zeros((self.max_polyps, self.params.n_signals))
+        self.buffer = np.zeros((self.max_polyps)) # For intermediate calculation values.
 
         self.collisionManager = MeshCollisionManager(self.mesh, self.polyp_pos,\
                                                      self.polyp_size)
@@ -107,7 +108,6 @@ class Coral(object):
 
     def smoothSharp(self):
         self.mesh.calculateDefect()
-
         for vert in self.mesh.verts:
             if abs(vert.defect) > self.params.max_defect:
                 avg = np.zeros(3)
@@ -122,10 +122,8 @@ class Coral(object):
     def applyHeightScale(self):
         bot = self.params.gradient_bottom
         height = self.params.gradient_height
-
         if height == 0:
             return
-
         for i in range(self.n_polyps):
             scale = bot + min(1, self.polyp_pos[i, 1] / height) * (1 - bot)
             self.polyp_collection[i] *= scale
@@ -145,7 +143,7 @@ class Coral(object):
         self.morphogens.update(self.params.morphogen_steps)
         self.calculateEnergy()
         self.applyHeightScale()
-        self.diffuseEnergy()
+        self.diffuse()
         self.volume = self.mesh.volume()
         np.nan_to_num(self.polyp_light, copy=False)
 
@@ -156,21 +154,32 @@ class Coral(object):
         self.collection = self.polyp_collection[:self.n_polyps].sum()
         self.energy = self.polyp_energy.sum()
 
-    def diffuseEnergy(self):
-        energy = np.zeros(self.n_polyps)
-        diff = .25
+    def diffuse(self):
+        """ Diffuse energy and signals across surface.
+        """
         neighbors = [ v.neighbors() for v in self.mesh.verts ]
 
-        for _ in range(self.diffuse_steps):
+        for _ in range(self.traits['energy_diffuse_steps']):
             for i in range(self.n_polyps):
-                esum = 0
+                nsum = 0
                 for vert in neighbors[i]:
-                    esum += self.polyp_energy[vert.id]
-
-                energy[i] = (1-diff)*self.polyp_energy[i] + diff*esum / len(neighbors[i])
+                    nsum += self.polyp_energy[vert.id]
+                self.buffer[i] = .5*self.polyp_energy[i] + .5*nsum / len(neighbors[i])
 
             for i in range(self.n_polyps):
-                self.polyp_energy[i] = energy[i]
+                self.polyp_energy[i] = self.buffer[i]
+
+        for mi in range(self.n_signals):
+            steps = self.traits['signal_diffuse_steps%i'%mi]
+            for _ in range(steps):
+                for i in range(self.n_polyps):
+                    nsum = 0
+                    for vert in neighbors[i]:
+                        nsum += self.polyp_signals[vert.id, mi]
+                    self.buffer[i] = .5*self.polyp_signals[i, mi] + .5*nsum / len(neighbors[i])
+
+                for i in range(self.n_polyps):
+                    self.polyp_signals[i, mi] = self.buffer[i]
 
     def createPolyp(self, vert):
         if self.n_polyps == self.max_polyps:

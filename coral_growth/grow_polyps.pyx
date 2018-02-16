@@ -10,12 +10,12 @@ from random import shuffle
 from libc.math cimport floor, fmin, fmax, fabs, atan, acos, cos, sin
 from cymesh.vector3D cimport inormalized, vadd, vsub, vmultf, vset, dot
 
-cdef double[:,:] spreads = np.array([
-    [1, 0, 0, 0],
-    [0.24522841, 0.12498851, 0, 0],
-    [0.08729082, 0.06935493, 0.03472476, 0],
-    [0.04280001, 0.03837332, 0.02765348, 0.01601401],
-])
+# cdef double[:,:] spreads = np.array([
+#     [1, 0, 0, 0],
+#     [0.24522841, 0.12498851, 0, 0],
+#     [0.08729082, 0.06935493, 0.03472476, 0],
+#     [0.04280001, 0.03837332, 0.02765348, 0.01601401],
+# ])
 
 cpdef void createPolypInputs(object coral) except *:
     """ Map polyp stats to nerual input in [-1, 1] range. """
@@ -32,7 +32,6 @@ cpdef void createPolypInputs(object coral) except *:
     cdef double[:] polyp_energy = coral.polyp_energy
     cdef bint use_polar_direction = coral.params.use_polar_direction
     cdef int num_inputs = coral.num_inputs
-    cdef list neighbors
     cdef double signal_sum, azimuthal_angle, polar_angle
 
     inputs[:, :] = -1
@@ -78,7 +77,6 @@ cpdef void grow_polyps(object coral) except *:
     cdef int n_memory = coral.n_memory
     cdef int n_signals = coral.n_signals
     cdef int n_morphogens = coral.n_morphogens
-    cdef list neighbors
     cdef object output
     cdef double[:,:] polyp_pos = coral.polyp_pos
     cdef double[:] polyp_energy = coral.polyp_energy
@@ -86,40 +84,28 @@ cpdef void grow_polyps(object coral) except *:
 
     cdef double[:,:] morphogensV = coral.morphogens.V
     cdef double[:] signal_decay = coral.signal_decay
-    cdef int[:] signal_range = coral.signal_range
-    cdef double[:] growth = np.zeros(coral.n_polyps)
+    # cdef int[:] signal_range = coral.signal_range
     cdef double target_edge_len = coral.target_edge_len
     cdef double[:,:] polyp_signals = coral.polyp_signals
     cdef unsigned int net_depth = coral.net_depth
-    cdef double max_growth = coral.max_growth
-    cdef double g
-    # cdef double[:,:] polyp_pos_past = coral.polyp_pos_past
+    cdef double growth
     cdef double[:,:] polyp_pos_next = coral.polyp_pos_next
     cdef double C = coral.C
 
-    # # Save old positions.
-    # for i in range(coral.n_polyps):
-    #     polyp_pos_past[i, 0] = polyp_pos[i, 0]
-    #     polyp_pos_past[i, 1] = polyp_pos[i, 1]
-    #     polyp_pos_past[i, 2] = polyp_pos[i, 2]
-
     createPolypInputs(coral)
-
-    # cdef double old_volume = coral.mesh.volume()
 
     for i in range(coral.n_polyps):
         # Compute feed-forward network results.
         coral.network.Flush()
         coral.network.Input(coral.polyp_inputs[i])
-        for _ in range(net_depth):
-            coral.network.ActivateFast()
+        for _ in range(net_depth): coral.network.ActivateFast()
         output = coral.network.Output()
 
         # Move in normal direction by growth amount.
-        growth[i] = min(output[0], polyp_energy[i]) * C
-        polyp_pos_next[i, 0] = polyp_pos[i, 0] + growth[i] * polyp_normal[i, 0]
-        polyp_pos_next[i, 1] = polyp_pos[i, 1] + growth[i] * polyp_normal[i, 1]
-        polyp_pos_next[i, 2] = polyp_pos[i, 2] + growth[i] * polyp_normal[i, 2]
+        growth = min(output[0], polyp_energy[i]) * C
+        polyp_pos_next[i, 0] = polyp_pos[i, 0] + growth * polyp_normal[i, 0]
+        polyp_pos_next[i, 1] = polyp_pos[i, 1] + growth * polyp_normal[i, 1]
+        polyp_pos_next[i, 2] = polyp_pos[i, 2] + growth * polyp_normal[i, 2]
 
         polyp_pos_next[i, 1] = max(0, polyp_pos_next[i, 1])
 
@@ -133,40 +119,16 @@ cpdef void grow_polyps(object coral) except *:
         # Signals
         for mi in range(n_signals):
             if output[out_idx] > .5:
-                sr = signal_range[mi]
-                polyp_signals[i, mi] += spreads[sr, 0]
+                # sr = signal_range[mi]
+                polyp_signals[i, mi] += 1.0 #spreads[sr, 0]
 
-                if sr == 1:
-                    for vert in coral.polyp_verts[i].neighbors():
-                        polyp_signals[vert.id, mi] += spreads[sr, 1] #* output[out_idx]
-                elif sr != 0:
-                    for d, vert in coral.mesh.getRings(coral.polyp_verts[i], sr):
-                        polyp_signals[vert.id, mi] += spreads[sr, d+1] #* output[out_idx]
+                # if sr == 1:
+                #     for vert in coral.polyp_verts[i].neighbors():
+                #         polyp_signals[vert.id, mi] += spreads[sr, 1] #* output[out_idx]
+                # elif sr != 0:
+                #     for d, vert in coral.mesh.getRings(coral.polyp_verts[i], sr):
+                #         polyp_signals[vert.id, mi] += spreads[sr, d+1] #* output[out_idx]
             out_idx += 1
 
-    # Calculate the desired volume and then scale it.
-    # cdef double desired_volume = coral.mesh.volume()
-
-    # Reset to old position
-    # for i in range(coral.n_polyps):
-    #     polyp_pos[i, 0] = polyp_pos_past[i, 0]
-    #     polyp_pos[i, 1] = polyp_pos_past[i, 1]
-    #     polyp_pos[i, 2] = polyp_pos_past[i, 2]
-
-    # Cap growth by amount of energy.
-    # cdef double desired_growth = desired_volume - old_volume
-    # cdef double allowed_growth = coral.C * coral.energy
-    # cdef double growth_scalar = min(1.0, desired_growth, allowed_growth)
-
     for i in range(coral.n_polyps):
-        # g = min(growth[i] * growth_scalar, max_growth)
-        # pos_next[i, 0] = polyp_pos[i, 0] + g * polyp_normal[i, 0]
-        # pos_next[i, 1] = max(0, polyp_pos[i, 1] + g * polyp_normal[i, 1])
-        # pos_next[i, 2] = polyp_pos[i, 2] + g * polyp_normal[i, 2]
-
-    # for i in range(coral.n_polyps):
-        vert = coral.mesh.verts[ i ]
-        # if abs(coral.polyp_verts[ i ].defect) > coral.params.max_defect:
-        #     continue
-        coral.polyp_collided[i] = coral.collisionManager.attemptVertUpdate(vert.id, polyp_pos_next[i])
-    # self.function_times['grow_polyps_p2'] += time.time() - t1
+        coral.polyp_collided[i] = coral.collisionManager.attemptVertUpdate(i, polyp_pos_next[i])

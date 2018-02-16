@@ -34,7 +34,7 @@ class Parameters(object):
         self.gradient_bottom = 0.5
         self.C = 10
 
-        self.addTrait('diffuse_steps', (0, 16), 'int')
+        self.addTrait('energy_diffuse_steps', (0, 8), 'int')
 
         if path:
             for line in open(path).readlines():
@@ -70,13 +70,10 @@ class Parameters(object):
             self.addTrait('F%i'%i, (.01, .06))
             self.addTrait('diffU%i'%i, (.005, .02))
             self.addTrait('diffV%i'%i, (.0025, .01))
-            # self.addTrait('diffU%i'%i, (.01, .01))
-            # self.addTrait('diffV%i'%i, (.005, .005))
 
         for i in range(self.n_signals):
             self.addTrait('signal_decay%i'%i, (0.0, .8))
-            self.addTrait('signal_range%i'%i, [0, 3], ttype='int')
-            # self.addTrait('signal_has_decay%i'%i, [0, 1], ttype='int')
+            self.addTrait('signal_diffuse_steps%i'%i, (0, 8), ttype='int')
 
     def write(self, neat_path, sim_path):
         self.neat.Save(neat_path)

@@ -14,7 +14,7 @@ def simulate_network(network, net_depth, traits, params, export_folder=None, ver
     for w_i, w_config in enumerate(params):
         save_flow_data = False#(export_folder is not None)
         # save_flow_data = True
-        coral = Coral(obj_path, network, net_depth, traits, w_config, save_flow_data)
+        coral = Coral(obj_path, network, net_depth, traits, w_config)
 
         if export_folder:
             os.mkdir(os.path.join(export_folder, str(w_i)))

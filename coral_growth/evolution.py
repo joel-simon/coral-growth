@@ -7,18 +7,13 @@ from coral_growth.simulate import simulate_genome
 
 def create_initial_population(params):
     # Create network size based off coral and parameters.
-    num_inputs = Coral.num_inputs + params.n_memory + params.n_signals +\
-                 params.n_morphogens*(params.morphogen_thresholds - 1) + \
-                 (4 * params.use_polar_direction)
-
-    num_outputs = Coral.num_outputs + params.n_memory + params.n_signals + \
-                  params.n_morphogens
+    n_inputs, n_outputs = Coral.calculate_inouts(params)
 
     genome_prototype = NEAT.Genome(
         0, # ID
-        num_inputs,
+        n_inputs,
         0, # NUM_HIDDEN
-        num_outputs,
+        n_outputs,
         False, # FS_NEAT
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.

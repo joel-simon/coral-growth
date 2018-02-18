@@ -12,12 +12,12 @@ from coral_growth.viewer import AnimationViewer
 from coral_growth.parameters import Parameters
 
 params = Parameters()
-params.n_signals = 2
-params.n_morphogens = 2
+params.n_signals = 4
+params.n_morphogens = 0
 params.morphogen_thresholds = 2
 params.height_boost = 0.0
 # params.max_defect = 1.4
-params.C = .10
+params.C = .30
 params.max_growth = .25
 params.max_polyps = 15000
 params.max_steps = 150
@@ -28,22 +28,17 @@ params.gradient_height = 1.0
 params.use_polar_direction = False
 params.calculateTraits()
 
-num_inputs = Coral.num_inputs + params.n_memory + params.n_signals + \
-             params.n_morphogens*(params.morphogen_thresholds - 1) + \
-             (4 * params.use_polar_direction)
-
-num_outputs = Coral.num_outputs + params.n_memory + params.n_signals + params.n_morphogens
+n_inputs, n_outputs = Coral.calculate_inouts(params)
 
 usig = NEAT.ActivationFunction.UNSIGNED_SIGMOID
 
 def create_initial_population():
     # Create network size based off coral and parameters.
-
     genome_prototype = NEAT.Genome(
         0, # ID
-        num_inputs,
+        n_inputs,
         0, # NUM_HIDDEN
-        num_outputs,
+        n_outputs,
         False, # FS_NEAT
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
@@ -51,7 +46,6 @@ def create_initial_population():
         params.neat,
         0,
     )
-
     pop = NEAT.Population(
         genome_prototype, # Seed genome.
         params.neat,
@@ -65,10 +59,10 @@ def create_initial_population():
 class NetworkDummy(object):
     depth=1
     def NumInputs(self):
-        return num_inputs
+        return n_inputs
 
     def NumOutputs(self):
-        return num_outputs
+        return n_outputs
 
     def Input(self, input):
         self.input = input
@@ -111,11 +105,6 @@ if __name__ == '__main__':
         #                          export_folder=export_folder, verbose=True)[0]
         coral = simulate_genome(genome, traits, [params], export_folder=export_folder,
                                 verbose=False)[0]
-
-        total = sum(coral.function_times.values())
-        for k, v in sorted(coral.function_times.items()):
-            print(k, v, v/ total)
-        print()
 
         if args.show:
             exported = os.path.join(tmp_dir, '0')

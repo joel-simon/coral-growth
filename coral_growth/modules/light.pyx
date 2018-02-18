@@ -8,57 +8,29 @@ from libc.math cimport M_PI, sin, cos, fmax
 import numpy as np
 cimport numpy as np
 
+from coral_growth.base_coral cimport BaseCoral
+from coral_growth.modules.tri_hash_2d cimport TriHash2D
+
 from cymesh.mesh cimport Mesh
 from cymesh.structures cimport Vert, Face, Edge
 from cymesh.vector3D cimport vangle
 
-from coral_growth.modules.tri_hash_2d cimport TriHash2D
-
-cdef bint pnt_in_tri(double[:] p, double[:] p0, double[:] p1, double[:] p2):
-    # https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
-    cdef double s = p0[1] * p2[0] - p0[0] * p2[1] + (p2[1] - p0[1]) * p[0] + \
-                                                    (p0[0] - p2[0]) * p[1]
-    cdef double t = p0[0] * p1[1] - p0[1] * p1[0] + (p0[1] - p1[1]) * p[0] + \
-                                                    (p1[0] - p0[0]) * p[1]
-
-    if (s < 0) != (t < 0):
-        return False
-
-    cdef double A = -p1[1] * p2[0] + p0[1] * (p2[0] - p1[0]) + p0[0] * \
-                                     (p1[1] - p2[1]) + p1[0] * p2[1]
-
-    if A < 0.0:
-        s = -s
-        t = -t
-        A = -A
-
-    return s > 0 and t > 0 and (s + t) <= A
-
-cpdef void calculate_light(coral) except *:
+cpdef void calculate_light(BaseCoral coral) except *:
     """ Calculate the light on each polyp of a coral.
     """
     cdef:
         Vert v1, v2, v3, vert
         Face face
         Edge e
+        Mesh mesh = coral.mesh
         double[:] p = np.zeros(2)
         double[:] a = np.zeros(2)
         double[:] b = np.zeros(2)
         double[:] c = np.zeros(2)
-
-        double[:] p1
-        double[:] p2
-        double[:] p3
-        double angle_to_light
+        double angle_to_light, c_height
         int i, j, n, v1_id, v2_id, v3_id, face_id
-
-    # Memeoryviews of coral.
-    cdef double[:] polyp_light = coral.polyp_light
-    cdef double[:,:] polyp_pos = coral.polyp_pos
-    cdef double[:,:] polyp_normal = coral.polyp_normal
-
-    cdef double[:] boundingBox = coral.mesh.boundingBox()
-    cdef double world_size = max(boundingBox[1]- boundingBox[0], boundingBox[3]- boundingBox[2])
+        double[:] boundingBox = coral.mesh.boundingBox()
+        double world_size = max(boundingBox[1]-boundingBox[0], boundingBox[3]-boundingBox[2])
 
     cdef double max_e = 0
     for e in coral.mesh.edges:
@@ -70,7 +42,8 @@ cpdef void calculate_light(coral) except *:
 
     cdef int[:,:] faces = np.zeros((len(coral.mesh.faces), 3), dtype='i')
 
-    for i, face in enumerate(coral.mesh.faces):
+    i = 0
+    for face in mesh.faces:
         v1 = face.he.vert
         v2 = face.he.next.vert
         v3 = face.he.next.next.vert
@@ -89,19 +62,20 @@ cpdef void calculate_light(coral) except *:
         c[1] = v3.p[2]
 
         th2d.add_tri(i, a, b, c)
+        i += 1
 
     for i in range(coral.n_polyps):
-        angle_to_light = vangle(light, polyp_normal[i]) / M_PI
+        angle_to_light = vangle(light, coral.polyp_normal[i]) / M_PI
 
         if angle_to_light > .5:
-            polyp_light[i] = 0
+            coral.polyp_light[i] = 0
             continue
 
-        polyp_light[i] = 1 - angle_to_light
+        coral.polyp_light[i] = 2*(1 - angle_to_light - 0.5)
 
         # Take position in xz plane.
-        p[0] = polyp_pos[i, 0]
-        p[1] = polyp_pos[i, 2]
+        p[0] = coral.polyp_pos[i, 0]
+        p[1] = coral.polyp_pos[i, 2]
 
         n = th2d.neighbors(p, face_buffer)
 
@@ -115,23 +89,20 @@ cpdef void calculate_light(coral) except *:
             if v1_id == i or v2_id == i or v3_id == i:
                 continue
 
-            p1 = polyp_pos[v1_id]
-            p2 = polyp_pos[v2_id]
-            p3 = polyp_pos[v3_id]
+            c_height = (coral.polyp_pos[v1_id, 1] + coral.polyp_pos[v2_id, 1] + \
+                        coral.polyp_pos[v3_id, 1]) / 3.0
 
             # If face is below vert, it does not block.
-            if (p1[1] + p2[1] + p3[1]) / 3.0 < polyp_pos[i, 1]:
+            if c_height / 3.0 < coral.polyp_pos[i, 1]:
                 continue
 
-            a[0] = p1[0]
-            a[1] = p1[2]
-
-            b[0] = p2[0]
-            b[1] = p2[2]
-
-            c[0] = p3[0]
-            c[1] = p3[2]
+            a[0] = coral.polyp_pos[v1_id, 0]
+            a[1] = coral.polyp_pos[v1_id, 2]
+            b[0] = coral.polyp_pos[v2_id, 0]
+            b[1] = coral.polyp_pos[v2_id, 2]
+            c[0] = coral.polyp_pos[v3_id, 0]
+            c[1] = coral.polyp_pos[v3_id, 2]
 
             if pnt_in_tri(p, a, b, c):
-                polyp_light[i] = 0
+                coral.polyp_light[i] = 0
                 break

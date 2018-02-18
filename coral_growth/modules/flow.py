@@ -6,10 +6,10 @@ import time
 
 from pykdtree.kdtree import KDTree
 
-def calculate_collection(coral, export=False):
-    tree = KDTree(coral.polyp_pos[:coral.n_polyps], leafsize=16)
-    dists, indx = tree.query(coral.polyp_pos[:coral.n_polyps], k=15)
-    np.clip(dists, 0, 10*coral.polyp_size, out=dists)
+def calculate_collection(coral, k, max_compete):
+    tree = KDTree(np.asarray(coral.polyp_pos[:coral.n_polyps]))
+    dists, indx = tree.query(np.asarray(coral.polyp_pos[:coral.n_polyps]), k=k+1)
+    np.clip(dists, 0, max_compete, out=dists)
     distances = np.mean(dists[:, 1:], axis=1)
 
     for i in range(coral.n_polyps):

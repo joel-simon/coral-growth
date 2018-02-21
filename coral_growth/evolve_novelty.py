@@ -14,7 +14,7 @@ def evaluate_novelty(genome, traits, params):
         coral = simulate_genome(genome, traits, [params])[0]
         fitness = coral.fitness()
         print('.', end='', flush=True)
-        return fitness, np.array(d2_features(coral.mesh, bins=64))
+        return fitness, np.array(d2_features(coral.mesh, n_points=1<<13,bins=64))
 
     except AssertionError as e:
         print('AssertionError:', e)

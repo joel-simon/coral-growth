@@ -72,8 +72,10 @@ class Parameters(object):
             self.addTrait('diffV%i'%i, (.0025, .01))
 
         for i in range(self.n_signals):
-            self.addTrait('signal_decay%i'%i, (0.0, .8))
+            self.addTrait('signal_decay%i'%i, (0.0, .4))
             self.addTrait('signal_diffuse_steps%i'%i, (0, 8), ttype='int')
+
+        # for i in range(self.n_memor):
 
     def write(self, neat_path, sim_path):
         self.neat.Save(neat_path)

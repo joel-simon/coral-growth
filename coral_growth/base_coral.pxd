@@ -12,11 +12,10 @@ cdef class BaseCoral:
     cdef public double[:] polyp_flow, polyp_gravity, polyp_collection, polyp_light,\
                           signal_decay, polyp_energy, buffer
     cdef public unsigned char[:] polyp_collided
-
     cpdef void calculateEnergy(self) except *
+    cpdef void calculateGravity(self) except *
     cpdef void createPolyp(self, Vert vert) except *
     cpdef void polypDivision(self) except *
-
     cpdef void applyHeightScale(self) except *
     cpdef void diffuse(self) except *
     cpdef void createPolypInputs(self) except *

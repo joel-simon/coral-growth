@@ -1,13 +1,18 @@
 from __future__ import print_function
 from math import isnan, sqrt, floor, pi
 import numpy as np
+from pykdtree.kdtree import KDTree
+
 from cymesh.mesh import Mesh
 from coral_growth.modules.morphogens import Morphogens
 from coral_growth.modules.collisions import MeshCollisionManager
+from coral_growth.modules.flowx import *
+from coral_growth.modules.flowx2 import *
 
 from cymesh.operators.relax import relax_mesh
 from coral_growth.modules import light, gravity
-from coral_growth.modules import flow as flow
+# from coral_growth.modules import flow as flow
+# from coral_growth.modules import flow as flow
 from coral_growth.base_coral import BaseCoral
 
 class Coral(BaseCoral):
@@ -68,7 +73,7 @@ class Coral(BaseCoral):
 
     @classmethod
     def calculate_inouts(cls, params):
-        n_inputs = 4 # [light, collection, energy, extra-bias-bit]
+        n_inputs = 6 # [light, collection, energy, gravity, curvature, extra-bias-bit]
         n_outputs = 1 # Growth
 
         n_inputs += params.n_memory + params.n_signals + \
@@ -95,9 +100,9 @@ class Coral(BaseCoral):
                 for vert2 in neighbors:
                     avg += vert2.p
                 avg /= len(neighbors)
-                vert.p[0] = .66 * vert.p[0] + .33 * avg[0]
-                vert.p[1] = .66 * vert.p[1] + .33 * avg[1]
-                vert.p[2] = .66 * vert.p[2] + .33 * avg[2]
+                vert.p[0] = .5 * vert.p[0] + .5 * avg[0]
+                vert.p[1] = .5 * vert.p[1] + .5 * avg[1]
+                vert.p[2] = .5 * vert.p[2] + .5 * avg[2]
 
     def updateAttributes(self):
         self.mesh.calculateNormals()
@@ -105,14 +110,30 @@ class Coral(BaseCoral):
         self.mesh.calculateCurvature()
         self.volume = self.mesh.volume()
         light.calculate_light(self) # Update the light
-        flow.calculate_collection(self, 20, 10*self.polyp_size)
-        gravity.calculate_gravity(self)
+        self.calculateCollection(radius=5)
+        self.calculateGravity()
         self.decaySignals()
         self.morphogens.update(self.params.morphogen_steps)
         self.applyHeightScale()
         self.calculateEnergy()
         self.diffuse()
         np.nan_to_num(self.polyp_light, copy=False)
+
+    def calculateCollection(self, radius):
+        polyp_voxels, voxel_grid, min_v = create_voxel_grid(self)
+        voxel_grid = np.array(voxel_grid).astype('uint8')
+        calculate_collection(self.polyp_collection, polyp_voxels, voxel_grid, radius)
+
+        # points = np.asarray(self.polyp_pos[:self.n_polyps])
+        # tree = KDTree(points)
+        # dists, indx = tree.query(points, distance_upper_bound=max_compete, k=k+1)
+        # distances = np.mean(dists[:, 1:], axis=1)
+        # outside = flood_fill(np.asarray(voxel_grid).astype('uint8'))
+        # collection = average_neighbors(outside, radius=5)
+
+        # for i in range(self.n_polyps):
+        #     vox = polyp_voxels[i]
+        #     self.polyp_collection[i] = collection[ vox[0], vox[1], vox[2] ]# * distances[i] * 5
 
     def fitness(self, verbose=False):
         if verbose:

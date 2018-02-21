@@ -9,6 +9,7 @@ import numpy as np
 cimport numpy as np
 
 from minheap import MinHeap
+from coral_growth.base_coral cimport BaseCoral
 
 cdef int[:,:] neighbors = np.array([[-1, 0, 0], [1, 0, 0], [0, 1, 0],
                                     [0, -1, 0], [0, 0, -1], [0, 0, 1]], dtype='int32')
@@ -123,7 +124,7 @@ cpdef tuple dijkstra_search(int[:,:,:] grid, float[:,:,:] cost_grid, int startx)
 
     return came_from, cost_so_far
 
-cpdef tuple create_voxel_grid(coral):
+cpdef tuple create_voxel_grid(BaseCoral coral):
     cdef int i, vx, vy, vz
     cpdef double[:] p
 
@@ -259,3 +260,4 @@ cpdef void calculate_collectionx_from_flow(double[:] collection, int[:,:] voxels
                         seen += flow_grid[dx, dy, dz] / counts[dx, dy, dz]
 
         collection[i] = seen / total
+

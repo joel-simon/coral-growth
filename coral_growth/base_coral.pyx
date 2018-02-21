@@ -4,14 +4,14 @@
 # cython: nonecheck=False
 # cython: cdivision=True
 from __future__ import division, print_function
-from libc.math cimport floor, fmin, fmax, fabs, atan, acos, cos, sin
+from libc.math cimport floor, atan, acos, cos, sin, M_PI
 import numpy as np
 cimport numpy as np
 
 from coral_growth.modules.morphogens import Morphogens
 from coral_growth.modules.collisions import MeshCollisionManager
 
-from cymesh.vector3D cimport inormalized, vadd, vsub, vmultf, vset, dot
+from cymesh.vector3D cimport inormalized, vadd, vsub, vmultf, vset, dot, vangle
 from cymesh.mesh cimport Mesh
 from cymesh.structures cimport Vert, Face
 from cymesh.subdivision.sqrt3 import split
@@ -30,6 +30,12 @@ cdef class BaseCoral:
                                    (1-light_amount)*self.polyp_collection[i]
         self.energy = light_amount*self.energy + (1-light_amount)*self.collection
 
+    cpdef void calculateGravity(self) except *:
+        cdef int i = 0
+        cdef double[:] down = np.array([0, -1.0, 0])
+        for i in range(self.n_polyps):
+            self.polyp_gravity[i] = vangle(down, self.polyp_normal[i]) / M_PI
+
     cpdef void createPolyp(self, Vert vert) except *:
         if self.n_polyps == self.max_polyps:
             return
@@ -45,15 +51,15 @@ cdef class BaseCoral:
         vert.p = self.polyp_pos[idx]
         self.polyp_verts[idx] = vert
 
-        n = 0
-        for vert_n in vert.neighbors():
-            if self.polyp_signals[vert_n.id, 0] == 0.0:
-                for i in range(self.n_signals):
-                    self.polyp_signals[idx, i] += self.polyp_signals[vert_n.id, i]
-            n += 1
+        # n = 0
+        # for vert_n in vert.neighbors():
+        #     if self.polyp_signals[vert_n.id, 0] == 0.0:
+        #         for i in range(self.n_signals):
+        #             self.polyp_signals[idx, i] += self.polyp_signals[vert_n.id, i]
+        #     n += 1
 
-        for i in range(self.n_signals):
-            self.polyp_signals[idx, i] /= n
+        # for i in range(self.n_signals):
+        #     self.polyp_signals[idx, i] /= n
 
         self.collisionManager.newVert(vert.id)
 
@@ -137,8 +143,10 @@ cdef class BaseCoral:
             self.polyp_inputs[i, 0] = (self.polyp_light[i] * 2) - 1
             self.polyp_inputs[i, 1] = (self.polyp_collection[i] * 2) - 1
             self.polyp_inputs[i, 2] = (self.polyp_energy[i] * 2) - 1
-
-            input_idx = 3
+            self.polyp_inputs[i, 3] = self.polyp_gravity[i]
+            self.polyp_inputs[i, 4] = self.mesh.verts[i].curvature
+            # assert (not np.isnan(self.mesh.verts[i].curvature)), 'nan curv'
+            input_idx = 5
 
             # Morphogens
             for mi in range(self.n_morphogens):
@@ -154,6 +162,11 @@ cdef class BaseCoral:
             for mi in range(self.n_signals):
                 self.polyp_inputs[i, input_idx] = self.polyp_signals[i, mi] > 0.5
                 input_idx += 1
+
+            # # Memory
+            # for mi in range(self.n_memory):
+            #     self.polyp_inputs[i, input_idx] = self.polyp_signals[i, mi] > 0.5
+            #     input_idx += 1
 
             if use_polar_direction:
                 azimuthal_angle = atan(self.polyp_normal[i, 1] / self.polyp_normal[i, 0])

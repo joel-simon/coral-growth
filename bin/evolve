@@ -43,16 +43,16 @@ if __name__ == '__main__':
     params.n_signals = 2
     params.n_morphogens = 1
     params.morphogen_thresholds = 2
-    params.gradient_height = 4.0
-    params.gradient_bottom = 0.05
+    params.gradient_height = 3.0
+    params.gradient_bottom = 0.2
     params.light_amount = 0.5
-    params.max_defect = 1.4
+    params.max_defect = 1.45
 
-    params.C = .3
+    params.C = .4
     params.max_growth = .20
-    params.max_polyps = 10000#15000
-    params.max_steps = 100#150
-    params.max_volume = 50#75.0
+    params.max_polyps = 10000
+    params.max_steps = 100
+    params.max_volume = 30.0
 
     params.max_face_growth = 1.3
 

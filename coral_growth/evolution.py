@@ -1,6 +1,5 @@
 from __future__ import print_function
-import time
-import os
+import os, time, math
 import MultiNEAT as NEAT
 from coral_growth.coral import Coral
 from coral_growth.simulate import simulate_genome
@@ -35,8 +34,14 @@ def evaluate(genome, traits, params):
         coral = simulate_genome(genome, traits, [params])[0]
         fitness = coral.fitness()
     except AssertionError as e:
-        print('Exception:', e)
+        print('Exception:', e, end='', flush=True)
         fitness = 0
+
+    # Check for NaN or infinite values.
+    if not math.isfinite(fitness):
+        print('E', end='', flush=True)
+        return 0
+
     print('.', end='', flush=True)
     return fitness
 

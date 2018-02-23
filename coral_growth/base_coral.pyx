@@ -28,7 +28,8 @@ cdef class BaseCoral:
             self.collection += self.polyp_collection[i]
             self.polyp_energy[i] = light_amount * self.polyp_light[i] + \
                                    (1-light_amount)*self.polyp_collection[i]
-        self.energy = light_amount*self.energy + (1-light_amount)*self.collection
+
+        self.energy = light_amount*self.light + (1-light_amount)*self.collection
 
     cpdef void calculateGravity(self) except *:
         cdef int i = 0

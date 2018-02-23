@@ -6,10 +6,10 @@ class Parameters(object):
 
         # Evolution.
         self.neat = NEAT.Parameters()
-        self.neat.PopulationSize = 100
+        self.neat.PopulationSize = 80
         self.neat.OldAgeTreshold = 10
         self.neat.SpeciesMaxStagnation = 10
-        self.neat.MinSpecies = 3
+        self.neat.MinSpecies = 2
         self.neat.MaxSpecies = 8
         self.neat.OverallMutationRate = 0.6
         self.neat.MutateAddNeuronProb = 0.05
@@ -17,22 +17,25 @@ class Parameters(object):
         self.neat.AllowLoops = False
 
         # Coral Growth.
-        self.max_polyps = 10000
-        self.max_volume = 40.0
-        self.max_steps = 40
-        self.max_growth = .5
+        self.max_polyps = 15000
+        self.max_volume = 50.0
+        self.max_steps = 150
+        self.max_growth = .20
         self.max_defect = 1.4
-        self.max_face_growth = 1.5
-        self.n_signals = 1
-        self.n_memory = 0
-        self.n_morphogens = 0
-        self.morphogen_thresholds = 3
-        self.morphogen_steps = 200
-        self.use_polar_direction = True
+        self.max_face_growth = 1.3
 
-        self.gradient_height = 1.0
-        self.gradient_bottom = 0.5
-        self.C = 10
+        self.n_morphogens = 2
+        self.n_signals = 3
+        self.n_memory = 0
+
+        self.light_amount = 0.7
+        self.gradient_height = 6.0
+        self.gradient_bottom = 0.2
+        self.C = .4
+
+        self.morphogen_thresholds = 2
+        self.morphogen_steps = 200
+        self.use_polar_direction = False
 
         self.addTrait('energy_diffuse_steps', (0, 8), 'int')
 

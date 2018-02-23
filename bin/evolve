@@ -22,9 +22,15 @@ if __name__ == '__main__':
     parser.add_argument("--out", default='../output', help="Output dir.")
     parser.add_argument("--cores", default=1, help="Number of cores.", type=int)
     parser.add_argument('--method', default='neat')
-    args = parser.parse_args()
+
+    # Allow arbitrary command line flags.
+    args, remaining = parser.parse_known_args(sys.argv[1:])
 
     methods = ['neat', 'novelty', 'local']
+    pool = None
+    rid = generate_id(4)
+
+    print('Run ID: ', rid)
 
     if args.method not in methods:
         print('Error: method not recognized', args.method)
@@ -32,33 +38,27 @@ if __name__ == '__main__':
         exit()
 
     print(args)
-    rid = generate_id(4)
-    print('Run ID: ', rid)
+
+
 
     params = Parameters()
-    # Neat parameters.
-    params.neat.MinSpecies = 3
-    params.neat.PopulationSize = 60#80
-    # Simulation parameters.
-    params.n_signals = 2
-    params.n_morphogens = 1
-    params.morphogen_thresholds = 2
-    params.gradient_height = 3.0
-    params.gradient_bottom = 0.2
-    params.light_amount = 0.5
-    params.max_defect = 1.45
 
-    params.C = .4
-    params.max_growth = .20
-    params.max_polyps = 10000
-    params.max_steps = 100
-    params.max_volume = 30.0
+    # Update default parameters using optional command line input.
+    for i in range(0, len(remaining), 2):
+        flag = remaining[i].split('--')[1]
+        value = remaining[i+1]
+        value = int(value) if value.isdigit() else float(value)
+        is_neat = (flag.split('.')[0] == 'neat')
 
-    params.max_face_growth = 1.3
+        print('Parameter detected { %s: %s}'%(flag, str(value)))
 
-    params.calculateTraits()
-
-    pool = None
+        if is_neat:
+            flag = flag.split('.')[1]
+            assert hasattr(params.neat, flag), 'Unrecognized parameter: '+flag
+            setattr(params.neat, flag, value)
+        else:
+            assert hasattr(params, flag), 'Unrecognized parameter: '+flag
+            setattr(params, flag, value)
 
     if args.method == "novelty":
         params.neat.PopulationSize = 20
@@ -69,6 +69,7 @@ if __name__ == '__main__':
     else:
         dir_name = rid+"__{:%B_%d_%Y_%H_%M}".format(datetime.now())
 
+    params.calculateTraits()
     dir_path = os.path.join(args.out, dir_name)
     os.makedirs(dir_path)
 

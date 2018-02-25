@@ -51,18 +51,7 @@ cdef class BaseCoral:
         vert.normal = self.polyp_normal[idx]
         vert.p = self.polyp_pos[idx]
         self.polyp_verts[idx] = vert
-
-        # n = 0
-        # for vert_n in vert.neighbors():
-        #     if self.polyp_signals[vert_n.id, 0] == 0.0:
-        #         for i in range(self.n_signals):
-        #             self.polyp_signals[idx, i] += self.polyp_signals[vert_n.id, i]
-        #     n += 1
-
-        # for i in range(self.n_signals):
-        #     self.polyp_signals[idx, i] /= n
-
-        self.collisionManager.newVert(vert.id)
+        self.collisionManager.newVert(vert)
 
         assert vert.id == idx
 
@@ -222,8 +211,8 @@ cdef class BaseCoral:
                     self.polyp_signals[i, mi] = 1.0
                 out_idx += 1
 
-        for i in range(self.n_polyps):
-            self.polyp_collided[i] = self.collisionManager.attemptVertUpdate(i, self.polyp_pos_next[i])
+        # for i in range(self.n_polyps):
+        #     self.polyp_collided[i] = self.collisionManager.attemptVertUpdate(i, self.polyp_pos_next[i])
 
     cpdef void export(self, str path) except *:
         """ Export the coral to .coral.obj file

@@ -66,7 +66,7 @@ class Coral(BaseCoral):
         self.buffer = np.zeros((self.max_polyps)) # For intermediate calculation values.
 
         self.collisionManager = MeshCollisionManager(self.mesh, self.polyp_pos,\
-                                                     self.polyp_size)
+                                                     self.polyp_normal, self.polyp_size)
         for vert in self.mesh.verts:
             self.createPolyp(vert)
         self.updateAttributes()
@@ -85,6 +85,10 @@ class Coral(BaseCoral):
 
     def step(self):
         self.growPolyps()
+
+        for i in range(self.n_polyps):
+            self.collisionManager.attemptVertUpdate(self.mesh.verts[i], self.polyp_pos_next[i])
+
         relax_mesh(self.mesh)
         self.smoothSharp()
         self.polypDivision() # Divide mesh and create new polyps.

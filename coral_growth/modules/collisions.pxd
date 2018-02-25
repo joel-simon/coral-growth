@@ -1,10 +1,12 @@
+from cymesh.structures cimport Vert
+
 cdef class MeshCollisionManager:
     cdef public object mesh
-    cdef public double[:,:] vertices
+    cdef public double[:,:] vertices, normals
     cdef public double blocksize, r
-    cdef public unsigned int[:,:] particles
+    cdef public int[:,:] particles
     cdef public object grid
 
-    cdef bint collides(self, int id1, int id2)
-    cpdef void newVert(self, int id) except *
-    cpdef bint attemptVertUpdate(self, int id, double[:] p) except *
+    cpdef int[:] getIndices(self, double[:] p) except *
+    cpdef void newVert(self, Vert vert) except *
+    cpdef bint attemptVertUpdate(self, Vert vert, double[:] p) except *

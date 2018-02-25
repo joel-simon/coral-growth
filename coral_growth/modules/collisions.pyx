@@ -1,95 +1,79 @@
+# cython: boundscheck=False
+# cython: wraparound=True
+# cython: initializedcheck=False
+# cython: nonecheck=False
+# cython: cdivision=True
 from __future__ import print_function
 from libc.math cimport sqrt, floor, fmin
 from collections import defaultdict
-from cymesh.vector3D cimport dot
+from cymesh.structures cimport Vert
+from cymesh.vector3D cimport dot, vdist, vsub
 import numpy as np
 cimport numpy as np
 
 cdef class MeshCollisionManager:
-    def __init__(self, mesh, vertices, r=1):
+    def __init__(self, mesh, vertices, normals, r=1):
         self.mesh = mesh
         self.vertices = vertices
+        self.normals = normals
         self.blocksize = 2*r
         self.r = r
-        self.particles = np.zeros((vertices.shape[0], 3), dtype='uint32')
+        self.particles = np.zeros((vertices.shape[0], 3), dtype='int32')
         self.grid = defaultdict(set)
 
-    cdef bint collides(self, int id1, int id2):
-        cdef double[:] p1 = self.vertices[id1]
-        cdef double[:] p2 = self.vertices[id2]
-
-        cdef double dx = p1[0] - p2[0]
-        cdef double dy = p1[1] - p2[1]
-        cdef double dz = p1[2] - p2[2]
-        cdef double d = sqrt(dx*dx + dy*dy + dz*dz)
-
-        if d > self.blocksize:
-            return False
-
-        # Do a check that one is in front of the other and not behind.
-        cdef double[:] AB = np.array(p2) - p1
-        cdef bint is_in_front = dot(AB, self.mesh.verts[id1].normal) > 0
-
-        return is_in_front
-
-    cpdef void newVert(self, int id) except *:
-        """ Return True if add was accepted and False otherwise.
+    cpdef int[:] getIndices(self, double[:] p) except *:
+        """ Map the floating point position into voxel space.
         """
-        assert id >= 0 and id < self.particles.shape[0]
+        cdef int[:] indices = np.zeros(3, dtype='i')
+        indices[0] = <int>(floor((p[0]) / self.blocksize))
+        indices[1] = <int>(floor((p[1]) / self.blocksize))
+        indices[2] = <int>(floor((p[2]) / self.blocksize))
+        return indices
 
-        vert = self.mesh.verts[id]
+    cpdef void newVert(self, Vert vert) except *:
+        cdef int[:] ind = self.getIndices(vert.p)
+        self.grid[ (ind[0], ind[1], ind[2]) ].add( vert.id )
+        self.particles[vert.id, 0] = ind[0]
+        self.particles[vert.id, 1] = ind[1]
+        self.particles[vert.id, 2] = ind[1]
 
-        cdef double[:] p = vert.p
-        cdef int xc = <int>(floor(p[0] / self.blocksize))
-        cdef int yc = <int>(floor(p[1] / self.blocksize))
-        cdef int zc = <int>(floor(p[2] / self.blocksize))
-
-        self.grid[(xc, yc, zc)].add(id)
-        self.particles[id][0] = xc
-        self.particles[id][1] = yc
-        self.particles[id][2] = zc
-
-    cpdef bint attemptVertUpdate(self, int id, double[:] p) except *:
+    cpdef bint attemptVertUpdate(self, Vert vert, double[:] p) except *:
         """ Update if it does not collide and return True, else False
         """
-        cdef int ix, iy, iz
+        cdef int ix, iy, iz, id_other
+        cdef double dist
         cdef set block
-        cdef object vert = self.mesh.verts[id]
-        cdef set neighbors = set()
+        cdef int vid = vert.id
+        cdef list neighbors = [v.id for v in vert.neighbors()]
+        cdef int[:] old_ind = self.particles[vert.id]
+        cdef int[:] new_ind = self.getIndices(p)
+        cdef double[:] temp = np.zeros(3)
 
-        cdef int xc0 = self.particles[id, 0]
-        cdef int yc0 = self.particles[id, 1]
-        cdef int zc0 = self.particles[id, 2]
-
-        cdef int xc = <int>(floor(p[0] / self.blocksize))
-        cdef int yc = <int>(floor(p[1] / self.blocksize))
-        cdef int zc = <int>(floor(p[2] / self.blocksize))
-
-        for other in vert.neighbors():
-            neighbors.add(other.id)
-
-        for ix in range(xc-1, xc+2):
-            for iy in range(yc-1, yc+2):
-                for iz in range(zc-1, zc+2):
-                    block = self.grid.get((ix, iy, iz), set())
+        for ix in range(new_ind[0]-1, new_ind[0]+2):
+            for iy in range(new_ind[1]-1, new_ind[1]+2):
+                for iz in range(new_ind[2]-1, new_ind[2]+2):
+                    block = self.grid.get((ix, iy, iz), None)
+                    if block is None:
+                        continue
 
                     for id_other in block:
-                        if id != id_other and id_other not in neighbors and self.collides(id, id_other):
-                            return False
+                        if vid == id_other or id_other in neighbors:
+                            continue
+                        dist = vdist(p, self.vertices[id_other])
+                        if dist <= self.blocksize:
+                            # Do a check that one is in front of the other and not behind.
+                            vsub(temp, self.vertices[id_other], p)
+                            if dot(temp, self.normals[vid]) > 0:
+                                return False
 
         # Accept the update.
         vert.p[:] = p
-        self.particles[id][0] = xc
-        self.particles[id][1] = yc
-        self.particles[id][2] = zc
+        self.particles[vid, 0] = new_ind[0]
+        self.particles[vid, 1] = new_ind[1]
+        self.particles[vid, 2] = new_ind[2]
 
-        if xc0 != xc or yc0 != yc or zc0 != zc:
-            self.grid[(xc0, yc0, zc0)].remove(id)
-            self.grid[(xc, yc, zc)].add(id)
+        if old_ind[0] != new_ind[0] or old_ind[1] != new_ind[1] or old_ind[2] != new_ind[2]:
+            self.grid[(old_ind[0], old_ind[1], old_ind[2])].remove(vid)
+            self.grid[(new_ind[0], new_ind[1], new_ind[2])].add(vid)
 
         return True
-
-    # def removeParticle(self, id):
-    #     x, y, r, ix, iy, iz = self.particles[id]
-    #     del self.particles[id]
-    #     self.grid[(ix, iy, iz)].remove(id)

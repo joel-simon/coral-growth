@@ -74,16 +74,14 @@ class NetworkDummy(object):
         pass
 
     def Output(self):
-        # out = [1 for _ in range(self.NumOutputs())]
         out = [random.random() for _ in range(self.NumOutputs())]
-        # out = [0 for _ in range(self.NumOutputs())]
-        # out[0] = 1
         return out
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--steps", default=25, help="Num Steps.", type=int, required=False)
     parser.add_argument("--show", default=1, help="Display output.", type=int, required=False)
+    parser.add_argument("--net", default=0, help="The network has random output instead of a random network.", type=int)
     args = parser.parse_args()
     params.max_steps = args.steps
 
@@ -98,13 +96,16 @@ if __name__ == '__main__':
             print(k,'\t', v)
 
         export_folder = None
+
         if args.show:
             export_folder = tmp_dir
 
-        # coral = simulate_network(NetworkDummy(), NetworkDummy.depth, traits, [params],\
-        #                          export_folder=export_folder, verbose=True)[0]
-        coral = simulate_genome(genome, traits, [params], export_folder=export_folder,
-                                verbose=True)[0]
+        if args.net:
+            coral = simulate_network(NetworkDummy(), NetworkDummy.depth, traits, [params],\
+                                     export_folder=export_folder, verbose=True)[0]
+        else:
+            coral = simulate_genome(genome, traits, [params], export_folder=export_folder,
+                                    verbose=True)[0]
 
         if args.show:
             exported = os.path.join(tmp_dir, '0')

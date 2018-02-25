@@ -14,24 +14,23 @@ from coral_growth.parameters import Parameters
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("max_polyps", default=10000, help="Generations.", type=int)
-    parser.add_argument("time_steps", default=100, help="Output dir.", type=int)
     parser.add_argument("root_path", help="")
     parser.add_argument("generation", type=int, help="")
-    # parser.add_argument("genome_path", help="")
-    # parser.add_argument("trait_path", help="")
-    # parser.add_argument("params_path", help="")
+    parser.add_argument("--max_polyps", default=10000, help="Generations.", type=int)
+    parser.add_argument("--max_steps", default=100, help="Output dir.", type=int)
+
     args = parser.parse_args()
 
     genome_path = os.path.join(args.root_path, 'genome_%i'%args.generation)
     trait_path = os.path.join(args.root_path, 'best_%i_traits.txt'%args.generation)
-    params_path = os.path.join(args.root_path, 'params.txt')
+    params_path = os.path.join(args.root_path, 'sim_params.txt')
+
 
     traits = ast.literal_eval(open(trait_path, 'r').readlines()[0])
     genome = NEAT.Genome(genome_path)
 
     params = Parameters(params_path)
-    params.max_steps = args.time_steps
+    params.max_steps = args.max_steps
     params.max_polyps = args.max_polyps
 
     with TemporaryDirectory() as tmp_dir:

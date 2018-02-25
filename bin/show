@@ -1,40 +1,37 @@
 #!/usr/bin/env python3
-import sys, os
+import sys, os, argparse
 sys.path.append(os.path.abspath('..'))
 from coral_growth.simulate import simulate_genome
 from coral_growth.viewer import AnimationViewer
 
 if __name__ == '__main__':
     assert(len(sys.argv) >= 2)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input", nargs='*')
+    parser.add_argument("--width", default=1330, type=int)
+    parser.add_argument("--height", default=1000, type=int)
+    parser.add_argument("--all", default=1, type=int)
+    args = parser.parse_args()
+
     width = 1330
     height = 1000
 
-    directories = sys.argv[1:]
-
-    if sys.argv[1].isdigit():
-        width = int(sys.argv[1])
-        directories = sys.argv[2:]
-
-    if len(sys.argv) > 2 and sys.argv[2].isdigit():
-        height = int(sys.argv[2])
-        directories = sys.argv[3:]
-
-    print(width, height)
-
     all_files = []
 
-    for folder in directories:
+    for folder in args.input:
         folder += '/0'
         files = [f for f in os.listdir(folder) if f.endswith('.coral.obj')]
         files = sorted(files, key=lambda f: int(f.split('.')[0]))
         files = [os.path.join(folder, f) for f in files]
 
-        all_files.extend(files)
-        if len(directories) > 1:
-            for _ in range(5):
-                all_files.append(all_files[-1])
+        if args.all:
+            all_files.extend(files)
+        else:
+            all_files.append(files[-1])
 
-        # all_files.append(files[-2])
+        # if len(directories) > 1:
+        #     for _ in range(5):
+        #         all_files.append(all_files[-1])
 
-    view = AnimationViewer(all_files, (width, height))
+    view = AnimationViewer(all_files, (args.width, args.height))
     view.main_loop()

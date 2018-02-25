@@ -44,7 +44,7 @@ cpdef uint8[:,:,:] flood_fill(uint8[:,:,:] grid) except *:
 
 cpdef void calculate_collection(double[:] collection, int[:,:] voxels,\
                                 uint8[:,:,:] voxel_grid, int radius = 3) except *:
-    cdef int i, x, y, z, dx, dy, dz, x2, y2, z2
+    cdef int i, x, y, z, dx, dy, dz, x2, y2, z2, d
     cdef float v
     cdef float total = float((2*radius+1)**3)
     cdef int nx = voxel_grid.shape[0]
@@ -56,13 +56,17 @@ cpdef void calculate_collection(double[:] collection, int[:,:] voxels,\
     ### Create a 3D kernel
     cdef int w = (2*radius)+1
     cdef float[:,:,:] kernel = np.zeros((w, w, w), dtype='float32')
+    cdef int r2 = radius * radius
+
     for x in range(w):
         for y in range(w):
             for z in range(w):
                 dx = abs(x - (radius))
                 dy = abs(y - (radius))
                 dz = abs(z - (radius))
-                kernel[x, y, z] = 1.0 / (1 + (dx*dx + dy*dy + dz*dz))
+                d = dx*dx + dy*dy + dz*dz
+                if d <= radius*radius:
+                    kernel[x, y, z] = 1.0 / (1 + d)
 
     for i in range(voxels.shape[0]):
         x = voxels[i, 0]

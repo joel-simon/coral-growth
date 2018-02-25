@@ -114,7 +114,7 @@ class Coral(BaseCoral):
         self.mesh.calculateCurvature()
         self.volume = self.mesh.volume()
         light.calculate_light(self) # Update the light
-        self.calculateCollection(radius=5)
+        self.calculateCollection(radius=self.params.collection_radius)
         self.calculateGravity()
         self.decaySignals()
         self.morphogens.update(self.params.morphogen_steps)

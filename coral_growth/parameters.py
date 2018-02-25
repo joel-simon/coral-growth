@@ -31,6 +31,7 @@ class Parameters(object):
         self.light_amount = 0.7
         self.gradient_height = 6.0
         self.gradient_bottom = 0.2
+        self.collection_radius = 5
         self.C = .4
 
         self.morphogen_thresholds = 2

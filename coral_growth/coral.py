@@ -11,8 +11,6 @@ from coral_growth.modules.flowx2 import *
 
 from cymesh.operators.relax import relax_mesh
 from coral_growth.modules import light, gravity
-# from coral_growth.modules import flow as flow
-# from coral_growth.modules import flow as flow
 from coral_growth.base_coral import BaseCoral
 
 class Coral(BaseCoral):
@@ -26,6 +24,7 @@ class Coral(BaseCoral):
         self.n_memory = params.n_memory
         self.max_polyps = params.max_polyps
         self.n_morphogens = params.n_morphogens
+        self.max_growth = params.max_growth
 
         self.morphogens = Morphogens(self, traits, params.n_morphogens)
 
@@ -43,7 +42,7 @@ class Coral(BaseCoral):
         self.polyp_size = self.target_edge_len * 0.5
         self.max_edge_len = self.target_edge_len * 1.3
         self.max_face_area = np.mean([f.area() for f in self.mesh.faces]) * params.max_face_growth
-        self.voxel_length = self.target_edge_len * .8
+        self.voxel_length = self.target_edge_len
 
         # Data
         self.age = 0
@@ -89,24 +88,29 @@ class Coral(BaseCoral):
         for i in range(self.n_polyps):
             self.collisionManager.attemptVertUpdate(self.mesh.verts[i], self.polyp_pos_next[i])
 
-        relax_mesh(self.mesh)
         self.smoothSharp()
+        relax_mesh(self.mesh)
         self.polypDivision() # Divide mesh and create new polyps.
         self.updateAttributes()
         self.age += 1
 
     def smoothSharp(self):
+        buffer = np.zeros((self.n_polyps, 3))
         self.mesh.calculateDefect()
+
         for vert in self.mesh.verts:
             if abs(vert.defect) > self.params.max_defect:
-                avg = np.zeros(3)
                 neighbors = vert.neighbors()
                 for vert2 in neighbors:
-                    avg += vert2.p
-                avg /= len(neighbors)
-                vert.p[0] = .5 * vert.p[0] + .5 * avg[0]
-                vert.p[1] = .5 * vert.p[1] + .5 * avg[1]
-                vert.p[2] = .5 * vert.p[2] + .5 * avg[2]
+                    buffer[vert.id] += vert2.p
+
+                buffer[vert.id] /= len(neighbors)
+
+        for vert in self.mesh.verts:
+            if abs(vert.defect) > self.params.max_defect:
+                vert.p[0] = .5 * vert.p[0] + .5 * buffer[vert.id, 0]
+                vert.p[1] = .5 * vert.p[1] + .5 * buffer[vert.id, 1]
+                vert.p[2] = .5 * vert.p[2] + .5 * buffer[vert.id, 2]
 
     def updateAttributes(self):
         self.mesh.calculateNormals()
@@ -127,17 +131,6 @@ class Coral(BaseCoral):
         polyp_voxels, voxel_grid, min_v = create_voxel_grid(self)
         voxel_grid = np.array(voxel_grid).astype('uint8')
         calculate_collection(self.polyp_collection, polyp_voxels, voxel_grid, radius)
-
-        # points = np.asarray(self.polyp_pos[:self.n_polyps])
-        # tree = KDTree(points)
-        # dists, indx = tree.query(points, distance_upper_bound=max_compete, k=k+1)
-        # distances = np.mean(dists[:, 1:], axis=1)
-        # outside = flood_fill(np.asarray(voxel_grid).astype('uint8'))
-        # collection = average_neighbors(outside, radius=5)
-
-        # for i in range(self.n_polyps):
-        #     vox = polyp_voxels[i]
-        #     self.polyp_collection[i] = collection[ vox[0], vox[1], vox[2] ]# * distances[i] * 5
 
     def fitness(self, verbose=False):
         if verbose:

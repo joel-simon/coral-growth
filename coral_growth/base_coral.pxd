@@ -6,7 +6,7 @@ cdef class BaseCoral:
     cdef public object network, params, morphogens, traits, collisionManager
     cdef public int n_polyps, n_signals, n_memory, max_polyps, n_morphogens, \
                     morphogen_thresholds, n_inputs, n_outputs, age
-    cdef public double light, collection, energy, volume, max_face_area, C
+    cdef public double light, collection, energy, volume, max_face_area, C, max_growth
 
     cdef public double[:,::1] polyp_inputs, polyp_pos, polyp_pos_next, polyp_normal, polyp_signals
     cdef public double[:] polyp_flow, polyp_gravity, polyp_collection, polyp_light,\

@@ -13,9 +13,6 @@ if __name__ == '__main__':
     parser.add_argument("--all", default=1, type=int)
     args = parser.parse_args()
 
-    width = 1330
-    height = 1000
-
     all_files = []
 
     for folder in args.input:

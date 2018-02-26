@@ -172,7 +172,7 @@ cdef class BaseCoral:
             assert input_idx == (self.n_inputs-1)
 
     cpdef void growPolyps(self) except *:
-        cdef int i, out_idx, mi
+        cdef int i, out_idx, mi, n
         cdef double growth
         cdef object output
         cdef double[:,:] morphogensV = self.morphogens.V
@@ -193,10 +193,8 @@ cdef class BaseCoral:
 
             # Move in normal direction by growth amount.
             growth = min(output[0], self.polyp_energy[i]) * self.C
-            self.polyp_pos_next[i, 0] = self.polyp_pos[i, 0] + growth * self.polyp_normal[i, 0]
-            self.polyp_pos_next[i, 1] = self.polyp_pos[i, 1] + growth * self.polyp_normal[i, 1]
-            self.polyp_pos_next[i, 2] = self.polyp_pos[i, 2] + growth * self.polyp_normal[i, 2]
-            self.polyp_pos_next[i, 1] = max(0, self.polyp_pos_next[i, 1]) # Can't go below ground
+            growth = min(growth, self.max_growth)
+            self.buffer[i] = growth
 
             # Morphogens.
             out_idx = 1
@@ -211,7 +209,19 @@ cdef class BaseCoral:
                     self.polyp_signals[i, mi] = 1.0
                 out_idx += 1
 
-        # for i in range(self.n_polyps):
+        for i in range(self.n_polyps):
+            growth = 0.0
+            n = 0
+
+            for vert in self.mesh.verts[i].neighbors():
+                growth += self.buffer[vert.id]
+                n += 1
+
+            self.polyp_pos_next[i, 0] = self.polyp_pos[i, 0] + growth * self.polyp_normal[i, 0]
+            self.polyp_pos_next[i, 1] = self.polyp_pos[i, 1] + growth * self.polyp_normal[i, 1]
+            self.polyp_pos_next[i, 2] = self.polyp_pos[i, 2] + growth * self.polyp_normal[i, 2]
+            self.polyp_pos_next[i, 1] = max(0, self.polyp_pos_next[i, 1]) # Can't go below ground
+
         #     self.polyp_collided[i] = self.collisionManager.attemptVertUpdate(i, self.polyp_pos_next[i])
 
     cpdef void export(self, str path) except *:

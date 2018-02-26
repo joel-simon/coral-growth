@@ -12,8 +12,8 @@ from coral_growth.viewer import AnimationViewer
 from coral_growth.parameters import Parameters
 
 params = Parameters()
-params.n_signals = 4
-params.n_morphogens = 0
+params.n_signals = 2
+params.n_morphogens = 2
 params.morphogen_thresholds = 2
 params.height_boost = 0.0
 # params.max_defect = 1.4

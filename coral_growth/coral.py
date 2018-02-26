@@ -10,7 +10,7 @@ from coral_growth.modules.flowx import *
 from coral_growth.modules.flowx2 import *
 
 from cymesh.operators.relax import relax_mesh
-from coral_growth.modules import light, gravity
+from coral_growth.modules import light
 from coral_growth.base_coral import BaseCoral
 
 class Coral(BaseCoral):

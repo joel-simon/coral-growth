@@ -53,6 +53,17 @@ cdef class BaseCoral:
         self.polyp_verts[idx] = vert
         self.collisionManager.newVert(vert)
 
+        # Signals are average of neighbors.
+        n = 0
+        for vert_n in vert.neighbors():
+            if self.polyp_signals[vert_n.id, 0] == 0.0:
+                for i in range(self.n_signals):
+                    self.polyp_signals[idx, i] += self.polyp_signals[vert_n.id, i]
+            n += 1
+
+        for i in range(self.n_signals):
+            self.polyp_signals[idx, i] /= n
+
         assert vert.id == idx
 
     cpdef void polypDivision(self) except *:
@@ -216,6 +227,8 @@ cdef class BaseCoral:
             for vert in self.mesh.verts[i].neighbors():
                 growth += self.buffer[vert.id]
                 n += 1
+
+            growth = ((growth/n) + self.buffer[i]) * 0.5
 
             self.polyp_pos_next[i, 0] = self.polyp_pos[i, 0] + growth * self.polyp_normal[i, 0]
             self.polyp_pos_next[i, 1] = self.polyp_pos[i, 1] + growth * self.polyp_normal[i, 1]

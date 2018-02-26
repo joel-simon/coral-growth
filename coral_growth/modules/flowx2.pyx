@@ -66,7 +66,8 @@ cpdef void calculate_collection(double[:] collection, int[:,:] voxels,\
                 dz = abs(z - (radius))
                 d = dx*dx + dy*dy + dz*dz
                 if d <= radius*radius:
-                    kernel[x, y, z] = 1.0 / (1 + d)
+                    # kernel[x, y, z] = 1.0 / (1 + d)
+                    kernel[x, y, z] = 1.0
 
     for i in range(voxels.shape[0]):
         x = voxels[i, 0]

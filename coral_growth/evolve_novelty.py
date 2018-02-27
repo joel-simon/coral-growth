@@ -6,15 +6,16 @@ import MultiNEAT as NEAT
 from pykdtree.kdtree import KDTree
 
 from coral_growth.simulate import simulate_genome
-from coral_growth.evolution import create_initial_population, evaluate, simulate_and_save
-from coral_growth.shape_features import d2_features
+from coral_growth.evolution import * #create_initial_population, evaluate, simulate_and_save, shape_descriptor
+# from coral_growth.shape_features import d2_features
 
 def evaluate_novelty(genome, traits, params):
     try:
         coral = simulate_genome(genome, traits, [params])[0]
         fitness = coral.fitness()
         print('.', end='', flush=True)
-        return fitness, np.array(d2_features(coral.mesh, n_points=1<<13,bins=64))
+        return fitness, shape_descriptor(coral)
+        # np.array(d2_features(coral.mesh, n_points=1<<13,bins=64))
 
     except AssertionError as e:
         print('AssertionError:', e)

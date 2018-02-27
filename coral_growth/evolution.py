@@ -1,6 +1,8 @@
 from __future__ import print_function
 import os, time, math
 import MultiNEAT as NEAT
+import numpy as np
+from cymesh.shape_features import d2_features, a2_features
 from coral_growth.coral import Coral
 from coral_growth.simulate import simulate_genome
 
@@ -44,6 +46,11 @@ def evaluate(genome, traits, params):
 
     print('.', end='', flush=True)
     return fitness
+
+def shape_descriptor(coral):
+    d2 = d2_features(coral.mesh, n_points=2<<13, n_bins=32, hrange=(0.0, 3.0))
+    a2 = a2_features(coral.mesh, n_points=2<<13, n_bins=32, hrange=(0.0, 3.0))
+    return np.hstack((d2, a2))
 
 def simulate_and_save(genome, params, out_dir, generation, fitness, meanf):
     genome.Save(out_dir+'/genome_%i' % generation)

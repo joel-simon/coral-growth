@@ -17,15 +17,15 @@ params.n_morphogens = 2
 params.morphogen_thresholds = 2
 params.height_boost = 0.0
 # params.max_defect = 1.4
-params.C = .30
-params.max_growth = .25
-params.max_polyps = 15000
-params.max_steps = 150
-params.max_volume = 75.0
-params.light_amount = 0.6
-params.max_face_growth = 1.3
-params.gradient_height = 1.0
-params.use_polar_direction = False
+params.C = .50
+# params.max_growth = .25
+# params.max_polyps = 15000
+# params.max_steps = 150
+# params.max_volume = 75.0
+# params.light_amount = 0.6
+# params.max_face_growth = 1.3
+# params.gradient_height = 1.0
+# params.use_polar_direction = False
 params.calculateTraits()
 
 n_inputs, n_outputs = Coral.calculate_inouts(params)

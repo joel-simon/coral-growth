@@ -66,8 +66,8 @@ cpdef void calculate_collection(double[:] collection, int[:,:] voxels,\
                 dz = abs(z - (radius))
                 d = dx*dx + dy*dy + dz*dz
                 if d <= radius*radius:
-                    # kernel[x, y, z] = 1.0 / (1 + d)
                     kernel[x, y, z] = 1.0
+                    # kernel[x, y, z] = 1.0 / (1 + d / radius)
 
     for i in range(voxels.shape[0]):
         x = voxels[i, 0]
@@ -81,18 +81,21 @@ cpdef void calculate_collection(double[:] collection, int[:,:] voxels,\
                     y2 = y + dy - 2*radius
                     z2 = z + dz - 2*radius
                     if x2>0 and y2>0 and z2>0 and x2<nx-1 and y2<ny-1 and z2<nz-1:
-                        counts[dx, dy, dz] += kernel[dx, dy, dz]
+                        counts[ dx, dy, dz ] += kernel[ dx, dy, dz ]
 
     for i in range(voxels.shape[0]):
         x = voxels[i, 0]
         y = voxels[i, 1]
         z = voxels[i, 2]
         v = 0
-        for x2 in range(x-radius, x+radius+1):
-            for y2 in range(y-radius, y+radius+1):
-                for z2 in range(z-radius, z+radius+1):
+        for dx in range(w):
+            for dy in range(w):
+                for dz in range(w):
+                    x2 = x + dx - 2*radius
+                    y2 = y + dy - 2*radius
+                    z2 = z + dz - 2*radius
                     if x2>0 and y2>0 and z2>0 and x2<nx-1 and y2<ny-1 and z2<nz-1:
-                        v += outside[x2, y2, z2] / (1 + counts[x2, y2, z2])
+                        v += kernel[dx, dy, dz] * outside[x2, y2, z2] / (1 + counts[x2, y2, z2])
 
         collection[i] = v / total
 

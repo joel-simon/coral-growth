@@ -6,31 +6,7 @@ import MultiNEAT as NEAT
 from pykdtree.kdtree import KDTree
 
 from coral_growth.simulate import simulate_genome
-from coral_growth.evolution import * #create_initial_population, evaluate, simulate_and_save, shape_descriptor
-# from coral_growth.shape_features import d2_features
-
-def evaluate_novelty(genome, traits, params):
-    try:
-        coral = simulate_genome(genome, traits, [params])[0]
-        fitness = coral.fitness()
-        print('.', end='', flush=True)
-        return fitness, shape_descriptor(coral)
-        # np.array(d2_features(coral.mesh, n_points=1<<13,bins=64))
-
-    except AssertionError as e:
-        print('AssertionError:', e)
-        fitness = 0
-        return 0, np.zeros(64)
-
-def evaluate_genomes(genomes, params, pool):
-    if pool:
-        data = [ (g, g.GetGenomeTraits(), params) for g in genomes ]
-        ff = pool.starmap(evaluate_novelty, data)
-    else:
-        ff = [ evaluate_novelty(g, g.GetGenomeTraits(), params) for g in genomes ]
-
-    fitness_list, feature_list = zip(*ff)
-    return fitness_list, feature_list
+from coral_growth.evolution import *
 
 def calculate_sparseness(archive, feature_list, k):
     feature_arr = np.array(feature_list)
@@ -48,7 +24,7 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, ls50=True, \
 
     print('Creating initial archive.')
     genomes = NEAT.GetGenomeList(pop)
-    _, feature_list = evaluate_genomes(genomes, params, pool)
+    _, feature_list = evaluate_genomes_novelty(genomes, params, pool)
     archive.extend(feature_list)
 
     # Main loop
@@ -58,7 +34,7 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, ls50=True, \
         print('Novelty threshold', novelty_threshold)
 
         genomes = NEAT.GetGenomeList(pop)
-        fitness_list, feature_list = evaluate_genomes(genomes, params, pool)
+        fitness_list, feature_list = evaluate_genomes_novelty(genomes, params, pool)
         sparseness_list = calculate_sparseness(archive, feature_list, ns_K)
 
         print()

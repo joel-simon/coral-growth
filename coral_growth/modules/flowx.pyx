@@ -4,7 +4,7 @@
 # cython: nonecheck=False
 # cython: cdivision=True
 import math
-from libc.math cimport round
+from libc.math cimport round, floor
 import numpy as np
 cimport numpy as np
 
@@ -135,15 +135,16 @@ cpdef tuple create_voxel_grid(BaseCoral coral):
     # Map each polyp to its voxel positions. This contains negatives at first.
     cdef int [:,:] polyp_voxel = np.zeros((coral.n_polyps, 3), dtype='int32')
     for i in range(coral.n_polyps):
-        polyp_voxel[i, 0] = <int>(round(polyp_pos[i, 0] / voxel_length))
-        polyp_voxel[i, 1] = <int>(round(polyp_pos[i, 1] / voxel_length))
-        polyp_voxel[i, 2] = <int>(round(polyp_pos[i, 2] / voxel_length))
+        polyp_voxel[i, 0] = <int>(floor(polyp_pos[i, 0] / voxel_length))
+        polyp_voxel[i, 1] = <int>(floor(polyp_pos[i, 1] / voxel_length))
+        polyp_voxel[i, 2] = <int>(floor(polyp_pos[i, 2] / voxel_length))
 
     # Calculate the size of the grid.
     cdef int[:] min_v = np.min(polyp_voxel, axis=0)
     cdef int[:] max_v = np.max(polyp_voxel, axis=0)
-    padding = np.array([4, 2, 4], dtype='int32')
-    cdef int[:] offset = padding - 2
+
+    padding = np.array([8, 4, 8], dtype='int32')
+    cdef int[:] offset = padding - 4
     cdef int[:,:,:] voxel_grid = np.zeros(padding + max_v - min_v + [2, 1, 2], dtype='int32')
 
     for i in range(polyp_voxel.shape[0]):
@@ -156,9 +157,9 @@ cpdef tuple create_voxel_grid(BaseCoral coral):
 
     for face in coral.mesh.faces:
         p = face.midpoint()
-        vx = <int>(round(p[0] / voxel_length)) - min_v[0] + offset[0]
-        vy = <int>(round(p[1] / voxel_length)) - min_v[1] + offset[1]
-        vz = <int>(round(p[2] / voxel_length)) - min_v[2] + offset[2]
+        vx = <int>(floor(p[0] / voxel_length)) - min_v[0] + offset[0]
+        vy = <int>(floor(p[1] / voxel_length)) - min_v[1] + offset[1]
+        vz = <int>(floor(p[2] / voxel_length)) - min_v[2] + offset[2]
         voxel_grid[vx, vy, vz] = 1
 
     return polyp_voxel, voxel_grid, (np.array(min_v) - offset)

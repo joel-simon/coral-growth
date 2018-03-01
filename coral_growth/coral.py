@@ -134,6 +134,7 @@ class Coral(BaseCoral):
 
         for i in range(self.n_polyps):
             self.polyp_collection[i] *= 100
+
         # print(np.mean(self.polyp_collection[:self.n_polyps]), np.max(self.polyp_collection))
         # print(np.mean(self.polyp_light[:self.n_polyps]), np.max(self.polyp_light))
 

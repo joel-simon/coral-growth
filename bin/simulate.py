@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ For simulating a genome.
 """
-import os, sys, random, argparse, pickle
+import os, sys, random, argparse, pickle, json
 sys.path.append(os.path.abspath('..'))
 random.seed(123)
 import ast
@@ -14,19 +14,18 @@ from coral_growth.parameters import Parameters
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("root_path", help="")
+    parser.add_argument("path", help="")
     parser.add_argument("generation", type=int, help="")
     parser.add_argument("--max_polyps", default=10000, help="Generations.", type=int)
     parser.add_argument("--max_steps", default=100, help="Output dir.", type=int)
 
     args = parser.parse_args()
 
-    genome_path = os.path.join(args.root_path, 'genome_%i'%args.generation)
-    trait_path = os.path.join(args.root_path, 'best_%i_traits.txt'%args.generation)
-    params_path = os.path.join(args.root_path, 'sim_params.txt')
+    genome_path = os.path.join(args.path, str(args.generation), 'genome.txt')
+    trait_path = os.path.join(args.path, str(args.generation),'traits.txt')
+    params_path = os.path.join(args.path, 'sim_params.txt')
 
-
-    traits = ast.literal_eval(open(trait_path, 'r').readlines()[0])
+    traits = json.load(open(trait_path, 'r'))
     genome = NEAT.Genome(genome_path)
 
     params = Parameters(params_path)

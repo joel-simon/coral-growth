@@ -1,5 +1,5 @@
 from __future__ import print_function
-import os, time, math
+import os, time, math, json
 from os.path import join as pjoin
 import MultiNEAT as NEAT
 import numpy as np
@@ -84,12 +84,11 @@ def simulate_and_save(genome, params, out_dir, generation, fitness, meanf):
 
     genome.Save(pjoin(export_folder, 'genome.txt'))
 
-    with open(pjoin(out_dir, 'scores.txt'), "a") as f:
-        f.write("%i\t%f\t%f\n"%(generation, fitness, meanf))
+    with open(pjoin(out_dir, 'scores.txt'), 'a') as f:
+        f.write("%i\t%f\t%f\n" % (generation, fitness, meanf))
 
     traits = genome.GetGenomeTraits()
-    with open(pjoin(export_folder, 'traits.txt'), "w+") as f:
-        for k, v in sorted(traits.items()):
-            f.write("%s\t%f\n"%(k, v))
+    with open(pjoin(export_folder, 'traits.json'), 'w+') as f:
+        json.dump(traits, f, indent=2)
 
     return simulate_genome(genome, traits, [params], export_folder=export_folder)

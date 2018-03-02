@@ -93,7 +93,7 @@ cpdef void calculate_light(BaseCoral coral) except *:
                         coral.polyp_pos[v3_id, 1]) / 3.0
 
             # If face is below vert, it does not block.
-            if c_height / 3.0 < coral.polyp_pos[i, 1]:
+            if c_height < coral.polyp_pos[i, 1]:
                 continue
 
             a[0] = coral.polyp_pos[v1_id, 0]

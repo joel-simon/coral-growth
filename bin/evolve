@@ -18,10 +18,10 @@ def generate_id(n):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--gens", default=100, help="Generations.", type=int)
-    parser.add_argument("--out", default='../output', help="Output dir.")
+    parser.add_argument("--gens", default=100, help="Number of generations.", type=int)
+    parser.add_argument("--out", default='../output', help="Output directory.")
     parser.add_argument("--cores", default=1, help="Number of cores.", type=int)
-    parser.add_argument('--method', default='neat')
+    parser.add_argument('--method', default='neat', help="'neat', 'novelty' or 'local'.")
 
     # Allow arbitrary command line flags.
     args, remaining = parser.parse_known_args(sys.argv[1:])

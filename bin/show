@@ -8,9 +8,9 @@ if __name__ == '__main__':
     assert(len(sys.argv) >= 2)
     parser = argparse.ArgumentParser()
     parser.add_argument("input", nargs='*')
-    parser.add_argument("--width", default=1330, type=int)
-    parser.add_argument("--height", default=1000, type=int)
-    parser.add_argument("--all", default=1, type=int)
+    parser.add_argument("--width", default=1330, type=int, help='Screen width.')
+    parser.add_argument("--height", default=1000, type=int, help='Screen height.')
+    parser.add_argument("--all", default=1, type=int, help='Show all growth steps or just the last.')
     args = parser.parse_args()
 
     all_files = []

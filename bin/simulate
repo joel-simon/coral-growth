@@ -22,7 +22,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     genome_path = os.path.join(args.path, str(args.generation), 'genome.txt')
-    trait_path = os.path.join(args.path, str(args.generation),'traits.txt')
+    trait_path = os.path.join(args.path, str(args.generation),'traits.json')
     params_path = os.path.join(args.path, 'sim_params.txt')
 
     traits = json.load(open(trait_path, 'r'))
@@ -31,6 +31,8 @@ if __name__ == "__main__":
     params = Parameters(params_path)
     params.max_steps = args.max_steps
     params.max_polyps = args.max_polyps
+
+    # params.max_growth = 0.15
 
     with TemporaryDirectory() as tmp_dir:
         simulate_genome(genome, traits, [params], export_folder=tmp_dir, verbose=True)

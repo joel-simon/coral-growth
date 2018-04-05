@@ -24,11 +24,11 @@ if __name__ == '__main__':
         if args.all:
             all_files.extend(files)
         else:
-            all_files.append(files[-1])
+            all_files.append(files[-2])
 
         # if len(directories) > 1:
         #     for _ in range(5):
         #         all_files.append(all_files[-1])
 
-    view = AnimationViewer(all_files, (args.width, args.height))
+    view = AnimationViewer(all_files, (args.width, args.height), color=(1,1,1, 0))
     view.main_loop()

@@ -40,12 +40,14 @@ def draw_net(network, in_names, out_names, view=False, filename=None):
     # dot.graph_attr['rankdir'] = 'LR'
     dot.graph_attr['ranksep'] = '1.5'
 
+    print(names)
+
     for nid, neuron in enumerate(network.neurons):
         name = names.get(nid, str(nid))
-        if neuron.type == NeuronType.INPUT:
+        if neuron.type == NeuronType.INPUT or neuron.type == NeuronType.BIAS:
             dot.node(name, _attributes=input_attrs)
         else:
-            dot.node(name, _attributes=input_attrs)
+            dot.node(name, _attributes=output_attrs)
         # elif neuron.type == NeuronType.OUTPUT:
             # dot.node(out_names[nid - len(in_names)], _attributes=output_attrs)
 

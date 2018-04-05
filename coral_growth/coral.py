@@ -134,18 +134,3 @@ class Coral(BaseCoral):
 
         for i in range(self.n_polyps):
             self.polyp_collection[i] *= 100
-
-        # print(np.mean(self.polyp_collection[:self.n_polyps]), np.max(self.polyp_collection))
-        # print(np.mean(self.polyp_light[:self.n_polyps]), np.max(self.polyp_light))
-
-    def fitness(self, verbose=False):
-        if verbose:
-            print('n_polyps=',self.n_polyps)
-            print('Light=', self.light)
-            print('Collection=', self.collection)
-            print('Energy=', self.energy)
-            print('Volume=', self.volume)
-
-        return self.energy
-
-

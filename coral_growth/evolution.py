@@ -3,7 +3,7 @@ import os, time, math, json
 from os.path import join as pjoin
 import MultiNEAT as NEAT
 import numpy as np
-from cymesh.shape_features import d2_features, a2_features
+from cymesh.shape_features import d2_features, a3_features
 from coral_growth.coral import Coral
 from coral_growth.simulate import simulate_genome
 
@@ -37,7 +37,7 @@ def evaluate(genome, traits, params):
     """
     try:
         coral = simulate_genome(genome, traits, [params])[0]
-        fitness = coral.fitness()
+        fitness = coral.energy
         assert math.isfinite(fitness), 'Not-finite'
         print('.', end='', flush=True)
         return fitness
@@ -46,23 +46,24 @@ def evaluate(genome, traits, params):
         print('Exception:', e, end='', flush=True)
         return 0
 
-def shape_descriptor(coral):
+def shape_descriptor(coral, n=1024*1024):
     if coral is None:
         return np.zeros(64)
     else:
-        d2 = d2_features(coral.mesh, n_points=2<<13, n_bins=32, hrange=(0.0, 3.0))
-        a2 = a2_features(coral.mesh, n_points=2<<13, n_bins=32, hrange=(0.0, 3.0))
-        return np.hstack((d2, a2))
+        d2 = d2_features(coral.mesh, n_points=n, n_bins=32, hrange=(0.0, 3.0))
+        a3 = a3_features(coral.mesh, n_points=n, n_bins=32, vmin=0.0, vmax=math.pi)
+        return np.hstack((d2, a3))
 
 def evaluate_novelty(genome, traits, params):
     """ Run the simulation and return the fitness and feature vector.
     """
     try:
         coral = simulate_genome(genome, traits, [params])[0]
-        fitness = coral.fitness()
+        fitness = coral.energy
+        features = shape_descriptor(coral)
         assert math.isfinite(fitness), 'Not-finite'
         print('.', end='', flush=True)
-        return fitness, shape_descriptor(coral)
+        return fitness, features
 
     except AssertionError as e:
         print('AssertionError:', e, end='', flush=True)

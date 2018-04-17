@@ -4,7 +4,7 @@
 # cython: nonecheck=False
 # cython: cdivision=True
 
-from coral_growth.base_coral cimport BaseCoral
+from coral_growth.growth_form cimport GrowthForm
 
 cdef inline bint pnt_in_tri(double[:] p, double[:] p0, double[:] p1, double[:] p2) nogil:
     # https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
@@ -26,4 +26,4 @@ cdef inline bint pnt_in_tri(double[:] p, double[:] p0, double[:] p1, double[:] p
 
     return s > 0 and t > 0 and (s + t) <= A
 
-cpdef void calculate_light(BaseCoral) except *
+cpdef void calculate_light(GrowthForm) except *

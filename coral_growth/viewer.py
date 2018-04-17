@@ -312,7 +312,7 @@ from colorsys import hsv_to_rgb
 import re
 
 def parse_coral_file(file):
-    polyp_data = []
+    node_data = []
     coral_data = {}
     view_names = None
     n_views = None
@@ -328,7 +328,7 @@ def parse_coral_file(file):
             except:
                 pass
 
-        elif line.startswith("#coral"):
+        elif line.startswith("#form"):
             header = line.split(' ')[1:]
             n_views = len(header)
             view_names = header
@@ -344,9 +344,9 @@ def parse_coral_file(file):
                 else:
                     d[i] = float(d[i]) if '.' in d[i] else int(d[i])
 
-            polyp_data.append( d )
+            node_data.append( d )
 
-    return coral_data, polyp_data, view_names, n_views
+    return coral_data, node_data, view_names, n_views
 
 generation_re = re.compile('out_.*?\/([0-9]+)\/')
 def get_generation(filename):
@@ -357,6 +357,9 @@ def get_generation(filename):
 
 class AnimationViewer(Viewer):
     def __init__(self, files, view_size, color=(0.7, 0.7, 0.7, 0.0)):
+        if len(files) == 0:
+            raise ValueError('No files passed to AnimationViewer.')
+
         super(AnimationViewer, self).__init__(view_size, color)
         print('Loading Animation')
 
@@ -369,7 +372,7 @@ class AnimationViewer(Viewer):
         self.n_views = None
         self.view_lists = None#
 
-        coral_data, polyp_data, view_names, n_views = parse_coral_file(files[0])
+        coral_data, node_data, view_names, n_views = parse_coral_file(files[0])
         self.view_names = view_names
         self.n_views = n_views
         self.view_lists = [[] for _ in range(self.n_views)]
@@ -380,7 +383,7 @@ class AnimationViewer(Viewer):
 
             """ Read the file and store the colors.
             """
-            coral_data, polyp_data, _, _ = parse_coral_file(file)
+            coral_data, node_data, _, _ = parse_coral_file(file)
             raw_mesh = Mesh.from_obj(file)
             mesh = raw_mesh.export()
             mesh['vert_colors'] = np.zeros((mesh['vertices'].shape))
@@ -394,10 +397,10 @@ class AnimationViewer(Viewer):
                 glNewList(gl_list, GL_COMPILE)
 
                 # Calculate Colors
-                for polyp_idx, data in enumerate(polyp_data):
+                for node_idx, data in enumerate(node_data):
                     d = data[ view_idx ]
                     color = int_colors[d] if isinstance(d, int) else (.1 , d, .1)
-                    mesh['vert_colors'][polyp_idx] = color
+                    mesh['vert_colors'][node_idx] = color
 
                 self.draw_mesh(mesh)
                 self.view_lists[ view_idx ].append([ gl_list ])

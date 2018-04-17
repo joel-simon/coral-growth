@@ -9,7 +9,7 @@ import numpy as np
 cimport numpy as np
 
 from minheap import MinHeap
-from coral_growth.base_coral cimport BaseCoral
+from coral_growth.growth_form cimport GrowthForm
 
 cdef int[:,:] neighbors = np.array([[-1, 0, 0], [1, 0, 0], [0, 1, 0],
                                     [0, -1, 0], [0, 0, -1], [0, 0, 1]], dtype='int32')
@@ -124,36 +124,36 @@ cpdef tuple dijkstra_search(int[:,:,:] grid, float[:,:,:] cost_grid, int startx)
 
     return came_from, cost_so_far
 
-cpdef tuple create_voxel_grid(BaseCoral coral):
+cpdef tuple create_voxel_grid(GrowthForm coral):
     cdef int i, vx, vy, vz
     cpdef double[:] p
 
     # Cast coral objects for fast access.
     cdef double voxel_length = coral.voxel_length
-    cdef double[:,:] polyp_pos = coral.polyp_pos
+    cdef double[:,:] node_pos = coral.node_pos
 
-    # Map each polyp to its voxel positions. This contains negatives at first.
-    cdef int [:,:] polyp_voxel = np.zeros((coral.n_polyps, 3), dtype='int32')
-    for i in range(coral.n_polyps):
-        polyp_voxel[i, 0] = <int>(floor(polyp_pos[i, 0] / voxel_length))
-        polyp_voxel[i, 1] = <int>(floor(polyp_pos[i, 1] / voxel_length))
-        polyp_voxel[i, 2] = <int>(floor(polyp_pos[i, 2] / voxel_length))
+    # Map each node to its voxel positions. This contains negatives at first.
+    cdef int [:,:] node_voxel = np.zeros((coral.n_nodes, 3), dtype='int32')
+    for i in range(coral.n_nodes):
+        node_voxel[i, 0] = <int>(floor(node_pos[i, 0] / voxel_length))
+        node_voxel[i, 1] = <int>(floor(node_pos[i, 1] / voxel_length))
+        node_voxel[i, 2] = <int>(floor(node_pos[i, 2] / voxel_length))
 
     # Calculate the size of the grid.
-    cdef int[:] min_v = np.min(polyp_voxel, axis=0)
-    cdef int[:] max_v = np.max(polyp_voxel, axis=0)
+    cdef int[:] min_v = np.min(node_voxel, axis=0)
+    cdef int[:] max_v = np.max(node_voxel, axis=0)
 
     padding = np.array([8, 4, 8], dtype='int32')
     cdef int[:] offset = padding - 4
     cdef int[:,:,:] voxel_grid = np.zeros(padding + max_v - min_v + [2, 1, 2], dtype='int32')
 
-    for i in range(polyp_voxel.shape[0]):
-        polyp_voxel[i, 0] += offset[0] - min_v[0]
-        polyp_voxel[i, 1] += offset[1] - min_v[1]
-        polyp_voxel[i, 2] += offset[2] - min_v[2]
+    for i in range(node_voxel.shape[0]):
+        node_voxel[i, 0] += offset[0] - min_v[0]
+        node_voxel[i, 1] += offset[1] - min_v[1]
+        node_voxel[i, 2] += offset[2] - min_v[2]
 
-    for i in range(coral.n_polyps):
-        voxel_grid[polyp_voxel[i,0], polyp_voxel[i,1], polyp_voxel[i,2]] = 1
+    for i in range(coral.n_nodes):
+        voxel_grid[node_voxel[i,0], node_voxel[i,1], node_voxel[i,2]] = 1
 
     for face in coral.mesh.faces:
         p = face.midpoint()
@@ -162,7 +162,7 @@ cpdef tuple create_voxel_grid(BaseCoral coral):
         vz = <int>(floor(p[2] / voxel_length)) - min_v[2] + offset[2]
         voxel_grid[vx, vy, vz] = 1
 
-    return polyp_voxel, voxel_grid, (np.array(min_v) - offset)
+    return node_voxel, voxel_grid, (np.array(min_v) - offset)
 
 cpdef void diffuse(float[:,:,:] collection, int steps=1):
     cdef int i, x, y, z

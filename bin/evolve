@@ -12,6 +12,8 @@ from coral_growth.evolve_neat import evolve_neat
 from coral_growth.evolve_novelty import evolve_novelty
 from coral_growth.evolve_local import evolve_local
 
+from coral_growth.forms import forms
+
 def generate_id(n):
     options = string.ascii_uppercase + string.digits
     return ''.join(random.choice(options) for _ in range(n))
@@ -22,6 +24,7 @@ if __name__ == '__main__':
     parser.add_argument("--out", default='../output', help="Output directory.")
     parser.add_argument("--cores", default=1, help="Number of cores.", type=int)
     parser.add_argument('--method', default='neat', help="'neat', 'novelty' or 'local'.")
+    parser.add_argument('--form', default='coral', help="One of the forms in forms directory to evolve.")
 
     # Allow arbitrary command line flags.
     args, remaining = parser.parse_known_args(sys.argv[1:])
@@ -37,9 +40,12 @@ if __name__ == '__main__':
         print('Method must be one of', methods)
         exit()
 
+    if args.form not in forms:
+        raise ValueError('Form not one of the options, must be in', str(list(forms.keys())))
+
+    Form = forms[ args.form ]
+
     print(args)
-
-
 
     params = Parameters()
 
@@ -62,12 +68,12 @@ if __name__ == '__main__':
 
     if args.method == "novelty":
         params.neat.PopulationSize = 20
-        dir_name = rid+"__novelty_{:%B_%d_%Y_%H_%M}".format(datetime.now())
+        dir_name = rid+ '__' + args.form + "__novelty_{:%B_%d_%Y_%H_%M}".format(datetime.now())
     elif args.method == "local":
         params.neat.PopulationSize = 20
-        dir_name = rid+"__local_{:%B_%d_%Y_%H_%M}".format(datetime.now())
+        dir_name = rid+ '__' + args.form + "__local_{:%B_%d_%Y_%H_%M}".format(datetime.now())
     else:
-        dir_name = rid+"__{:%B_%d_%Y_%H_%M}".format(datetime.now())
+        dir_name = rid+ '__' + args.form + "__{:%B_%d_%Y_%H_%M}".format(datetime.now())
 
     params.calculateTraits()
     dir_path = os.path.join(args.out, dir_name)
@@ -80,13 +86,12 @@ if __name__ == '__main__':
         pool = Pool(processes=args.cores)
 
     if args.method == "novelty":
-        evolve_novelty(params, args.gens, dir_path, rid, pool)
+        evolve_novelty(Form, params, args.gens, dir_path, rid, pool)
     elif args.method == "local":
-        evolve_local(params, args.gens, dir_path, rid, pool)
+        evolve_local(Form, params, args.gens, dir_path, rid, pool)
     else:
-        evolve_neat(params, args.gens, dir_path, rid, pool)
+        evolve_neat(Form, params, args.gens, dir_path, rid, pool)
 
     if pool is not None:
         pool.close()
         pool.join()
-

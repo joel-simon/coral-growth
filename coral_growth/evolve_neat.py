@@ -3,8 +3,8 @@ import time
 import MultiNEAT as NEAT
 from coral_growth.evolution import create_initial_population, evaluate, simulate_and_save
 
-def evolve_neat(params, generations, out_dir, run_id, pool):
-    pop = create_initial_population(params)
+def evolve_neat(Form, params, generations, out_dir, run_id, pool):
+    pop = create_initial_population(Form, params)
     max_ever = None
     t = time.time()
 
@@ -13,10 +13,10 @@ def evolve_neat(params, generations, out_dir, run_id, pool):
         genomes = NEAT.GetGenomeList(pop)
 
         if pool:
-            data = [ (g, g.GetGenomeTraits(), params) for g in genomes ]
+            data = [ (Form, g, g.GetGenomeTraits(), params) for g in genomes ]
             fitnesses = pool.starmap(evaluate, data)
         else:
-            fitnesses = [ evaluate(g, g.GetGenomeTraits(), params) for g in genomes ]
+            fitnesses = [ evaluate(Form, g, g.GetGenomeTraits(), params) for g in genomes ]
 
         NEAT.ZipFitness(genomes, fitnesses)
 
@@ -33,7 +33,7 @@ def evolve_neat(params, generations, out_dir, run_id, pool):
             best = pop.GetBestGenome()
             max_ever = maxf
             print('New best fitness.', best.NumNeurons(), best.NumLinks())
-            coral = simulate_and_save(best, params, out_dir, generation, maxf, meanf)[0]
+            coral = simulate_and_save(Form, best, params, out_dir, generation, maxf, meanf)[0]
 
         pop.Epoch()
         print('#'*80)

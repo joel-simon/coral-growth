@@ -17,7 +17,9 @@ class Parameters(object):
         self.neat.AllowLoops = False
 
         # Coral Growth.
-        self.max_polyps = 15000
+        self.seed_type = 0 # 0 is flat bottom and 1 is round, use 0 with 'has_ground'
+
+        self.max_nodes = 15000
         self.max_volume = 50.0
         self.max_steps = 150
         self.max_growth = .20
@@ -28,15 +30,17 @@ class Parameters(object):
         self.n_signals = 3
         self.n_memory = 0
 
+        self.C = .4
+        self.morphogen_thresholds = 2
+        self.morphogen_steps = 200
+        self.use_polar_direction = False
+        self.has_ground = True
+
+        # These are coral specific and should get re-factored somewhere...
         self.light_amount = 0.7
         self.gradient_height = 6.0
         self.gradient_bottom = 0.2
         self.collection_radius = 5
-        self.C = .4
-
-        self.morphogen_thresholds = 2
-        self.morphogen_steps = 200
-        self.use_polar_direction = False
 
         self.addTrait('energy_diffuse_steps', (0, 8), 'int')
 
@@ -78,8 +82,6 @@ class Parameters(object):
         for i in range(self.n_signals):
             self.addTrait('signal_decay%i'%i, (0.0, .4))
             self.addTrait('signal_diffuse_steps%i'%i, (0, 8), ttype='int')
-
-        # for i in range(self.n_memor):
 
     def write(self, neat_path, sim_path):
         self.neat.Save(neat_path)

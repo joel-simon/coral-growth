@@ -8,15 +8,15 @@ from libc.math cimport M_PI, sin, cos, fmax
 import numpy as np
 cimport numpy as np
 
-from coral_growth.base_coral cimport BaseCoral
+from coral_growth.growth_form cimport GrowthForm
 from coral_growth.modules.tri_hash_2d cimport TriHash2D
 
 from cymesh.mesh cimport Mesh
 from cymesh.structures cimport Vert, Face, Edge
 from cymesh.vector3D cimport vangle
 
-cpdef void calculate_light(BaseCoral coral) except *:
-    """ Calculate the light on each polyp of a coral.
+cpdef void calculate_light(GrowthForm coral) except *:
+    """ Calculate the light on each node of a coral.
     """
     cdef:
         Vert v1, v2, v3, vert
@@ -64,18 +64,18 @@ cpdef void calculate_light(BaseCoral coral) except *:
         th2d.add_tri(i, a, b, c)
         i += 1
 
-    for i in range(coral.n_polyps):
-        angle_to_light = vangle(light, coral.polyp_normal[i]) / M_PI
+    for i in range(coral.n_nodes):
+        angle_to_light = vangle(light, coral.node_normal[i]) / M_PI
 
         if angle_to_light > .5:
-            coral.polyp_light[i] = 0
+            coral.node_light[i] = 0
             continue
 
-        coral.polyp_light[i] = 2*(1 - angle_to_light - 0.5)
+        coral.node_light[i] = 2*(1 - angle_to_light - 0.5)
 
         # Take position in xz plane.
-        p[0] = coral.polyp_pos[i, 0]
-        p[1] = coral.polyp_pos[i, 2]
+        p[0] = coral.node_pos[i, 0]
+        p[1] = coral.node_pos[i, 2]
 
         n = th2d.neighbors(p, face_buffer)
 
@@ -89,20 +89,20 @@ cpdef void calculate_light(BaseCoral coral) except *:
             if v1_id == i or v2_id == i or v3_id == i:
                 continue
 
-            c_height = (coral.polyp_pos[v1_id, 1] + coral.polyp_pos[v2_id, 1] + \
-                        coral.polyp_pos[v3_id, 1]) / 3.0
+            c_height = (coral.node_pos[v1_id, 1] + coral.node_pos[v2_id, 1] + \
+                        coral.node_pos[v3_id, 1]) / 3.0
 
             # If face is below vert, it does not block.
-            if c_height < coral.polyp_pos[i, 1]:
+            if c_height < coral.node_pos[i, 1]:
                 continue
 
-            a[0] = coral.polyp_pos[v1_id, 0]
-            a[1] = coral.polyp_pos[v1_id, 2]
-            b[0] = coral.polyp_pos[v2_id, 0]
-            b[1] = coral.polyp_pos[v2_id, 2]
-            c[0] = coral.polyp_pos[v3_id, 0]
-            c[1] = coral.polyp_pos[v3_id, 2]
+            a[0] = coral.node_pos[v1_id, 0]
+            a[1] = coral.node_pos[v1_id, 2]
+            b[0] = coral.node_pos[v2_id, 0]
+            b[1] = coral.node_pos[v2_id, 2]
+            c[0] = coral.node_pos[v3_id, 0]
+            c[1] = coral.node_pos[v3_id, 2]
 
             if pnt_in_tri(p, a, b, c):
-                coral.polyp_light[i] = 0
+                coral.node_light[i] = 0
                 break

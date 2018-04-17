@@ -29,17 +29,17 @@ cdef class Morphogens:
             self.diffU[i] = config['diffU%i'%i]
             self.diffV[i] = config['diffV%i'%i]
 
-        self.U = np.ones((self.n_morphogens, coral.max_polyps))
-        self.V = np.zeros((self.n_morphogens, coral.max_polyps))
+        self.U = np.ones((self.n_morphogens, coral.max_nodes))
+        self.V = np.zeros((self.n_morphogens, coral.max_nodes))
 
-        self.dU = np.zeros((coral.max_polyps))
-        self.dV = np.zeros((coral.max_polyps))
+        self.dU = np.zeros((coral.max_nodes))
+        self.dV = np.zeros((coral.max_nodes))
 
-        # self.n_neighbors = np.zeros(coral.max_polyps, dtype='uint16')
+        # self.n_neighbors = np.zeros(coral.max_nodes, dtype='uint16')
         self.neighbors = NULL
 
     cpdef void update(self, int steps) except *:
-        cdef int n = self.coral.n_polyps
+        cdef int n = self.coral.n_nodes
         cdef int i = 0
         cdef int c
         cdef Node *node
@@ -49,7 +49,7 @@ cdef class Morphogens:
 
         for i in range(n):
             self.neighbors[i] = NULL
-            vert = self.coral.polyp_verts[i]
+            vert = self.coral.node_verts[i]
 
             for nvert in vert.neighbors():
                 node = <Node *>self.mem.alloc(1, sizeof(Node))
@@ -62,7 +62,7 @@ cdef class Morphogens:
 
     cpdef void gray_scott(self, int steps, int mi) except *:
         cdef int i = 0
-        cdef int n = self.coral.n_polyps
+        cdef int n = self.coral.n_nodes
         cdef int nidx, nn
         cdef double uvv, u, v, lapU, lapV
         cdef Node *node

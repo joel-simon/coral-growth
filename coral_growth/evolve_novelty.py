@@ -15,16 +15,16 @@ def calculate_sparseness(archive, feature_list, k):
     sparseness_list = np.mean(dists[:, 1:], axis=1)
     return sparseness_list
 
-def evolve_novelty(params, generations, out_dir, run_id, pool, ls50=True, \
+def evolve_novelty(Form, params, generations, out_dir, run_id, pool, ls50=True, \
                    novelty_threshold=0.4, archive_stagnation=4, ns_K=10):
     max_ever = None
     archive = []
     evals_since_last_archiving = 0
-    pop = create_initial_population(params)
+    pop = create_initial_population(Form, params)
 
     print('Creating initial archive.')
     genomes = NEAT.GetGenomeList(pop)
-    _, feature_list = evaluate_genomes_novelty(genomes, params, pool)
+    _, feature_list = evaluate_genomes_novelty(Form, genomes, params, pool)
     archive.extend(feature_list)
 
     # Main loop
@@ -34,7 +34,7 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, ls50=True, \
         print('Novelty threshold', novelty_threshold)
 
         genomes = NEAT.GetGenomeList(pop)
-        fitness_list, feature_list = evaluate_genomes_novelty(genomes, params, pool)
+        fitness_list, feature_list = evaluate_genomes_novelty(Form, genomes, params, pool)
         sparseness_list = calculate_sparseness(archive, feature_list, ns_K)
 
         print()
@@ -78,6 +78,6 @@ def evolve_novelty(params, generations, out_dir, run_id, pool, ls50=True, \
             max_ever = maxf
             best = genomes[fitness_list.index(maxf)]
             print('New best fitness.', best.NumNeurons(), best.NumLinks())
-            simulate_and_save(best, params, out_dir, generation, maxf, meanf)
+            simulate_and_save(Form, best, params, out_dir, generation, maxf, meanf)
 
         pop.Epoch()

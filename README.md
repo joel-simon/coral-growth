@@ -2,7 +2,7 @@
 
 A research project simulating the evolution of virtual corals. Corals are grown in a simulated underwater environment and evolved with a genetic-algorithm. Morphogens, signaling, memory and other biologically motived capacities enable a multipurpose biomemetic form optimization engine.
 
-The coral is modelled as a 3d mesh with a neural net that is evaluated across each node. Each node detects its light, water and curvature and may grow along its normal vector. This neurla network is evolved with teh NEAT genetic algorithm.
+The coral is modelled as a 3d mesh with a neural net that is evaluated across each node. Each node detects its light, water and curvature and may grow along its normal vector. This neural network is evolved with the NEAT genetic algorithm.
 
 
 ## INSTALL
@@ -22,7 +22,7 @@ cd bin/
 ```
 
 There are several scripts in the bin folder.
-### evolve 
+### evolve
 The main evolve script. Any parameter present in the parameters.py or MultiNEAT parameter can be optionally sent as well.
 
 ```
@@ -34,7 +34,7 @@ optional arguments:
   --out OUT        Output directory.
   --cores CORES    Number of cores.
   --method METHOD  'neat', 'novelty' or 'local'
-    
+
 ```
 
 For example:
@@ -75,10 +75,10 @@ optional arguments:
 
 
 ### simulate
-Re simualtes the growth of a coral using the genone and traits file. Must be passed the base output of a run (not coral). 
+Re simualtes the growth of a coral using the genone and traits file. Must be passed the base output of a run (not coral).
 
 ```
-usage: simulate [-h] [--max_polyps MAX_POLYPS] [--max_steps MAX_STEPS]
+usage: simulate [-h] [--max_nodes MAX_POLYPS] [--max_steps MAX_STEPS]
                    path generation
 
 positional arguments:
@@ -87,9 +87,8 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  --max_polyps MAX_POLYPS
+  --max_nodes MAX_POLYPS
                         Generations.
   --max_steps MAX_STEPS
                         Output dir.
 ```
- 

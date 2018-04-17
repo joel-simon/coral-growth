@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("path", help="")
     parser.add_argument("generation", type=int, help="")
-    parser.add_argument("--max_polyps", default=10000, help="Generations.", type=int)
+    parser.add_argument("--max_nodes", default=10000, help="Generations.", type=int)
     parser.add_argument("--max_steps", default=100, help="Output dir.", type=int)
 
     args = parser.parse_args()
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     params = Parameters(params_path)
     params.max_steps = args.max_steps
-    params.max_polyps = args.max_polyps
+    params.max_nodes = args.max_nodes
 
     # params.max_growth = 0.15
 

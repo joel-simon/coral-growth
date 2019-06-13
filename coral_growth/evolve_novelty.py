@@ -15,8 +15,8 @@ def calculate_sparseness(archive, feature_list, k):
     sparseness_list = np.mean(dists[:, 1:], axis=1)
     return sparseness_list
 
-def evolve_novelty(Form, params, generations, out_dir, run_id, pool, ls50=True, \
-                   novelty_threshold=0.4, archive_stagnation=4, ns_K=10):
+def evolve_novelty(Form, params, generations, out_dir, run_id, pool, save_novel,\
+                    ls50=True, novelty_threshold=0.4, archive_stagnation=4, ns_K=10):
     max_ever = None
     archive = []
     evals_since_last_archiving = 0
@@ -75,17 +75,18 @@ def evolve_novelty(Form, params, generations, out_dir, run_id, pool, ls50=True, 
 
 
         # Comment / uncomment to save most novel each generation.
-        if n_archive_added > 0:
-            maxf, meanf = max(sparseness_list), sum(sparseness_list) / float(len(sparseness_list))
-            best = genomes[sparseness_list.tolist().index(maxf)]
-            print('New best fitness.', best.NumNeurons(), best.NumLinks())
-            simulate_and_save(Form, best, params, out_dir, generation, maxf, meanf)
-
-        # maxf, meanf = max(fitness_list), sum(fitness_list) / float(len(fitness_list))
-        # if max_ever is None or maxf > max_ever:
-        #     max_ever = maxf
-        #     best = genomes[fitness_list.index(maxf)]
-        #     print('New best fitness.', best.NumNeurons(), best.NumLinks())
-        #     simulate_and_save(Form, best, params, out_dir, generation, maxf, meanf)
+        if save_novel:
+            if n_archive_added > 0:
+                maxf, meanf = max(sparseness_list), sum(sparseness_list) / float(len(sparseness_list))
+                best = genomes[sparseness_list.tolist().index(maxf)]
+                print('New most novel.', best.NumNeurons(), best.NumLinks())
+                simulate_and_save(Form, best, params, out_dir, generation, maxf, meanf)
+        else:
+            maxf, meanf = max(fitness_list), sum(fitness_list) / float(len(fitness_list))
+            if max_ever is None or maxf > max_ever:
+                max_ever = maxf
+                best = genomes[fitness_list.index(maxf)]
+                print('New best fitness.', best.NumNeurons(), best.NumLinks())
+                simulate_and_save(Form, best, params, out_dir, generation, maxf, meanf)
 
         pop.Epoch()

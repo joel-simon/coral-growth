@@ -26,6 +26,7 @@ if __name__ == '__main__':
     parser.add_argument('--method', default='neat', help="'neat', 'novelty' or 'local'.")
     parser.add_argument('--form', default='coral', help="One of the forms in forms directory to evolve.")
     parser.add_argument('--params', default=None, help="Path to a parameters .txt file. ")
+    parser.add_argument('--save_novel', default=False, help="For novelty search. Save the most novel instead of the most fit.")
 
     # Allow arbitrary command line flags.
     args, remaining = parser.parse_known_args(sys.argv[1:])
@@ -87,7 +88,7 @@ if __name__ == '__main__':
         pool = Pool(processes=args.cores)
 
     if args.method == "novelty":
-        evolve_novelty(Form, params, args.gens, dir_path, rid, pool)
+        evolve_novelty(Form, params, args.gens, dir_path, rid, pool, args.save_novel),
     elif args.method == "local":
         evolve_local(Form, params, args.gens, dir_path, rid, pool)
     else:

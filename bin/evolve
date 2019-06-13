@@ -25,6 +25,7 @@ if __name__ == '__main__':
     parser.add_argument("--cores", default=1, help="Number of cores.", type=int)
     parser.add_argument('--method', default='neat', help="'neat', 'novelty' or 'local'.")
     parser.add_argument('--form', default='coral', help="One of the forms in forms directory to evolve.")
+    parser.add_argument('--params', default=None, help="Path to a parameters .txt file. ")
 
     # Allow arbitrary command line flags.
     args, remaining = parser.parse_known_args(sys.argv[1:])
@@ -47,7 +48,7 @@ if __name__ == '__main__':
 
     print(args)
 
-    params = Parameters()
+    params = Parameters(args.params)
 
     # Update default parameters using optional command line input.
     for i in range(0, len(remaining), 2):

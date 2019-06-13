@@ -6,9 +6,15 @@ The coral is modelled as a 3d mesh with a neural net that is evaluated across ea
 
 
 ## INSTALL
-Requires python3, cython, numpy, pygame/pyopengl (for viewing), [pykdtree](https://github.com/storpipfugl/pykdtree), [MultiNEAT](https://github.com/peter-ch/MultiNEAT).
+Requires python3, cython, numpy, cymem, pygame/pyopengl (for viewing)
 
-Requires my helf-edge mesh library [cymesh](https://github.com/joel-simon/cymesh)
+Must be manualled installed;
+[pykdtree](https://github.com/storpipfugl/pykdtree),
+[MultiNEAT](https://github.com/MultiNEAT/MultiNEAT) (conda is recommended for install),
+[cyheap](https://github.com/ncloudioj/cyheap),
+My custom half-edge mesh library [cymesh](https://github.com/joel-simon/cymesh)
+
+It's hopefully worth installing all that!
 
 ```
 https://github.com/joel-simon/coral-growth
@@ -44,7 +50,7 @@ For example:
 
 ### rand
 
-A rand script for visualizing the growth of a random coral. Useful for debugging. Useful for profilling if run with --show 0.
+A rand script for visualizing the growth of a random coral. Useful for debugging. Useful for profiling if run with --show 0.
 
 ```
 usage: rand [-h] [--steps STEPS] [--show SHOW] [--net NET]
@@ -75,7 +81,7 @@ optional arguments:
 
 
 ### simulate
-Re simualtes the growth of a coral using the genone and traits file. Must be passed the base output of a run (not coral).
+Re simulates the growth of a coral using the genome and traits file. Must be passed the base output of a run (not coral).
 
 ```
 usage: simulate [-h] [--max_nodes MAX_POLYPS] [--max_steps MAX_STEPS]

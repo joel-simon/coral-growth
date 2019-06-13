@@ -15,14 +15,14 @@ def create_initial_population(Form, params):
     genome_prototype = NEAT.Genome(
         0, # ID
         n_inputs,
-        0, # NUM_HIDDEN
+        0, # NumHidden
         n_outputs,
         False, # FS_NEAT
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Output activation function.
         NEAT.ActivationFunction.UNSIGNED_SIGMOID, # Hidden activation function.
-        0, # Seed type, must be 1 to have hidden nodes.
+        1, # Seed type, must be 1 to have hidden nodes.
         params.neat,
-        0
+        0 # Number of hidden layers. Each will have NumHidden nodes
     )
     pop = NEAT.Population(
         genome_prototype, # Seed genome.
@@ -52,7 +52,7 @@ def shape_descriptor(form, n=1024*1024):
         return np.zeros(64)
     else:
         d2 = d2_features(form.mesh, n_points=n, n_bins=32, hrange=(0.0, 3.0))
-        a3 = a3_features(form.mesh, n_points=n, n_bins=32, vmin=0.0, vmax=math.pi)
+        a3 = a3_features(form.mesh, n_points=n, n_bins=32, hrange=(0.0, 3.0))#vmin=0.0, vmax=math.pi)
         return np.hstack((d2, a3))
 
 def evaluate_novelty(Form, genome, traits, params):

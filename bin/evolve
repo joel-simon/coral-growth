@@ -68,10 +68,10 @@ if __name__ == '__main__':
             setattr(params, flag, value)
 
     if args.method == "novelty":
-        params.neat.PopulationSize = 20
+        # params.neat.PopulationSize = 20
         dir_name = rid+ '__' + args.form + "__novelty_{:%B_%d_%Y_%H_%M}".format(datetime.now())
     elif args.method == "local":
-        params.neat.PopulationSize = 20
+        # params.neat.PopulationSize = 20
         dir_name = rid+ '__' + args.form + "__local_{:%B_%d_%Y_%H_%M}".format(datetime.now())
     else:
         dir_name = rid+ '__' + args.form + "__{:%B_%d_%Y_%H_%M}".format(datetime.now())

@@ -1,4 +1,4 @@
-gm rf __pycache__
+__pycache__/
 *.pyc
 *.prof
 out*
@@ -7,9 +7,12 @@ buid/
 *.o
 *.c
 *.so
-*.html
 *.cpp
 *dSYM/
 *.jpg
 *.png
 *.DS_store
+
+viewer/node_modules/
+viewer/public/data/
+viewer/tmp/

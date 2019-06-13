@@ -1,0 +1,475 @@
+<html lang="en">
+<head>
+    <style>
+        body {
+            color: #ffffff;
+            font-family: Monospace;
+            font-size: 13px;
+            text-align: center;
+            font-weight: bold;
+            background-color: #000000;
+            margin: 0px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+<script src="js/mesh.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/lib/three.js"></script>
+<script src="js/lib/stats.min.js"></script>
+<script src="js/lib/OrbitControls.js"></script>
+
+<script src="js/lib/OBJLoader.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script id="vertInstanced" type="x-shader/x-vertex">
+    #define SHADER_NAME vertInstanced
+
+    precision highp float;
+
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+
+    attribute vec3 position;
+    attribute vec3 mcol0;
+    attribute vec3 mcol1;
+    attribute vec3 mcol2;
+    attribute vec3 mcol3;
+
+    attribute vec3 color;
+    varying vec3 vPosition;
+    varying vec3 vColor;
+
+    void main() {
+        mat4 matrix = mat4(
+            vec4( mcol0, 0 ),
+            vec4( mcol1, 0 ),
+            vec4( mcol2, 0 ),
+            vec4( mcol3, 1 )
+        );
+
+        vec3 positionEye = ( modelViewMatrix * matrix * vec4( position, 1.0 ) ).xyz;
+
+
+        vColor = color;
+        vPosition = positionEye;
+        gl_Position = projectionMatrix * vec4( positionEye, 1.0 );
+
+    }
+</script>
+
+<script id="fragInstanced" type="x-shader/x-fragment">
+    #define SHADER_NAME fragInstanced
+
+    #extension GL_OES_standard_derivatives : enable
+
+    precision mediump float;
+
+    varying vec3 vColor;
+
+    varying vec3 vPosition;
+
+    void main() {
+        vec3 fdx = dFdx( vPosition );
+        vec3 fdy = dFdy( vPosition );
+        vec3 normal = normalize( cross( fdx, fdy ) );
+        float diffuse = dot( normal, vec3( 0.0, 0.0, 1.0 ) );
+        gl_FragColor = vec4( diffuse * vColor, 1.0 );
+        // gl_FragColor = vec4( vColor, 1.0 );
+
+    }
+</script>
+
+<script id="fragParticle" type="x-shader/x-fragment">
+    precision highp float;
+
+    uniform sampler2D map;
+
+    varying vec2 vUv;
+
+    void main() {
+        vec4 diffuseColor = texture2D( map, vUv );
+        // gl_FragColor = vec4( diffuseColor.xyz * vec3(1.0, 1.0, 1.0), 1.0);
+        gl_FragColor = vec4(1.0,1.0,1.0,.5);
+        // gl_FragColor = diffuseColor;
+        if ( diffuseColor.w < 0.5 ) discard;
+    }
+</script>
+
+<script id="vertParticle" type="x-shader/x-vertex">
+    precision highp float;
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+    uniform float time;
+
+    attribute vec3 position;
+    attribute vec2 uv;
+    attribute vec3 translate;
+    attribute vec3 velocity;
+    varying vec2 vUv;
+
+    void main() {
+        vec4 mvPosition = modelViewMatrix * vec4( translate, 1.0 );
+        vec3 delta = vec3(time*velocity.x, time*velocity.y, time*velocity.z);
+        mvPosition.xyz += position * 0.1;
+        mvPosition.xyz += delta;
+        vUv = uv;
+        gl_Position = projectionMatrix * mvPosition;
+    }
+</script>
+
+<script>
+
+// function load_coral(path, scale, x, z) {
+//     console.time('load_coral'+path)
+//     return new Promise(function (resolve, reject) {
+//         var promises = [
+//             array_promise(path+'vert_array', Float32Array),
+//             array_promise(path+'color_array', Float32Array),
+//             array_promise(path+'face_array', Uint32Array),
+//             array_promise(path+'vert_indices', Uint32Array),
+//             array_promise(path+'face_indices', Uint32Array),
+//             new Promise(function (resolve, reject) {
+//                 loader.load( 'obj/polyp4.js', resolve, null, reject)
+//             })
+//         ]
+//         Promise.all(promises).then(function(values) {
+//             console.timeEnd('load_coral'+path)
+//             coral = new CoralAnimationViewer(values[0],values[1], values[2],
+//                                             values[3], values[4], values[5])
+//             // coral.start_position = new THREE.Vector3( ...position );
+//             coral.setPosition(x, 0, z)
+//             // coral.start_rotation = new THREE.Vector3( ...rotation );
+//             // console.log( coral.start_position, coral.start_rotation);
+//             // console.log(rotation.x, rotation.y, rotation.z);
+//             // coral.setRotation(rotation[0], rotation[1], rotation[2])
+//             coral.setScale(1);
+
+//             coral.addToScene(scene);
+//             coral.setFrame(0);
+//             corals.push(coral);
+//             // num_frames.push(coral.num_frames);
+//             resolve(coral);
+
+//         }).catch(reject);
+//     });
+// }
+
+var renderer, scene, camera;
+var mouse;
+var socket;
+var line;
+var MAX_POINTS = 15000;
+var drawCount;
+var click_objects = [];
+
+init();
+
+var container, stats;
+var camera, scene, renderer;
+var mesh;
+var animation;
+var particleSystem;
+var particles;
+var laoder;
+var corals = [];
+var particle_material;
+
+
+function init_particles() {
+    var particleCount = 1000;
+    particles = new THREE.Geometry()
+    particle_velocities = [];
+
+    // create the particle variables
+    var pMaterial = new THREE.ParticleBasicMaterial({
+        color: 0xFFFFFF,
+        size: 1,
+        map: THREE.ImageUtils.loadTexture(
+            "img/circle.png"
+        ),
+        blending: THREE.AdditiveBlending,
+        transparent: true
+    });
+
+    for (var p = 0; p < particleCount; p++) {
+        var pX = (Math.random()-0.5) * 100,
+            pY = Math.random() * 100,
+            pZ = (Math.random()-0.5) * 100;
+        var particle = new THREE.Vector3(pX, pY, pZ);
+        var velocity = new THREE.Vector3((Math.random()-0.5) * .01, (Math.random()-0.5) * .01, (Math.random()-0.5) * .01);
+        particle.velocity = velocity
+        particles.vertices.push(particle);
+        // particle_velocities.push(velocity);
+    }
+
+    // create the particle system
+    particleSystem = new THREE.Points(particles, pMaterial);
+    particleSystem.sortParticles = true;
+    scene.add(particleSystem);
+
+}
+
+function init_shader_particles(particleCount, scale, v) {
+    var circleGeometry = new THREE.CircleBufferGeometry( 1, 6 );
+
+    geometry = new THREE.InstancedBufferGeometry();
+    geometry.index = circleGeometry.index;
+    geometry.attributes = circleGeometry.attributes;
+
+    var translateArray = new Float32Array( particleCount * 3 );
+    var velocityArray = new Float32Array( particleCount * 3 );
+
+    for ( var i = 0, i3 = 0, l = particleCount; i < l; i ++, i3 += 3 ) {
+        translateArray[ i3 + 0 ] = Math.random() * 2 - 1;
+        translateArray[ i3 + 1 ] = Math.random() * 2 - 1;
+        translateArray[ i3 + 2 ] = Math.random() * 2 - 1;
+        velocityArray[ i3 + 0 ] = (Math.random()-.5) * v;
+        velocityArray[ i3 + 1 ] = (Math.random()-.5) * v;
+        velocityArray[ i3 + 2 ] = (Math.random()-.5) * v;
+    }
+
+    geometry.addAttribute( 'translate', new THREE.InstancedBufferAttribute( translateArray, 3, 1 ) );
+    geometry.addAttribute( 'velocity', new THREE.InstancedBufferAttribute( velocityArray, 3, 1 ) );
+
+    particle_material = new THREE.RawShaderMaterial( {
+        uniforms: {
+            map: { value: new THREE.TextureLoader().load( 'img/circle.png' ) },
+            time: { value: 0.0 }
+        },
+        vertexShader: document.getElementById( 'vertParticle' ).textContent,
+        fragmentShader: document.getElementById( 'fragParticle' ).textContent,
+        depthTest: true,
+        depthWrite: true
+    } );
+
+    mesh = new THREE.Mesh( geometry, particle_material );
+    mesh.scale.set( scale, scale, scale );
+    scene.add( mesh );
+
+}
+
+function init() {
+    socket = io.connect('http://localhost:9001/');
+    container = document.createElement( 'div' );
+    document.body.appendChild( container );
+
+    // CAMERA
+    camera = new THREE.PerspectiveCamera( 27, window.innerWidth / window.innerHeight, 1, 3500 );
+    camera.position.z = 2750/100;
+    // camera.position.y = 20;
+
+    // SCENE
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color( 0x050505 );
+    scene.fog = new THREE.Fog(  0x3f7b9d, 0, 200 );
+
+    // RENDERER
+    renderer = new THREE.WebGLRenderer( { antialias: true } );
+    renderer.setPixelRatio( window.devicePixelRatio );
+    renderer.setSize( window.innerWidth, window.innerHeight );
+    renderer.gammaInput = true;
+    renderer.gammaOutput = true;
+    renderer.setClearColor( 0xffffff, 1);
+    renderer.shadowMap.enabled = true;
+    // renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild( renderer.domElement );
+
+    // STATS
+    stats = new Stats();
+    container.appendChild( stats.dom );
+
+    // CONTROLS
+    controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.minDistance = 1;
+    controls.maxDistance = 75;
+    controls.maxPolarAngle = Math.PI/2.2;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.5;
+    // controls.enableKeys = false;
+    // controls.enablePan = false;
+    controls.target.y = 5;
+    // LIGHTS
+    var light1 = new THREE.DirectionalLight( 0xaaaaaa, .25 );
+    light1.position.set( 0, 10, 2 );
+    light1.castShadow = true;
+    light1.shadow.mapSize.width = 2048;
+    light1.shadow.mapSize.height = 2048;
+
+    light1.shadow.camera.left = -50;
+    light1.shadow.camera.bottom = -50;
+    light1.shadow.camera.right = 50;
+    light1.shadow.camera.top = 50;
+
+    scene.add( light1 );
+
+    scene.add(new THREE.HemisphereLight(0xFFFFFF, 1.0))
+
+    init_particles();
+
+    loader = new THREE.JSONLoader();
+
+    loader.load( 'obj/half_sphere_smooth4.js', function(geometry) {
+        var groundMaterial = new THREE.MeshPhongMaterial( {
+            color: 0xaaaaaa,
+            wireframe:false,
+            reflectivity:0.5
+        });
+        var world = new THREE.Mesh( geometry, groundMaterial );
+        world.material.side = THREE.BackSide;
+        world.scale.x = 150;
+        world.scale.y = 150;
+        world.scale.z = 150;
+        world.receiveShadow = true;
+
+        var s;
+        var verts = world.geometry.vertices;
+        for (var i = 0; i < verts.length; i++) {
+            s = Math.sqrt(verts[i].x**2 + verts[i].y**2 + verts[i].y**2);
+            if (s > .2){
+                verts[i].x += Math.random() * .2 * s;
+                verts[i].y += Math.random() * .2 * s;
+                verts[i].z += Math.random() * .2 * s;
+            }
+        }
+        scene.add(world)
+    })
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+
+    Promise.all([
+        // load_coral('data/NNJV_g78/',  0, 0),
+        // load_coral('data/ANSQ_g106/', 10, 0),
+        // load_coral('data/TI2Y_g116/', -10, 0),
+        // load_coral('data/3QNL_g85/', 20, 0),
+
+        // load_coral('data/53F2_g216/', 0, 0),
+        load_coral('data/VDVB_g252/', 0, 0),
+        // load_coral('data/Y0KA_g50/', -10, 0),
+        // load_coral('data/NG08_g307_pca/', 10, 0),
+        // load_coral('data/J2PQ_g94/', 0, 0),
+        // load_coral('data/WJBI_g44/', 20, 0),
+        // load_coral('data/IV74_g85/', 0, 20),
+
+    ]).then(function(result){
+        corals = result;
+
+        for (var i = 0; i < corals.length; i++) {
+            // corals.push(coral)
+            click_objects.push(corals[i].dynamicMesh.mesh)
+        }
+        animate()
+    }).catch((err) => console.log(err))
+
+    // load_coral('data/C68O_g78/', 8, -8, -Math.PI/4)
+    // load_coral('data/RN07_g26/', -8, 8)
+    // load_coral('data/831c_g60/', 0, 8)
+    // load_coral('data/SSJL_g96/', -12, -8, Math.PI/4)
+    // load_coral('data/AL78_g5/', 0, -12, Math.PI/2)
+    // load_coral('data/JHE7_gen93/', 0, 0, Math.PI/2)
+    // load_coral('data/JGYW_g94/', 12, 12, 0)
+
+    window.addEventListener( 'resize', onWindowResize, false );
+    document.addEventListener("keydown", onDocumentKeyDown, false);
+    document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize( window.innerWidth, window.innerHeight );
+}
+//
+function animate() {
+    requestAnimationFrame( animate );
+    update()
+    render();
+    stats.update();
+    controls.update()
+}
+
+var last_update = 0
+var need_reset = false;
+
+function onDocumentKeyDown(event) {
+    var keyCode = event.which;
+    var r_key = 82;
+    var space_key = 32;
+    if (keyCode == r_key) {
+        need_reset = true;
+    }
+};
+
+function onDocumentMouseDown( event ) {
+
+    event.preventDefault();
+
+    mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1;
+    mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1;
+
+    raycaster.setFromCamera( mouse, camera );
+
+    var intersects = raycaster.intersectObjects( click_objects );
+    var i;
+
+    if ( intersects.length > 0 ) {
+        i = click_objects.indexOf(intersects[ 0 ].object);
+        corals[i].setFrame(0);
+    }
+}
+
+function update() {
+    var d = Date.now()
+    if (need_reset) {
+        for (var i = 0; i < corals.length; i++) {
+            corals[i].setFrame(0)
+        }
+        need_reset = false
+    } else if (d - last_update > 50) {
+        for (var i = 0; i < corals.length; i++) {
+            corals[i].nextFrame(false)
+        }
+        last_update = d
+    }
+
+    for (var i = 0; i < particles.vertices.length; i++) {
+        var particle = particles.vertices[i];
+        particle.add(particle.velocity);
+        if (particle.x < 0) {
+            particle.x == 100;
+        } else if (particle.x > 100) {
+            particle.x = 0;
+        }
+        if (particle.y < 0) {
+            particle.y == 100;
+        } else if (particle.y > 100) {
+            particle.y = 0;
+        }
+        if (particle.z < 0) {
+            particle.z == 100;
+        } else if (particle.z > 100) {
+            particle.z = 0;
+        }
+    }
+    particleSystem.geometry.verticesNeedUpdate = true;
+}
+window.save = false;
+window.frame = 0;
+
+function render() {
+    renderer.render( scene, camera );
+    if (window.save) {
+        socket.emit('render-frame', {
+            frame: (frame++),
+            out_dir: 'teaser_1',
+            file: document.querySelector('canvas').toDataURL("image/jpeg")
+        });
+    }
+}
+
+</script>
+
+</body>
+</html>

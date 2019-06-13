@@ -1,0 +1,542 @@
+<html lang="en">
+<body>
+<script src="js/three.js"></script>
+<script src="js/Detector.js"></script>
+<script src="js/stats.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/OBJLoader.js"></script>
+<script src="js/BufferSubdivisionModifier.js"></script>
+
+<script id="shader-vs" type="x-shader/x-vertex">
+// Inherits from Phong Shading in ThreeJS, allows compatibility with chunks
+#define PHONG
+
+// Normalize diagonal matrix (1)
+const mat4 D = mat4(
+    vec4(1.0, 0.0, 0.0, 0.0),
+    vec4(0.0, 1.0, 0.0, 0.0),
+    vec4(0.0, 0.0, 1.0, 0.0),
+    vec4(0.0, 0.0, 0.0, -1.0)
+);
+
+// Create transpose method (not built-in OpenGL ES Shading Language)
+highp mat4 transpose(in highp mat4 inMatrix) {
+    highp vec4 i0 = inMatrix[0];
+    highp vec4 i1 = inMatrix[1];
+    highp vec4 i2 = inMatrix[2];
+    highp vec4 i3 = inMatrix[3];
+
+    highp mat4 outMatrix = mat4(
+        vec4(i0.x, i1.x, i2.x, i3.x),
+        vec4(i0.y, i1.y, i2.y, i3.y),
+        vec4(i0.z, i1.z, i2.z, i3.z),
+        vec4(i0.w, i1.w, i2.w, i3.w)
+    );
+
+    return outMatrix;
+}
+
+#include <common>
+#include <color_pars_vertex>
+#include <logdepthbuf_pars_vertex>
+#include <clipping_planes_pars_vertex>
+
+attribute float radius;
+
+uniform vec4 viewport;
+uniform mat4 modelViewMatrixInverse;
+
+varying mat4 MTInverse;
+varying mat4 VPInverse;
+varying vec4 centernormclip;
+
+// Near, far, width and height
+varying float n, f, w, h;
+varying float projMatrix11;
+varying float projMatrix22;
+
+// Compatibility with threejs chunks
+varying vec3 vViewPosition;
+
+void main() {
+    // Chunck to color vertex with vertex color attribute
+    #include <color_vertex>
+
+    // Chunck to compute position in world space
+    #include <begin_vertex>
+    #include <project_vertex>
+    #include <logdepthbuf_vertex>
+    #include <clipping_planes_vertex>
+
+    vViewPosition = - mvPosition.xyz;
+
+    // Computing T matrix with u,v,w and c as quadratic surface parameters (2)
+    mat4 T = mat4(
+        // Three following vectors represents u, v, w axis of the quadric
+        vec4(radius,        0.0,           0.0,           0.0),
+        vec4(0.0,           radius,        0.0,           0.0),
+        vec4(0.0,           0.0,           radius,        0.0),
+        // Represents c, center of the quadric
+        vec4(position.x,    position.y,    position.z,    1.0)
+    );
+
+    // Computing PMTt Matrix
+    mat4 PMTt = transpose(projectionMatrix * modelViewMatrix * T);
+
+    // Getting coefficients
+    vec4 r1 = PMTt[0];
+    vec4 r2 = PMTt[1];
+    vec4 r4 = PMTt[3];
+
+    // Intermediate computations
+    float r4TDr4 = dot(r4, D * r4);
+    float r1TDr4 = dot(r1, D * r4);
+    float r1TDr1 = dot(r1, D * r1);
+    float r2TDr4 = dot(r2, D * r4);
+    float r2TDr2 = dot(r2, D * r2);
+
+    // Computing bounding box by resolving second degree equations (5)
+    vec2 vertBorders;
+    vec2 horizBorders;
+    float A, B, C;
+    A = r4TDr4; B = -2.0 * r1TDr4; C = r1TDr1;
+    horizBorders[0] = ( -B - sqrt( B * B - 4.0 * A * C ) ) / ( 2.0 * A );
+    horizBorders[1] = ( -B + sqrt( B * B - 4.0 * A * C ) ) / ( 2.0 * A );
+    A = r4TDr4; B = - 2.0 * r2TDr4; C = r2TDr2;
+    vertBorders[0] = ( -B - sqrt( B * B - 4.0 * A * C ) ) / ( 2.0 * A );
+    vertBorders[1] = ( -B + sqrt( B * B - 4.0 * A * C ) ) / ( 2.0 * A );
+
+    // Getting bounding box size in window space
+    float bx = abs( horizBorders[ 0 ] - horizBorders[ 1 ] ) * viewport.z;
+    float by = abs( vertBorders[ 0 ] - vertBorders[ 1 ] ) * viewport.w;
+
+    // Getting bounding box center in clip space
+    float cx = 0.5 * (horizBorders.x + horizBorders.y);
+    float cy = 0.5 * (vertBorders.x + vertBorders.y);
+
+    // Setting point size
+    gl_PointSize = max(bx, by) * 0.5;
+
+    // Reposition vertex to fit with bounding box
+    gl_Position.xy = vec2(cx, cy) * gl_Position.w;
+
+    // Prepare varyings for fragment shader
+    mat4 TInverse = mat4(
+        1.0,          0.0,          0.0,         0.0,
+        0.0,          1.0,          0.0,         0.0,
+        0.0,          0.0,          1.0,         0.0,
+        -position.x,  -position.y,  -position.z, radius
+    );
+    MTInverse = TInverse * modelViewMatrixInverse;
+
+    // Getting near and far
+    n = projectionMatrix[3][2] / (projectionMatrix[2][2] - 1.0);
+    f = ((projectionMatrix[2][2] - 1.0) * n) / (projectionMatrix[2][2] + 1.0);
+
+    // Getting width and height of the viewport for fragment
+    w = viewport.z;
+    h = viewport.w,
+
+    // Getting projection matrix diagonal
+    projMatrix11 = projectionMatrix[0][0];
+    projMatrix22 = projectionMatrix[1][1];
+}
+</script>
+<script id="shader-fs" type="x-shader/x-fragment">
+// Inherits from Phong Shading in ThreeJS, allows compatibility with chunks
+#define PHONG
+
+#include <common>
+#include <fog_pars_fragment>
+#include <color_pars_fragment>
+#include <lights_pars>
+#include <bsdfs>
+#include <lights_phong_pars_fragment>
+#include <clipping_planes_pars_fragment>
+
+// Normalize diagonal matrix (1)
+const mat4 D = mat4(
+    vec4(1.0, 0.0, 0.0, 0.0),
+    vec4(0.0, 1.0, 0.0, 0.0),
+    vec4(0.0, 0.0, 1.0, 0.0),
+    vec4(0.0, 0.0, 0.0, -1.0)
+);
+
+// Create transpose method (not built-in OpenGL ES Shading Language)
+highp mat4 transpose(in highp mat4 inMatrix) {
+    highp vec4 i0 = inMatrix[0];
+    highp vec4 i1 = inMatrix[1];
+    highp vec4 i2 = inMatrix[2];
+    highp vec4 i3 = inMatrix[3];
+
+    highp mat4 outMatrix = mat4(
+        vec4(i0.x, i1.x, i2.x, i3.x),
+        vec4(i0.y, i1.y, i2.y, i3.y),
+        vec4(i0.z, i1.z, i2.z, i3.z),
+        vec4(i0.w, i1.w, i2.w, i3.w)
+    );
+
+    return outMatrix;
+}
+
+varying mat4 MTInverse;
+varying mat4 VPInverse;
+varying vec4 centernormclip;
+
+// Near, far, width and height
+varying float n, f, w, h;
+varying float projMatrix11;
+varying float projMatrix22;
+
+uniform vec3 diffuse;
+uniform vec3 emissive;
+uniform vec3 specular;
+uniform float shininess;
+uniform float opacity;
+uniform mat4 projectionMatrixInverse;
+
+void main() {
+    float c = (f - n) / (2.0 * n * f) * 2.0 / (gl_DepthRange.diff);
+    vec4 c3 = MTInverse[3] * c;
+
+    // Computing xprime (6)
+    vec4 xp = vec4(
+        1.0 / projMatrix11 * (gl_FragCoord.x * 2.0 / w - 1.0),
+        1.0 / projMatrix22 * (gl_FragCoord.y * 2.0 / h - 1.0),
+        -1.0,
+        (f + n) / (2.0 * f * n) - (n - f) /
+            (2.0 * f * n) * (gl_DepthRange.near + gl_DepthRange.far) / -gl_DepthRange.diff
+    );
+    vec4 xpPrime = MTInverse * xp;
+
+    // Checking quadratic equation discriminant (7)
+    float c3TDc3 = dot(c3, D * c3);
+    float xpPrimeTDc3 = dot(xpPrime, D * c3);
+    float xpPrimeTDxpPrime = dot(xpPrime, D * xpPrime);
+    float A = c3TDc3, B = 2.0 * xpPrimeTDc3, C = xpPrimeTDxpPrime;
+    float discriminant = B * B - 4.0 * A * C;
+
+    gl_FragColor = vec4(1.0);
+    if (discriminant < 0.0) {
+        discard;
+    } else {
+        // Resolving solutions
+        float x1 = (-B - sqrt(discriminant)) / (2.0 * A);
+        float x2 = (-B + sqrt(discriminant)) / (2.0 * A);
+        float z = 1.0 - max(x1, x2);
+        gl_FragDepthEXT = z;
+
+        // Getting current pixel clip coordinate
+        vec4 vClipPos = vec4(
+            (gl_FragCoord.x * 2.0 - 1.0),
+            (gl_FragCoord.y * 2.0 - 1.0),
+            z * 2.0 - 1.0,
+            1.0
+        );
+
+        // Computing current pixel position in eye space
+        vec4 vViewPos = projectionMatrixInverse * vClipPos;
+        vViewPos = vViewPos / vViewPos.w;
+        vViewPos.z = - vViewPos.z;
+
+        // Performing clipping
+        #if NUM_CLIPPING_PLANES > 0
+        for ( int i = 0; i < NUM_CLIPPING_PLANES; ++ i ) {
+            vec4 plane = clippingPlanes[ i ];
+            if ( dot(vViewPos.xyz, plane.xyz ) > plane.w ) {
+                discard;
+            }
+        }
+        #endif
+
+        // Position in eye coordinates (8)
+        vec4 pe = vec4(
+            1.0 / projMatrix11 * (gl_FragCoord.x * 2.0 / w - 1.0),
+            1.0 / projMatrix22 * (gl_FragCoord.y * 2.0 / h - 1.0),
+            -1.0,
+            (f + n)/(2.0 * f * n) -
+                (n - f)/(2.0 * f * n) * (gl_DepthRange.near + gl_DepthRange.far) / gl_DepthRange.diff +
+                z * ((n - f) / (n * f) / gl_DepthRange.diff)
+        );
+        vec4 np = MTInverse * pe;
+        vec4 ne = transpose(MTInverse) * np;
+
+        // Declaring normal to get compatibility with threejs Phong chunks
+        vec3 normal = normalize(ne.xyz);
+
+        // Starting to compute phong lighting
+        vec4 diffuseColor = vec4(diffuse, opacity);
+        ReflectedLight reflectedLight = ReflectedLight(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
+        vec3 totalEmissiveLight = emissive;
+        #include <color_fragment>
+        // Declaring specularStength to get compatibility with threejs chunks
+        float specularStrength = 1.0;
+        #include <lights_phong_fragment>
+        #include <lights_template>
+        vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse +
+                                reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveLight;
+
+        gl_FragColor = vec4(outgoingLight, opacity);
+
+        #include <fog_fragment>
+    }
+}
+</script>
+
+<script>
+    var camera, scene, directionalLight, renderer, geometry, material, mesh, gl;
+
+    var WIDTH = window.innerWidth - 20;
+    var HEIGHT = window.innerHeight - 20;
+    var SCALE = 1.0
+
+    var controls;
+    var impostorMaterial;
+
+    createImpostorMaterial();
+    init(function () {
+        animate();
+    })
+
+
+
+    function init(callback) {
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera(50, WIDTH / HEIGHT, 1, 20);
+        camera.position.z = 10;
+        camera.position.y = 10;
+
+        var ambient = new THREE.AmbientLight( 0x404040 );
+        scene.add(ambient);
+
+        directionalLight = new THREE.DirectionalLight( 0xffffff, 1.0 );
+            directionalLight.position.set( 0, 3, 3 );
+            scene.add( directionalLight );
+
+        scene.add(camera);
+
+        // controls
+        controls = new THREE.OrbitControls( camera );
+
+        createBufferGeometry(function (geometry) {
+            // geometry.scale.set(SCALE, SCALE, SCALE)
+            // mesh = new THREE.Points(geometry, impostorMaterial);
+            // scene.add(mesh);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(WIDTH, HEIGHT);
+            renderer.setClearColor( 0xffffff, 1);
+
+            document.body.appendChild(renderer.domElement);
+            callback()
+
+        });
+
+        material = new THREE.MeshLambertMaterial( { color: 0x0000dd } )
+        var loader = new THREE.OBJLoader( )
+            loader.load( '43.coral.obj', function ( object ) {
+                console.log(object);
+
+                // object.scale.set( SCALE, SCALE, SCALE );
+
+                object.traverse( function ( child ) {
+                    if ( child instanceof THREE.Mesh ) {
+                        var  geometry = child.geometry;
+                        geometry.index.array[ 0 ] = 10;
+                        geometry.index.needsUpdate = true;
+
+                        // geometry.scale( params.scale, params.scale, params.scale );
+                        var modifier = new THREE.BufferSubdivisionModifier( 2 );
+
+                        smooth = modifier.modify( geometry );
+
+                        // var TypedArrayHelper = function (size, registers, register_type, array_type, unit_size, accessors)
+                        var colors = new TypedArrayHelper( 0, 1, THREE.Color, Float32Array, 3, [ 'r', 'g', 'b' ] );
+
+                        for ( var i = 0; i < smooth.attributes.position.array.length / 3; i ++ ) {
+
+                            var hue = ( smooth.attributes.position.array[ ( i * 3 ) + 1 ] / 200 ) + 0.5;
+                            colors.register[ 0 ].setHSL( hue, 1, 0.5 );
+                            colors.push_element( colors.register[ 0 ] );
+
+                        }
+
+                        colors.trim_size();
+                        smooth.addAttribute( 'color', new THREE.BufferAttribute( colors.buffer, 3 ) );
+
+                        group = new THREE.Group();
+                        scene.add( group );
+
+                        material = new THREE.MeshBasicMaterial( { color: 0xffffff, wireframe: true } );
+                        mesh = new THREE.Mesh( geometry, material );
+                        group.add( mesh );
+
+                        var meshmaterials = [
+                            new THREE.MeshPhongMaterial( { color: 0xffffff, flatShading: true, vertexColors: THREE.VertexColors } ),
+                            new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, opacity: 0.15, transparent: true } )
+                        ];
+
+                        cube = THREE.SceneUtils.createMultiMaterialObject( smooth, meshmaterials );
+                        // cube.scale.setScalar( params.meshScale ? params.meshScale : 1 );
+                        scene.add( cube );
+
+                        group.scale.copy( cube.scale );
+
+                    }
+                } );
+                // object.position.y = - 95;
+
+                // scene.add( object );
+                // callback()
+            });
+    }
+
+    var previousTime;
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        var now = Date.now();
+        if (isNaN(previousTime)) {
+            previousTime = Date.now();
+        }
+        var time = (now - previousTime) * 0.0005;
+        previousTime = now;
+
+        // var x = directionalLight.position.x;
+        // var z = directionalLight.position.z;
+        // directionalLight.position.x = x * Math.cos(time) - z * Math.sin(time);
+        // directionalLight.position.z = z * Math.cos(time) + x * Math.sin(time);
+        render();
+    }
+
+    function render() {
+        // Update uniforms for outline
+        updateMaterialUniforms(scene, camera);
+
+        // Render the scene
+        renderer.render(scene, camera);
+    }
+
+    function load_array(url, callback) {
+        var request = new XMLHttpRequest();
+        request.open('GET', url, true);
+        request.responseType = 'arraybuffer';
+        request.onload = function (msg) {
+            var result = new Float32Array(this.response);
+            callback(result)
+        }
+        request.send();
+    }
+
+    function createBufferGeometry(callback) {
+        var geometry = new THREE.BufferGeometry();
+
+        load_array('vert_array', function (vert_array) {
+            load_array('color_array', function (color_array) {
+                // Creating vertex buffer
+                // var position = new Float32Array(positionArray);
+                geometry.addAttribute('position', new THREE.BufferAttribute(vert_array, 3));
+
+
+                // Creating radius buffer
+                var radiusArray = [];
+                for (var j = 0; j < vert_array.length/3; j++) {
+                    radiusArray.push(0.082*SCALE)
+                }
+                var radius = new Float32Array(radiusArray);
+                geometry.addAttribute('radius', new THREE.BufferAttribute(radius, 1));
+
+                // Creating color buffer
+                geometry.addAttribute('color', new THREE.BufferAttribute(color_array, 3));
+
+                geometry.computeVertexNormals();
+                geometry.normalizeNormals();
+                callback(geometry)
+            });
+        });
+    }
+
+    function createImpostorMaterial() {
+        var outline_shader = {
+            uniforms: THREE.UniformsUtils.merge([
+                THREE.UniformsLib['lights'],
+                THREE.UniformsLib['fog'],
+                {
+                    'viewport':  { type: 'v4', value: new THREE.Vector4() },
+                    'modelViewMatrixInverse':  { type: 'm4', value: new THREE.Matrix4() },
+                    'projectionMatrixInverse':  { type: 'm4', value: new THREE.Matrix4() },
+                    'emissive' : { type: 'c', value: new THREE.Color(0x000000) },
+                    'specular' : { type: 'c', value: new THREE.Color(0x111111) },
+                    'shininess': { type: 'f', value: 30 },
+                    'diffuse': { type: 'c', value: new THREE.Color(0xFFFFFF) },
+                    'opacity': { type: 'f', value: 0.1 },
+                    'fog': true
+                }]),
+            vertex_shader: document.getElementById('shader-vs').innerHTML,
+            fragment_shader: document.getElementById('shader-fs').innerHTML
+        };
+
+        impostorMaterial = new THREE.ShaderMaterial({
+            uniforms: THREE.UniformsUtils.clone(outline_shader.uniforms),
+            vertexShader: outline_shader.vertex_shader,
+            fragmentShader: outline_shader.fragment_shader,
+            lights: true,
+            vertexColors: THREE.VertexColors,
+            fog: true
+        });
+        impostorMaterial.extensions.fragDepth = true;
+    }
+
+    function updateMaterialUniforms(group, camera) {
+
+        var projectionMatrixInverse = new THREE.Matrix4();
+        var projectionMatrixTranspose = new THREE.Matrix4();
+
+        var modelViewMatrixInverse = new THREE.Matrix4();
+
+        var viewport = new THREE.Vector4(0.0, 0.0, WIDTH, HEIGHT);
+
+        camera.updateMatrixWorld();
+        camera.matrixWorldInverse.getInverse( camera.matrixWorld );
+
+        projectionMatrixInverse.getInverse(
+            camera.projectionMatrix
+        );
+
+        projectionMatrixTranspose.copy(
+            camera.projectionMatrix
+        ).transpose();
+
+        group.traverse(function(o) {
+            if (!o.material) { return; }
+
+            var u = o.material.uniforms;
+            if (!u) { return; }
+
+            if (u.projectionMatrixInverse) {
+                u.projectionMatrixInverse.value = projectionMatrixInverse;
+            }
+
+            if (u.projectionMatrixTranspose) {
+                u.projectionMatrixTranspose.value = projectionMatrixTranspose;
+            }
+
+            if (u.modelViewMatrixInverse) {
+                var matrix = new THREE.Matrix4().multiplyMatrices(camera.matrixWorldInverse, o.matrixWorld);
+                modelViewMatrixInverse.getInverse(
+                    matrix
+                );
+                u.modelViewMatrixInverse.value = modelViewMatrixInverse;
+            }
+
+            if (u.viewport) {
+                u.viewport.value = viewport;
+            }
+        });
+    };
+</script>
+
+</body>
+</html>

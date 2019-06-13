@@ -1,0 +1,374 @@
+<html lang="en">
+<head>
+    <style>
+        body {
+            color: #ffffff;
+            font-family: Monospace;
+            font-size: 13px;
+            text-align: center;
+            font-weight: bold;
+            background-color: #000000;
+            margin: 0px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+<script src="js/mesh.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/lib/three.js"></script>
+<script src="js/lib/OBJLoader.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script id="vertInstanced" type="x-shader/x-vertex">
+    #define SHADER_NAME vertInstanced
+
+    precision highp float;
+
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+
+    attribute vec3 position;
+    attribute vec3 mcol0;
+    attribute vec3 mcol1;
+    attribute vec3 mcol2;
+    attribute vec3 mcol3;
+
+    attribute vec3 color;
+    varying vec3 vPosition;
+    varying vec3 vColor;
+
+    void main() {
+        mat4 matrix = mat4(
+            vec4( mcol0, 0 ),
+            vec4( mcol1, 0 ),
+            vec4( mcol2, 0 ),
+            vec4( mcol3, 1 )
+        );
+
+        vec3 positionEye = ( modelViewMatrix * matrix * vec4( position, 1.0 ) ).xyz;
+
+
+        vColor = color;
+        vPosition = positionEye;
+        gl_Position = projectionMatrix * vec4( positionEye, 1.0 );
+
+    }
+</script>
+
+<script id="fragInstanced" type="x-shader/x-fragment">
+    #define SHADER_NAME fragInstanced
+
+    #extension GL_OES_standard_derivatives : enable
+
+    precision mediump float;
+
+    varying vec3 vColor;
+
+    varying vec3 vPosition;
+
+    void main() {
+        vec3 fdx = dFdx( vPosition );
+        vec3 fdy = dFdy( vPosition );
+        vec3 normal = normalize( cross( fdx, fdy ) );
+        float diffuse = dot( normal, vec3( 0.0, 0.0, 1.0 ) );
+        gl_FragColor = vec4( diffuse * vColor, 1.0 );
+        // gl_FragColor = vec4( vColor, 1.0 );
+
+    }
+</script>
+
+
+<script>
+var pi = Math.PI;
+var pi2 = 2*Math.PI;
+var renderer, scene, camera;
+var mouse;
+var line;
+var MAX_POINTS = 15000;
+var drawCount;
+var click_objects = [];
+
+init(function(){
+    animate();
+});
+
+var socket;
+var container;
+var camera, scene, renderer;
+var mesh;
+var animation;
+var particleSystem;
+var particles;
+var laoder;
+var corals = [];
+var particle_material;
+
+var min_y = Infinity;
+var max_y = -Infinity;
+
+var num_frames = [];
+var total_frames = null;
+var animate_rotation_y = 0;//Math.PI/2;
+
+var orthographic = true;
+
+const average = arr => arr.reduce( ( p, c ) => p + c, 0 ) / arr.length;
+
+var portrait = false;
+
+function init() {
+    socket = io.connect('http://localhost:9001/');
+    container = document.createElement( 'div' );
+    document.body.appendChild( container );
+
+    // CAMERA
+    if (true) {
+        camera = new THREE.OrthographicCamera( window.innerWidth / - 2, window.innerWidth / 2, window.innerHeight / 2, window.innerHeight / - 2, 1, 2000 );
+        camera.position.z = 500;
+        camera.position.y = 3;
+        camera.zoom = 50;
+        // camera.zoom = 45;
+        // camera.zoom = 35;
+        camera.updateProjectionMatrix();
+    } else {
+        // camera = new THREE.PerspectiveCamera( 27, window.innerWidth / window.innerHeight, 1, 3500 );
+        // camera.position.z = 27.50;
+        // camera.position.y = 3;
+    }
+
+    // SCENE
+    scene = new THREE.Scene();
+    // scene.background = new THREE.Color( 0xaaaaaa );
+    // scene.background = new THREE.Color( 0x000000 );
+    // scene.fog = new THREE.Fog(  0x3f7b9d, 20, 100 );
+
+    // RENDERER
+    renderer = new THREE.WebGLRenderer( { antialias: true } );
+    renderer.setPixelRatio( window.devicePixelRatio );
+    renderer.setSize( window.innerWidth, window.innerHeight );
+    renderer.gammaInput = true;
+    renderer.gammaOutput = true;
+    renderer.setClearColor( 0xFFFFFF, 1);
+    renderer.shadowMap.enabled = false;
+    container.appendChild( renderer.domElement );
+
+    // LIGHTS
+    var light1 = new THREE.DirectionalLight( 0xffffff, 0.25 );
+    light1.position.set( 0, 0, 20 );
+    // light1.castShadow = true;
+    // light1.shadow.mapSize.width = 2048;
+    // light1.shadow.mapSize.height = 2048;
+
+    // light1.shadow.camera.left = -50;
+    // light1.shadow.camera.bottom = -50;
+    // light1.shadow.camera.right = 50;
+    // light1.shadow.camera.top = 50;
+    scene.add( light1 );
+
+    // var light = new THREE.AmbientLight( 0x808080 ); // soft white light
+    // scene.add( light );
+    var hem = new THREE.HemisphereLight(0xeeeeee, 0.25);
+    hem.castShadow = false;
+    scene.add(hem)
+    loader = new THREE.JSONLoader();
+    corals = []
+    console.time('load_all')
+
+    var x_angle = 0;//Math.PI/10;
+    var pi2 = Math.PI *2
+    var pi = Math.PI
+    var s = 0.9
+
+    if (true) {
+        var promises = [
+
+        // load_coral('data/3QNL_g85/', .4, [0.0, 0, 0], [0,0, 0]),
+        load_coral(1, 'data/NG08_g307/', .46*s, [0.1, 5.4, 0], [0, -Math.PI, 0] ), //Center top
+
+
+        load_coral(2, 'data/B3DN_g111/', .47*s, [-5.8, 5.7, 0], [0, 0.8 * -pi, 0] ), // Top mid-left
+        load_coral(3, 'data/96LG_g94/', .42*s, [6.0, 5.8+.2, 0], [0,-1.5*Math.PI, 0] ), // Top mid-right
+
+        load_coral(4, 'data/NJFG_g183/', 0.54*s, [0.4, 1.7, 0], [Math.PI/2, .68*pi2, 0] ), // Center
+
+        load_coral(5, 'data/J3LT_g88/', .35*s, [-2.3, 3.7, 0], [0, 0, 0] ), // center, middle left
+        load_coral(6, 'data/WJBI_g92/', .35*s, [3.0, 3.9, 0], [0, .8*pi, 0] ), // center, middle right
+
+        load_coral(7, 'data/LEXL_g100/', 0.39*s, [ 5.6, -2.8, 0], [0, .5*pi2, 0] ), // Tall-right
+        load_coral(8, 'data/VDVB_g252/', 0.44*s, [ -5.6, -2.8, 0], [0, 1.25*pi, 0] ), // Tall-left
+
+        load_coral(9, 'data/96LG_g93/', .37*s, [-8.6, -1, 0], [pi2/4, 0, 0] ), // Bottom left circle
+        load_coral(10, 'data/P8QV_g97/', .35*s, [7.3, -0.3, 0], [pi2/4, pi2/4, 0] ), // Bottom right circle
+
+        load_coral(11, 'data/6VNA_g115/', .38*s, [8.9, 4.5, 0], [pi2/4, 0.90*pi, 0] ), //Top right corner
+        load_coral(12, 'data/2F64_g488/', .4*s, [-8.7, 4.2, 0], [pi2/4, .25*pi, 0] ), //Top left
+
+        load_coral(13, 'data/P8QV_g72/', .23*s, [-3.2, -1.6, 0], [Math.PI/2, 3.4*Math.PI/4, 0] ), // bottom, middle left
+        load_coral(14, 'data/4YAB_g107/', .23*s, [3.3, .1-1.6, 0], [Math.PI/2, -Math.PI/2, 0] ), // bottom, middle right
+        ]
+    } else {
+        s = 0.9
+        var y = 5
+        var promises = [
+
+        // load_coral('data/3QNL_g85/', .4, [0.0, 0, 0], [0,0, 0]),
+        load_coral(1, 'data/NG08_g307/', .46*s, [0.1, 5.4+y, 0], [0, -Math.PI, 0] ), //Center top
+
+
+        load_coral(2, 'data/B3DN_g111/', .47*s, [-6, 5.4+y, 0], [0, 0.8 * -pi, 0] ), // Top mid-left
+        load_coral(3, 'data/96LG_g94/', .42*s, [6.0, 5.7+y, 0], [0,-1.5*Math.PI, 0] ), // Top mid-right
+
+        load_coral(4, 'data/NJFG_g183/', 0.54*s, [0.4, 1+y, 0], [Math.PI/2, .68*pi2, 0] ), // Center
+
+        load_coral(5, 'data/J3LT_g88/', .35*s, [-2.6, 3.0+y, 0], [0, 0, 0] ), // center, middle left
+        load_coral(6, 'data/WJBI_g92/', .35*s, [3.5, 3.4+y, 0], [0, .8*pi, 0] ), // center, middle right
+
+        // load_coral('data/58A2_g360/', 0.3, [-3.0, 5.5, 0], [pi2/4, 0, 0] ), // Circle -left
+
+        load_coral(7, 'data/LEXL_g100/', 0.39*s, [ 6.5, -3.8+y, 0], [0, .5*pi2, 0] ), // Tall-right
+        load_coral(8, 'data/VDVB_g252/', 0.44*s, [ -6.5, -3.8+y, 0], [0, 1.25*pi, 0] ), // Tall-left
+
+
+        load_coral(9, 'data/IV74_g97/', .5*s, [.4, -8.5+y, 0], [0, 1.3*pi/2, 0] ), // center half-bottom
+        // load_coral(9, 'data/96LG_g93/', .37*s, [0, 4, 0], [pi2/4, 0, 0] ),
+        load_coral(10, 'data/P8QV_g97/', .35*s, [.4, -9.5+y, 0], [pi2/4, 0, 0] ),
+
+        load_coral(11, 'data/6VNA_g115/', .5*s, [5.9, -8.5+y, 0], [pi2/4, 0.90*pi, 0] ), //Top right corner
+        load_coral(12, 'data/2F64_g488/', .5*s, [-5.3, -8.9+5, 0], [pi2/4, .1*pi, 0] ), //Top left
+
+        load_coral(13, 'data/P8QV_g72/', .3*s, [-3.7, -3+y, 0], [Math.PI/2, 3.4*Math.PI/4, 0] ), // bottom, middle left
+        load_coral(14, 'data/4YAB_g107/', .3*s, [3.8, -3+y, 0], [Math.PI/2, -Math.PI/2, 0] ), // bottom, middle right
+        ]
+    }
+
+    Promise.all(promises).then(() =>{
+        console.timeEnd('load_all');
+        total_frames = Math.floor(average(num_frames));
+        // console.log(total_frames);
+        // console.log('all loaded!');
+        for (var i = 0; i < corals.length; i++) {
+            min_y = Math.min(min_y, corals[i].getPosition().y);
+            max_y = Math.max(max_y, corals[i].getPosition().y);
+        }
+        console.log(min_y, max_y);
+        animate();
+    })
+
+    window.addEventListener( 'resize', onWindowResize, false );
+    document.addEventListener("keydown", onDocumentKeyDown, false);
+}
+
+window.foo = {};
+function load_coral(id, path, scale, position, rotation) {
+    console.time('load_coral'+path)
+    return new Promise(function (resolve, reject) {
+        var promises = [
+            array_promise(path+'vert_array', Float32Array),
+            array_promise(path+'color_array', Float32Array),
+            array_promise(path+'face_array', Uint32Array),
+            array_promise(path+'vert_indices', Uint32Array),
+            array_promise(path+'face_indices', Uint32Array),
+            new Promise(function (resolve, reject) {
+                loader.load( 'obj/polyp4.js', resolve, null, reject)
+            })
+        ]
+        Promise.all(promises).then(function(values) {
+            console.timeEnd('load_coral'+path)
+            coral = new CoralAnimationViewer(values[0],values[1], values[2],
+                                            values[3], values[4], values[5])
+            // coral.start_position = new THREE.Vector3( ...position );
+            coral.setPosition(...position)
+            // coral.start_rotation = new THREE.Vector3( ...rotation );
+            // console.log( coral.start_position, coral.start_rotation);
+            // console.log(rotation.x, rotation.y, rotation.z);
+            coral.setRotation(rotation[0], rotation[1], rotation[2])
+            coral.setScale(scale);
+
+            coral.addToScene(scene);
+            coral.setFrame(coral.num_frames-1);
+            corals.push(coral);
+            num_frames.push(coral.num_frames);
+            window.foo[id] = coral;
+            resolve(coral);
+
+        }).catch(reject);
+    });
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize( window.innerWidth, window.innerHeight );
+}
+
+function animate() {
+    requestAnimationFrame( animate );
+    update()
+    render();
+}
+
+var frame = total_frames;
+
+function onDocumentKeyDown(event) {
+    var keyCode = event.which;
+    var r_key = 82;
+    var space_key = 32;
+    if (keyCode == r_key) {
+        frame = 0;
+    }
+};
+
+function update() {
+    var percent;
+    var delta_rotation
+
+    if (total_frames == null) return
+
+    if (frame == null) {
+        frame = total_frames;
+    }
+
+    var min_y = Infinity;
+    var max_y = -Infinity;
+
+    for (var i = 0; i < corals.length; i++) {
+        min_y = Math.min(min_y, corals[i].getPosition().y);
+        max_y = Math.max(max_y, corals[i].getPosition().y);
+    }
+
+    // console.log(min_y, max_y);
+    if (frame < (total_frames)) {
+
+        percent = frame / total_frames;
+
+
+
+        for (var i = 0; i < corals.length; i++) {
+            // var y_percent  = (corals[i].getPosition().y - min_y) / (max_y - min_y);
+            // y_percent = Math.min(.99, y_percent);
+            var y_percent = 1.0;
+            // console.log(corals[i].getPosition().y, y_percent);
+            corals[i].setFrame(Math.round(corals[i].num_frames * percent * y_percent));
+        }
+
+        frame += 1;
+    }
+}
+
+function render() {
+    renderer.render( scene, camera );
+    if (frame < total_frames) {
+        socket.emit('render-frame', {
+            frame: frame,
+            out_dir: portrait ? 'haeckal_tall': 'haeckal',
+            file: document.querySelector('canvas').toDataURL("image/jpeg")
+        });
+    }
+}
+
+</script>
+
+</body>
+</html>

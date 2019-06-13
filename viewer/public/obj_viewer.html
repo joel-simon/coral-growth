@@ -1,0 +1,126 @@
+
+<!-- Licensed under a BSD license. See license.html for license -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <style>
+    html, body {
+        margin: 0;
+        height: 100%;
+    }
+    #c {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+  </body>
+<script src="/js/lib/three.js"></script>
+<script src="/js/lib/OrbitControls.js"></script>
+<script src="/js/lib/LoaderSupport.js"></script>
+<script src="/js/lib/OBJLoader2.js"></script>
+<script>
+'use strict';
+
+/* global THREE */
+
+function main() {
+  const canvas = document.querySelector('#c');
+  const renderer = new THREE.WebGLRenderer({canvas});
+
+  const fov = 45;
+  const aspect = 2;  // the canvas default
+  const near = 0.1;
+  const far = 100;
+  const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+  camera.position.set(0, 10, 20);
+
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.target.set(0, 0, 0);
+  controls.update();
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('gray');
+
+  {
+    const skyColor = 0xB1E1FF;  // light blue
+    const groundColor = 0xB97A20;  // brownish orange
+    const intensity = 2;
+    const light = new THREE.HemisphereLight(skyColor, groundColor, intensity);
+    scene.add(light);
+  }
+
+  {
+    // LIGHTS
+    var light1 = new THREE.DirectionalLight( 0xaaaaaa, .25 );
+    light1.position.set( 0, 10, 2 );
+    light1.castShadow = true;
+    light1.shadow.mapSize.width = 2048;
+    light1.shadow.mapSize.height = 2048;
+
+    light1.shadow.camera.left = -50;
+    light1.shadow.camera.bottom = -50;
+    light1.shadow.camera.right = 50;
+    light1.shadow.camera.top = 50;
+
+    scene.add( light1 );
+
+    // scene.add(new THREE.HemisphereLight(0xFFFFFF, 1.0))
+
+    var light = new THREE.AmbientLight( 0x404040*2 ); // soft white light
+    scene.add( light );
+    // const color = 0xFFFFFF;
+    // const intensity = 1;
+    // const light = new THREE.DirectionalLight(color, intensity);
+    // light.position.set(0, 10, 0);
+    // light.target.position.set(-5, 0, 0);
+    // scene.add(light);
+    // scene.add(light.target);
+  }
+
+  {
+    const urlParams = new URLSearchParams(window.location.search);
+    const path = urlParams.get('obj')
+    const objLoader = new THREE.OBJLoader2()
+    objLoader.load('/obj/'+ encodeURIComponent(path), (event) => {
+      const root = event.detail.loaderRootNode;
+      scene.add(root);
+    });
+  }
+
+  function resizeRendererToDisplaySize(renderer) {
+    const canvas = renderer.domElement;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const needResize = canvas.width !== width || canvas.height !== height;
+    if (needResize) {
+      renderer.setSize(width, height, false);
+    }
+    return needResize;
+  }
+
+  function render() {
+
+    if (resizeRendererToDisplaySize(renderer)) {
+      const canvas = renderer.domElement;
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
+    }
+
+    renderer.render(scene, camera);
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+main();
+</script>
+</html>
+

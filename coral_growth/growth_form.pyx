@@ -22,6 +22,7 @@ from cymesh.operators.relax import relax_mesh
 
 cdef class GrowthForm:
     def __init__(self, attributes, obj_path, network, net_depth, traits, params):
+        assert type(attributes) == list
         self.params = params
         self.network = network
         self.mesh = Mesh.from_obj(obj_path)
@@ -48,6 +49,10 @@ cdef class GrowthForm:
         self.voxel_length = self.target_edge_len
 
         # Data
+        n_inputs, n_outputs = self.calculate_inouts(params)
+        self.n_inputs = n_inputs
+        self.n_outputs = n_outputs
+
         self.age = 0
         self.n_nodes = 0
         self.volume = 0
@@ -60,7 +65,7 @@ cdef class GrowthForm:
         self.node_gravity = np.zeros(self.max_nodes)
 
         self.node_signals = np.zeros((self.max_nodes, self.params.n_signals))
-        self.buffer = np.zeros((self.max_nodes)) # For intermediate calculation values.
+        self.buffer = np.zeros((self.max_nodes)) # For tmp calculation values.
         self.buffer3 = np.zeros((self.max_nodes, 3))
         self.node_attributes = np.zeros((self.max_nodes, self.n_attributes))
 
@@ -69,6 +74,15 @@ cdef class GrowthForm:
         for vert in self.mesh.verts:
             self.createNode(vert)
         self.calculateAttributes()
+
+    @classmethod
+    def calculate_inouts(cls, params):
+        n_inputs = 4 # energy, gravity, curvature, extra-bias-bit.
+        n_outputs = 1 # Growth.
+        n_inputs += params.n_signals + (4 * params.use_polar_direction) + \
+                     params.n_morphogens * (params.morphogen_thresholds-1)
+        n_outputs += params.n_signals + params.n_morphogens
+        return n_inputs, n_outputs
 
     cpdef void step(self) except *:
         self.grow()
@@ -209,7 +223,7 @@ cdef class GrowthForm:
                 self.node_signals[i, si] *= (1 - self.signal_decay[si])
 
     cpdef void createNodeInputs(self) except *:
-        """ Map node stats to nerual input in [-1, 1] range. """
+        """ Map node stats to neural input in [-1, 1] range. """
         cdef int input_idx, i, j, mi, mbin
         cdef int morphogen_thresholds = self.params.morphogen_thresholds
         cdef double[:,:] morphogensU = self.morphogens.U
@@ -328,12 +342,12 @@ cdef class GrowthForm:
         cdef int i
         out = open(path, 'w+')
         cdef list header = [a for a in self.attributes]
+        header.extend([ 'energy', 'curvature', 'gravity' ])
         for i in range(self.n_morphogens):
             header.append( 'mu_%i' % i )
         for i in range(self.n_signals):
             header.append( 'sig_%i' % i )
 
-        header.extend([ 'energy', 'curvature' ])
         out.write('#Exported from growth_forms\n')
         out.write('#form ' + ' '.join(header) + '\n')
 
@@ -343,15 +357,17 @@ cdef class GrowthForm:
             p_attributes[i] = []
 
             for j in range(self.n_attributes):
-                p_attributes[i].append(self.attributes[j, i])
+                p_attributes[i].append(self.node_attributes[i, j])
+
+            p_attributes[i].append( self.node_energy[i] )
+            p_attributes[i].append( self.node_verts[i].curvature )
+            p_attributes[i].append( self.node_gravity[i] )
 
             for j in range(self.n_morphogens):
                 p_attributes[i].append(self.morphogens.U[j, i])
 
-            p_attributes[i].extend(self.node_signals[i])
-
-            p_attributes[i].append( self.node_energy[i] )
-            p_attributes[i].append( self.node_verts[i].curvature )
+            for j in range(self.n_signals):
+                p_attributes[i].append(self.node_signals[i, j])
 
         assert len(p_attributes[0]) == len(header)
 

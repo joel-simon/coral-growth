@@ -17,24 +17,25 @@ class Parameters(object):
         self.neat.AllowLoops = False
 
         # Coral Growth.
-        self.seed_type = 0 # 0 is flat bottom and 1 is round, use 0 with 'has_ground'
+        self.seed_type = 1 # 0 is flat bottom and 1 is round, use 0 with 'has_ground'
 
         self.max_nodes = 15000
-        self.max_volume = 50.0
+        self.max_volume = 200.0
         self.max_steps = 150
-        self.max_growth = .20
+        self.max_growth = .25
         self.max_defect = 1.4
         self.max_face_growth = 1.3
 
         self.n_morphogens = 2
-        self.n_signals = 3
+        self.n_signals = 2
         self.n_memory = 0
+        self.use_gravity = True
 
-        self.C = .4
+        self.C = .3
         self.morphogen_thresholds = 2
         self.morphogen_steps = 200
-        self.use_polar_direction = False
-        self.has_ground = True
+        self.use_polar_direction = True
+        self.has_ground = False
 
         # These are coral specific and should get re-factored somewhere...
         self.light_amount = 0.7

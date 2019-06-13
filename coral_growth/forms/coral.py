@@ -1,6 +1,5 @@
 from __future__ import print_function
 import numpy as np
-# from pykdtree.kdtree import KDTree
 
 from coral_growth.modules.flowx import *
 from coral_growth.modules.flowx2 import *
@@ -11,23 +10,15 @@ from coral_growth.growth_form import GrowthForm
 class Coral(GrowthForm):
     def __init__(self, obj_path, network, net_depth, traits, params):
         # Corals calculate light and flow on every node to get growth energy.
-        n_inputs, n_outputs = Coral.calculate_inouts(params)
-        self.n_inputs = n_inputs
-        self.n_outputs = n_outputs
-
         self.node_light = np.zeros(params.max_nodes)
         self.node_collection = np.zeros(params.max_nodes)
-        super().__init__(2, obj_path, network, net_depth, traits, params)
+        attributes = ['light', 'collection']
+        super().__init__(attributes, obj_path, network, net_depth, traits, params)
 
     @classmethod
     def calculate_inouts(cls, params):
-        n_inputs = 6 # energy, gravity, curvature, extra-bias-bit.
-        n_outputs = 1 # growth.
-
-        n_inputs += params.n_signals + (4 * params.use_polar_direction) + \
-                     params.n_morphogens * (params.morphogen_thresholds-1)
-        n_outputs += params.n_signals + params.n_morphogens
-
+        n_inputs, n_outputs = GrowthForm.calculate_inouts(params)
+        n_inputs += 2 # Corals have two extra inputs, light and collection.
         return n_inputs, n_outputs
 
     def calculateEnergy(self):
@@ -51,8 +42,8 @@ class Coral(GrowthForm):
         for i in range(self.n_nodes):
             self.light += self.node_light[i]
             self.collection += self.node_collection[i]
-            self.node_attributes[i, 0] = self.light
-            self.node_attributes[i, 1] = self.collection
+            self.node_attributes[i, 0] = self.node_light[i]
+            self.node_attributes[i, 1] = self.node_collection[i]
             energy = light_amount * self.node_light[i] + \
                                    (1-light_amount)*self.node_collection[i]
             self.node_energy[i] = energy

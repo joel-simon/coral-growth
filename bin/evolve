@@ -40,10 +40,10 @@ if __name__ == '__main__':
         print('Method must be one of', methods)
         exit()
 
-    if args.form not in forms:
+    if args.form.lower() not in forms:
         raise ValueError('Form not one of the options, must be in', str(list(forms.keys())))
 
-    Form = forms[ args.form ]
+    Form = forms[ args.form.lower() ]
 
     print(args)
 

@@ -1,3 +1,5 @@
+""" Evolution utilties shared by the 3 evolution modules (local, neat & novelty)
+"""
 from __future__ import print_function
 import os, time, math, json
 from os.path import join as pjoin

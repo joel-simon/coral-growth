@@ -7,7 +7,6 @@ random.seed(123)
 import ast
 from tempfile import TemporaryDirectory
 import MultiNEAT as NEAT
-from coral_growth.coral import Coral
 from coral_growth.simulate import simulate_genome
 from coral_growth.viewer import AnimationViewer
 from coral_growth.parameters import Parameters

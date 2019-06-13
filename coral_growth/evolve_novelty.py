@@ -73,11 +73,19 @@ def evolve_novelty(Form, params, generations, out_dir, run_id, pool, ls50=True, 
         elif n_archive_added > 4:
             novelty_threshold *= 1.1
 
-        maxf, meanf = max(fitness_list), sum(fitness_list) / float(len(fitness_list))
-        if max_ever is None or maxf > max_ever:
-            max_ever = maxf
-            best = genomes[fitness_list.index(maxf)]
+
+        # Comment / uncomment to save most novel each generation.
+        if n_archive_added > 0:
+            maxf, meanf = max(sparseness_list), sum(sparseness_list) / float(len(sparseness_list))
+            best = genomes[sparseness_list.tolist().index(maxf)]
             print('New best fitness.', best.NumNeurons(), best.NumLinks())
             simulate_and_save(Form, best, params, out_dir, generation, maxf, meanf)
+
+        # maxf, meanf = max(fitness_list), sum(fitness_list) / float(len(fitness_list))
+        # if max_ever is None or maxf > max_ever:
+        #     max_ever = maxf
+        #     best = genomes[fitness_list.index(maxf)]
+        #     print('New best fitness.', best.NumNeurons(), best.NumLinks())
+        #     simulate_and_save(Form, best, params, out_dir, generation, maxf, meanf)
 
         pop.Epoch()

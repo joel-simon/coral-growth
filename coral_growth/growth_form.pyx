@@ -322,8 +322,7 @@ cdef class GrowthForm:
 
             # Signals
             for mi in range(self.n_signals):
-                if output[out_idx] > 0.5:
-                    self.node_signals[i, mi] = 1.0
+                self.node_signals[i, mi] = <int>(output[out_idx] > 0.5)
                 out_idx += 1
 
             # Memory

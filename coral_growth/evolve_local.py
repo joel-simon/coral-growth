@@ -71,10 +71,10 @@ class Archive(object):
         indices = sorted([(lf, i) for i,lf in enumerate(self.local_fitnesses)], reverse=True)
         return [  (lf, self.genomes[i]) for lf,i in indices[:n] ]
 
-def evolve_local( params, generations, out_dir, run_id, pool, max_size=400, K=10, N=5):
+def evolve_local(Form, params, generations, out_dir, run_id, pool, max_size=20, K=5, N=20):
     max_ever = None
     archive = Archive(max_size, K)
-    pop = create_initial_population(params)
+    pop = create_initial_population(Form, params)
     seen_genomes = set()
 
     corals_dir = pjoin(out_dir, 'corals')
@@ -90,7 +90,7 @@ def evolve_local( params, generations, out_dir, run_id, pool, max_size=400, K=10
         print(run_id, 'Starting generation %i' % generation)
 
         genomes = NEAT.GetGenomeList(pop)
-        fitness_list, feature_list = evaluate_genomes_novelty(genomes, params, pool)
+        fitness_list, feature_list = evaluate_genomes_novelty(Form, genomes, params, pool)
         local_fitness_list = archive.calcLocalFitnessAndUpdate(genomes, fitness_list, feature_list)
         NEAT.ZipFitness(genomes, local_fitness_list)
 
@@ -126,7 +126,7 @@ def evolve_local( params, generations, out_dir, run_id, pool, max_size=400, K=10
                         for k, v in sorted(traits.items()):
                             f.write("%s\t%f\n"%(k, v))
 
-                    simulate_genome(genome, traits, [params], export_folder=coral_dir)
+                    simulate_genome(Form, genome, traits, [params], export_folder=coral_dir)
 
             with open(pjoin(best_dir, '%i.txt'%generation), 'w+') as out:
                 for local_fitness, genome_id in top_n:

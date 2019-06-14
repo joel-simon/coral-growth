@@ -16,6 +16,12 @@ function getDirectories(path) {
     })
 }
 
+function getFiles(path) {
+    return fs.readdirSync(path).filter((file) => {
+        return !fs.statSync(path+'/'+file).isDirectory()
+    })
+}
+
 
 function file_cmp (f1, f2) {
     return parseInt(f2.split('.')[0]) -  parseInt(f1.split('.'))
@@ -38,27 +44,42 @@ app.get('/', (req, res) => {
 })
 
 app.get('/dir/:dir', (req, res) => {
-    const { dir } = req.params
-    const html = getDirectories(`${root}/${dir}`).sort(file_cmp).map(name => {
-        return `<a href=/view/${dir}/${name}/>${name}</a><br>`
-    }).join('')
+    const dir = decodeURIComponent(req.params.dir)
+    const directories = getDirectories(`${root}/${dir}`)
+    const files = getFiles(path.join(root, dir))
+
+    if (directories.length == 0 && files.every(f => f.endsWith('.obj'))) {
+        const max_path = files.sort(file_cmp)[0]
+        return res.redirect('/viewer?obj='+ encodeURIComponent(path.join(dir, max_path)))
+    }
+
+    const html =
+        directories
+        .sort(file_cmp)
+        .map(name => `<a href=/dir/${encodeURIComponent(path.join(root,dir,name))}/>${name}</a><br>` )
+        .join('')
+        +
+        files
+        .sort(file_cmp)
+        .map(name => `<a href=/view/${encodeURIComponent(path.join(root,dir,name))}/>${name}</a><br>` )
+        .join('')
+
     res.set('Content-Type', 'text/html')
     res.send(new Buffer.from(html))
 })
 
-app.get('/view/:dir/:gen', (req, res) => {
-    const { dir, gen } = req.params
-    const obj_dir = `${root}/${dir}/${gen}/0/`
-    const paths = fs.readdirSync(obj_dir).filter((f) => f.endsWith('.obj'))
-    const max_path = paths.sort(file_cmp)[0]
-    res.redirect('/viewer?obj='+encodeURIComponent(`${dir}/${gen}/0/${max_path}`))
+app.get('/view/:path', (req, res) => {
+    const p = path.resolve(decodeURIComponent(req.params.path))
+    if (p.endsWith('.obj')) {
+        res.redirect('/viewer?obj='+req.params.path)
+    } else {
+        res.sendFile(p)
+    }
 })
 
 app.get('/obj/:path', (req, res) => {
     // For loading the 3d objects.
     const full_path = path.resolve(path.join(root, decodeURIComponent(req.params.path)))
-    console.log(full_path)
-    // console.log()
     res.sendFile(full_path)
 })
 
@@ -91,6 +112,6 @@ io.sockets.on('connection', function (socket) {
     //     });
     // });
 });
-
 app.use(express.static('public'))
+// app.use(express.static('public'))
 server.listen(9001)

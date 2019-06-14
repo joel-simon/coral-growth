@@ -23,17 +23,20 @@ class Parameters(object):
         self.max_volume = 200.0
         self.max_steps = 150
         self.max_growth = .25
-        self.max_defect = 1.4
+        self.max_defect = 1.5
         self.max_face_growth = 1.3
+        self.C = .3
+
+        self.n_signals = 2
+        self.signal_thresholds = 3 # if n thresholds, n+1 options.
+
+        self.n_memory = 2
 
         self.n_morphogens = 2
-        self.n_signals = 2
-        self.n_memory = 0
-        self.use_gravity = True
-
-        self.C = .3
-        self.morphogen_thresholds = 2
+        self.morphogen_thresholds = 3
         self.morphogen_steps = 200
+
+        self.use_gravity = True
         self.use_polar_direction = True
         self.has_ground = False
 
@@ -81,7 +84,7 @@ class Parameters(object):
             self.addTrait('diffV%i'%i, (.0025, .01))
 
         for i in range(self.n_signals):
-            self.addTrait('signal_decay%i'%i, (0.0, .4))
+            # self.addTrait('signal_decay%i'%i, (0.0, .4))
             self.addTrait('signal_diffuse_steps%i'%i, (0, 8), ttype='int')
 
     def write(self, neat_path, sim_path):

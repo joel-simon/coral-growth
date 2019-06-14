@@ -30,6 +30,7 @@ cdef class GrowthForm:
         self.n_attributes = len(attributes)
         self.n_morphogens = params.n_morphogens
         self.n_signals = params.n_signals
+        self.n_memory = params.n_memory
         self.net_depth = net_depth
         self.C = params.C
         self.max_nodes = params.max_nodes
@@ -38,8 +39,8 @@ cdef class GrowthForm:
 
         # Some parameters are evolved traits.
         self.traits = traits
-        self.signal_decay = np.array([ traits['signal_decay%i'%i] \
-                                       for i in range(params.n_signals) ])
+        # self.signal_decay = np.array([ traits['signal_decay%i'%i] \
+        #                                for i in range(params.n_signals) ])
 
         # Constants for simulation dependent on start mesh.
         self.target_edge_len = np.mean([e.length() for e in self.mesh.edges])
@@ -65,6 +66,7 @@ cdef class GrowthForm:
         self.node_gravity = np.zeros(self.max_nodes)
 
         self.node_signals = np.zeros((self.max_nodes, self.params.n_signals))
+        self.node_memory = np.zeros((self.max_nodes, self.params.n_signals), dtype='int32')
         self.buffer = np.zeros((self.max_nodes)) # For tmp calculation values.
         self.buffer3 = np.zeros((self.max_nodes, 3))
         self.node_attributes = np.zeros((self.max_nodes, self.n_attributes))
@@ -78,13 +80,18 @@ cdef class GrowthForm:
     @classmethod
     def calculate_inouts(cls, params):
         n_inputs = 4 # energy, gravity, curvature, extra-bias-bit.
+        n_inputs += params.n_signals * (params.signal_thresholds-1)
+        n_inputs += params.n_morphogens * (params.morphogen_thresholds-1)
+        n_inputs += (4 * params.use_polar_direction)
+        n_inputs += params.n_memory
+
         n_outputs = 1 # Growth.
-        n_inputs += params.n_signals + (4 * params.use_polar_direction) + \
-                     params.n_morphogens * (params.morphogen_thresholds-1)
-        n_outputs += params.n_signals + params.n_morphogens
+        n_outputs += params.n_signals + params.n_morphogens + params.n_memory
+
         return n_inputs, n_outputs
 
     cpdef void step(self) except *:
+        self.createNodeInputs()
         self.grow()
         for i in range(self.n_nodes):
             self.collisionManager.attemptVertUpdate(self.mesh.verts[i], self.node_pos_next[i])
@@ -101,7 +108,7 @@ cdef class GrowthForm:
         self.calculateEnergy()
         self.volume = self.mesh.volume()
         self.calculateGravity()
-        self.decaySignals()
+        # self.decaySignals()
         self.morphogens.update(self.params.morphogen_steps)
         self.diffuse()
 
@@ -146,9 +153,8 @@ cdef class GrowthForm:
             return
 
         cdef Vert vert_n
-        cdef int i, n, idx
-
-        idx = self.n_nodes
+        cdef int i
+        cdef int idx = self.n_nodes
         self.n_nodes += 1
         vert.data['node'] = idx
         self.node_pos[idx, :] = vert.p
@@ -157,16 +163,21 @@ cdef class GrowthForm:
         self.node_verts[idx] = vert
         self.collisionManager.newVert(vert)
 
-        # Signals are average of neighbors.
-        n = 0
+        cdef int n = 0
         for vert_n in vert.neighbors():
-            if self.node_signals[vert_n.id, 0] == 0.0:
-                for i in range(self.n_signals):
-                    self.node_signals[idx, i] += self.node_signals[vert_n.id, i]
+            for i in range(self.n_memory):
+                self.node_memory[idx, i] += self.node_memory[vert_n.id, i]
+            # for i in range(self.n_signals):
+            #     self.node_signals[idx, i] += self.node_signals[vert_n.id, i]
             n += 1
 
-        for i in range(self.n_signals):
-            self.node_signals[idx, i] /= n
+        # Signals are average of neighbors.
+        # for i in range(self.n_signals):
+        #     self.node_signals[idx, i] /= n
+
+        # Take Memory if majority of neighbours have it.
+        for i in range(self.n_memory):
+            self.node_memory[idx, i] = 1 if self.node_memory[idx, i] > n/2 else 0
 
         assert vert.id == idx
 
@@ -215,17 +226,18 @@ cdef class GrowthForm:
                 for i in range(self.n_nodes):
                     self.node_signals[i, mi] = self.buffer[i]
 
-    cpdef void decaySignals(self) except *:
-        cdef int i, si
-        for i in range(self.n_nodes):
-            for si in range(self.n_signals):
-                self.node_signals[i, si] = min(1.0, self.node_signals[i, si])
-                self.node_signals[i, si] *= (1 - self.signal_decay[si])
+    # cpdef void decaySignals(self) except *:
+    #     cdef int i, si
+    #     for i in range(self.n_nodes):
+    #         for si in range(self.n_signals):
+    #             self.node_signals[i, si] = min(1.0, self.node_signals[i, si])
+    #             self.node_signals[i, si] *= (1 - self.signal_decay[si])
 
     cpdef void createNodeInputs(self) except *:
         """ Map node stats to neural input in [-1, 1] range. """
         cdef int input_idx, i, j, mi, mbin
         cdef int morphogen_thresholds = self.params.morphogen_thresholds
+        cdef int signal_thresholds = self.params.signal_thresholds
         cdef double[:,:] morphogensU = self.morphogens.U
         cdef bint use_polar_direction = self.params.use_polar_direction
         cdef double signal_sum, azimuthal_angle, polar_angle
@@ -246,15 +258,21 @@ cdef class GrowthForm:
             for mi in range(self.n_morphogens):
                 mbin = <int>(floor(morphogensU[mi, i] * morphogen_thresholds))
                 mbin = min(morphogen_thresholds - 1, mbin)
-
                 if mbin > 0:
                     self.node_inputs[i, input_idx + (mbin-1)] = 1
-
                 input_idx += (morphogen_thresholds-1)
 
             # Signals.
             for mi in range(self.n_signals):
-                self.node_inputs[i, input_idx] = self.node_signals[i, mi] > 0.5
+                mbin = <int>(floor(self.node_signals[i, mi] * signal_thresholds))
+                mbin = min(signal_thresholds - 1, mbin)
+                if mbin > 0:
+                    self.node_inputs[i, input_idx + (mbin-1)] = 1
+                input_idx += (signal_thresholds-1)
+
+            # Memory.
+            for mi in range(self.n_memory):
+                self.node_inputs[i, input_idx] = -1.0 + self.node_memory[i, mi] * 2.0
                 input_idx += 1
 
             if use_polar_direction:
@@ -277,8 +295,6 @@ cdef class GrowthForm:
         cdef double growth
         cdef object output
         cdef double[:,:] morphogensV = self.morphogens.V
-
-        self.createNodeInputs()
 
         # Boost library for neural network wants numpy array or list.
         cdef object inputs = np.asarray(self.node_inputs)
@@ -310,6 +326,12 @@ cdef class GrowthForm:
                     self.node_signals[i, mi] = 1.0
                 out_idx += 1
 
+            # Memory
+            for mi in range(self.n_memory):
+                if output[out_idx] > 0.75:
+                    self.node_memory[i, mi] = 1
+                out_idx += 1
+
         for i in range(self.n_nodes):
             growth = 0.0
             n = 0
@@ -339,7 +361,7 @@ cdef class GrowthForm:
             2. A line that begins with 'c' for each vert that contains values
                 for each attribute. Ordered the same as the vertices.
         """
-        cdef int i
+        cdef int i, j
         out = open(path, 'w+')
         cdef list header = [a for a in self.attributes]
         header.extend([ 'energy', 'curvature', 'gravity' ])
@@ -347,6 +369,8 @@ cdef class GrowthForm:
             header.append( 'mu_%i' % i )
         for i in range(self.n_signals):
             header.append( 'sig_%i' % i )
+        for i in range(self.n_memory):
+            header.append( 'memory_%i' % i )
 
         out.write('#Exported from growth_forms\n')
         out.write('#form ' + ' '.join(header) + '\n')
@@ -368,6 +392,9 @@ cdef class GrowthForm:
 
             for j in range(self.n_signals):
                 p_attributes[i].append(self.node_signals[i, j])
+
+            for j in range(self.n_memory):
+                p_attributes[i].append(self.node_memory[i, j])
 
         assert len(p_attributes[0]) == len(header)
 

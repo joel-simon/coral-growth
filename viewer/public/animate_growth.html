@@ -33,7 +33,7 @@ window.save = false;
 var renderer, scene, camera;
 var mouse;
 var line;
-var MAX_POINTS = 15000;
+var MAX_POINTS = 20000;
 var drawCount;
 var click_objects = [];
 
@@ -49,28 +49,19 @@ var laoder;
 var corals = [];
 var path;
 
-function getParameterByName(name, url) {
-    if (!url) url = window.location.href;
-    name = name.replace(/[\[\]]/g, "\\$&");
-    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
-        results = regex.exec(url);
-    if (!results) return null;
-    if (!results[2]) return '';
-    return decodeURIComponent(results[2].replace(/\+/g, " "));
-}
 
 function init() {
-    socket = io.connect('http://localhost:9001/');
-    container = document.createElement( 'div' );
-    document.body.appendChild( container );
+    socket = io.connect('http://localhost:9001/')
+    container = document.createElement( 'div' )
+    document.body.appendChild( container )
 
     // CAMERA
     camera = new THREE.PerspectiveCamera( 27, window.innerWidth / window.innerHeight, 1, 3500 );
     camera.position.z = 2750/100;
     camera.position.y = 10;
     // camera.zoom = 0.75;
-    camera.lookAt(0,2,0);
-    camera.updateProjectionMatrix();
+    camera.lookAt(0,2,0)
+    camera.updateProjectionMatrix()
 
 
     // SCENE
@@ -144,15 +135,24 @@ function init() {
     //     }
     //     scene.add(world)
     // })
+
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
-    path = getParameterByName('coral');
+    // path = getParameterByName('data');
+    const urlParams = new URLSearchParams(window.location.search)
+    // const path = 'growth_animation/'
+    let path = decodeURIComponent(urlParams.get('data'))
+    if (!path.endsWith('/')) {
+        path += '/'
+    }
+    // path = 'data/6C0G__TestForm__April_17_2018_18_03/41/0_animation/'
+    // console.log(path)
 
-    if (!path) {
+    if (!urlParams.get('data')) {
         alert('no path given "?coral="')
     } else {
-
-        load_coral('data/'+path, 0, 0).then(function(coral){
+        console.log(urlParams.get('data'))
+        load_coral('data/'+ encodeURIComponent(path), 0, 0).then(function(coral){
             // coral.setFrame(coral.num_frames-1);
             coral.setFrame(0);
             coral.setRotation(0, Math.PI/4,0);

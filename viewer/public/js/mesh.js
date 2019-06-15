@@ -1,4 +1,4 @@
-var MAX_POINTS = 15000;
+var MAX_POINTS = 20000;
 class CoralAnimationViewer {
     constructor(verts, colors, faces, vert_indices, face_indices, polyp_geo) {
         console.assert(vert_indices.length == face_indices.length)
@@ -171,6 +171,7 @@ class DynamicInstancesMesh {
 
 class DynamicMesh {
     constructor(max_verts) {
+        console.log(max_verts)
         this.max_verts = max_verts
         this.geometry = new THREE.BufferGeometry()
         var positions = new Float32Array( max_verts * 3 );
@@ -191,7 +192,7 @@ class DynamicMesh {
 
     update(position, color, indices) {
         if (position.length > this.max_verts *3) {
-            throw 'Position array too long', position.length
+            throw 'Position array too long', [position.length, this.max_verts]
         }
         this.geometry.attributes.position.array.fill(0);
         this.geometry.attributes.position.array.set(position);

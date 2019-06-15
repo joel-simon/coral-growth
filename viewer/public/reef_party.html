@@ -9,17 +9,25 @@
             font-weight: bold;
             background-color: #000000;
             margin: 0px;
-            overflow: hidden;
+            /*overflow: hidden;*/
+        }
+        canvas {
+            /*width: 1920px;*/
+            /*height: 1080px;*/
+            /*display: block;*/
+            /*transform-origin: 0 0;*/
+            /*transform: scale(0.5);*/
         }
     </style>
 </head>
 
 <body>
-<script src="js/mesh.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/lib/three.js"></script>
-<script src="js/lib/stats.min.js"></script>
-<script src="js/lib/OrbitControls.js"></script>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script src="/js/mesh.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/lib/three.js"></script>
+<script src="/js/lib/stats.min.js"></script>
+<script src="/js/lib/OrbitControls.js"></script>
 
 <script src="js/lib/OBJLoader.js"></script>
 <script src="/socket.io/socket.io.js"></script>
@@ -255,7 +263,8 @@ function init() {
     socket = io.connect('http://localhost:9001/');
     container = document.createElement( 'div' );
     document.body.appendChild( container );
-
+    const canvas = document.querySelector('canvas')
+    console.log(canvas.width)
     // CAMERA
     camera = new THREE.PerspectiveCamera( 27, window.innerWidth / window.innerHeight, 1, 3500 );
     camera.position.z = 2750/100;
@@ -267,9 +276,9 @@ function init() {
     scene.fog = new THREE.Fog(  0x3f7b9d, 0, 200 );
 
     // RENDERER
-    renderer = new THREE.WebGLRenderer( { antialias: true } );
+    renderer = new THREE.WebGLRenderer( { antialias: true, canvas } );
     renderer.setPixelRatio( window.devicePixelRatio );
-    renderer.setSize( window.innerWidth, window.innerHeight );
+    // renderer.setSize( window.innerWidth, window.innerHeight );
     renderer.gammaInput = true;
     renderer.gammaOutput = true;
     renderer.setClearColor( 0xffffff, 1);
@@ -377,9 +386,9 @@ function init() {
 }
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize( window.innerWidth, window.innerHeight );
+    // camera.aspect = window.innerWidth / window.innerHeight;
+    // camera.updateProjectionMatrix();
+    // renderer.setSize( window.innerWidth, window.innerHeight );
 }
 //
 function animate() {

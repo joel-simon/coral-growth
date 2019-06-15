@@ -4,7 +4,8 @@ const server = require('http').createServer(app)
 const io = require('socket.io').listen(server)
 const fs = require('fs')
 const path = require('path')
-
+const utils = require('./convert_utils.js')
+const objs2buffers = require('./objs2buffers.js')
 
 const root = process.argv[2]
 // process.chdir(process.argv[2]);
@@ -31,9 +32,11 @@ function file_cmp (f1, f2) {
 //     res.sendFile(__dirname + '/public/haeckel.html');
 // });
 
-// app.get('/animate_growth', function (req, res) {
-//     res.sendFile(__dirname + '/public/animate_growth.html');
-// });
+
+
+app.get('/reef', function (req, res) {
+    res.sendFile(__dirname + '/public/reef_party.html');
+});
 
 app.get('/', (req, res) => {
     const html = getDirectories(root).map(name => {
@@ -45,23 +48,34 @@ app.get('/', (req, res) => {
 
 app.get('/dir/:dir', (req, res) => {
     const dir = decodeURIComponent(req.params.dir)
-    const directories = getDirectories(`${root}/${dir}`)
-    const files = getFiles(path.join(root, dir))
+    const path_dir = path.join(root, dir)
 
+    const directories = getDirectories(path_dir)
+    const files = getFiles(path_dir)
+
+    /* Treat directory of objs differently */
     if (directories.length == 0 && files.every(f => f.endsWith('.obj'))) {
-        const max_path = files.sort(file_cmp)[0]
-        return res.redirect('/viewer?obj='+ encodeURIComponent(path.join(dir, max_path)))
+        const parent = path.dirname(path_dir)
+        const animation_dir = path.join(parent, path.basename(dir)+'_animation')
+
+        if (!fs.existsSync(animation_dir)) {
+            objs2buffers(path_dir, animation_dir)
+        }
+        return res.redirect('/animate?data='+ encodeURIComponent(path.join(parent, path.basename(dir)+'_animation')))
+
+        // const max_path = files.sort(file_cmp)[0]
+        // return res.redirect('/viewer?obj='+ encodeURIComponent(path.join(dir, max_path)))
     }
 
     const html =
         directories
         .sort(file_cmp)
-        .map(name => `<a href=/dir/${encodeURIComponent(path.join(root,dir,name))}/>${name}</a><br>` )
+        .map(name => `<a href=/dir/${encodeURIComponent(path.join(dir,name))}/>${name}</a><br>` )
         .join('')
         +
         files
         .sort(file_cmp)
-        .map(name => `<a href=/view/${encodeURIComponent(path.join(root,dir,name))}/>${name}</a><br>` )
+        .map(name => `<a href=/view/${encodeURIComponent(path.join(dir,name))}/>${name}</a><br>` )
         .join('')
 
     res.set('Content-Type', 'text/html')
@@ -77,15 +91,27 @@ app.get('/view/:path', (req, res) => {
     }
 })
 
-app.get('/obj/:path', (req, res) => {
-    // For loading the 3d objects.
-    const full_path = path.resolve(path.join(root, decodeURIComponent(req.params.path)))
-    res.sendFile(full_path)
+app.get('/data/:path', (req, res) => {
+    const p = path.resolve(path.join(root, decodeURIComponent(req.params.path)))
+    res.sendFile(p)
 })
 
 app.get('/viewer', (req, res) => {
     return res.sendFile(__dirname + '/public/obj_viewer.html')
 })
+
+app.get('/animate', function (req, res) {
+    return res.sendFile(__dirname + '/public/animate_growth.html')
+})
+
+
+// app.get('/obj/:path', (req, res) => {
+//     // For loading the 3d objects.
+//     const full_path = path.resolve(path.join(root, decodeURIComponent(req.params.path)))
+//     res.sendFile(full_path)
+// })
+
+
 
 io.sockets.on('connection', function (socket) {
     socket.on('render-frame', function (data) {
@@ -113,5 +139,4 @@ io.sockets.on('connection', function (socket) {
     // });
 });
 app.use(express.static('public'))
-// app.use(express.static('public'))
 server.listen(9001)

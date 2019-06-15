@@ -1,31 +1,28 @@
-'use strict'
-var glob = require("glob")
-var path = require('path');
-var fs = require('fs');
-var convert = require('color-convert');
-var PCA = require('ml-pca');
-var math = require('mathjs')
+const glob = require("glob")
+const path = require('path');
+const fs = require('fs');
+// const convert = require('color-convert');
+const PCA = require('ml-pca');
+const math = require('mathjs')
 
-var polyp_data = []
-var coral_data = {}
-var view_names = null
-var n_views = null
+const vert_indices = []
+const face_indices = []
+// const radii = []
+const verts = []
+const colors = []
+const faces = []
+const data = []
 
-var vert_indices = []
-var face_indices = []
-var radii = []
-var verts = []
-var colors = []
-var faces = []
-var values = [];
 
 function save_array(file_name, array) {
     fs.writeFileSync(file_name, new Buffer(array.buffer))
 }
 
 function clamp(num, min, max) {
-  return num <= min ? min : num >= max ? max : num;
+    return num <= min ? min : num >= max ? max : num;
 }
+
+const concat = (arrays) => [].concat.apply([], arrays)
 
 function parse_and_add_file(path) {
     var array = fs.readFileSync(path).toString().split("\n");
@@ -72,53 +69,62 @@ function parse_and_add_file(path) {
                 break
         }
     }
-    vert_indices.push(verts.length)
-    face_indices.push(faces.length)
+    // vert_indices.push(verts.length)
+    // face_indices.push(faces.length)
 }
 
 function process_files(files) {
     console.log(files.length, 'files found.');
     if (files.length == 0) {
         return
-        // process.exit(1);
-    }
-    // Drop the last file.
-    for (i in files) {
-        parse_and_add_file(files[i])
     }
 
-    var matrix_t = math.transpose(math.matrix(values))
-    var pca = new PCA(values);
-    var variances = pca.getExplainedVariance();
+    // const all_data = []
+    // const all_verts = []
+    // const all_faces = []
+    const parsed_files = []
+    for (const file of files) {
+        // const { data, verts, faces } = convert_utils.parse_file(file)
+        parsed_files.push(convert_utils.parse_file(file))
+        // all_data.push(data)
+        // all_data.push(data)
+        // parse_and_add_file(files[i])
+    }
+    const data = concat(parsed_files.map(f => f.data))
+
+    // var matrix_t = math.transpose(math.matrix(values))
+    const pca = new PCA(data)
+    const variances = pca.getExplainedVariance()
 
     console.log(variances, variances[0]+variances[1]+variances[2]);
 
-    var pca_values = pca.predict(values);
-    var mins = math.min(pca_values, 0);
-    var maxs = math.max(pca_values, 0);
+    const pca_data = pca.predict(data);
+    const mins = math.min(pca_data, 0);
+    const maxs = math.max(pca_data, 0);
 
-    var scales = math.subtract(maxs, mins);
+    const scales = math.subtract(maxs, mins);
 
-    pca_values.forEach((value, index, matrix) => {
-        //red
-        colors.push((value[1] - mins[1]) / scales[1]);
+    pca_data.forEach((value, index, matrix) => {
+        colors.push([
+            (value[1] - mins[1]) / scales[1], //red
+            (value[2] - mins[2]) / scales[2], //red
+            (value[0] - mins[0]) / scales[0] //red
+        ])
 
-        //green
-        colors.push((value[2] - mins[2]) / scales[2]);
-
-        //blue
-        colors.push((value[0] - mins[0]) / scales[0]);
-    });
+        // colors.push((value[1] - mins[1]) / scales[1]); //red
+        // colors.push((value[2] - mins[2]) / scales[2]); //green
+        // colors.push((value[0] - mins[0]) / scales[0]); //blue
+    })
 
     /*
         Convert to arrays and save.
     */
-    var vert_array = Float32Array.from(verts);
-    var color_array = Float32Array.from(colors);
-    var face_array = Uint32Array.from(faces);
+    const vert_array = Float32Array.from(verts)
+    const color_array = Float32Array.from(colors)
+    const face_array = Uint32Array.from(faces)
 
-    var last_vi = vert_indices[vert_indices.length-2];
-    var last_fi = face_indices[face_indices.length-2];
+    const last_vi = vert_indices[vert_indices.length-2];
+    const last_fi = face_indices[face_indices.length-2];
 
     save_array(path.join(out_dir, 'last_vert_array'), vert_array.slice(last_vi, vert_array.length));
     save_array(path.join(out_dir, 'last_color_array'), color_array.slice(last_vi, color_array.length));

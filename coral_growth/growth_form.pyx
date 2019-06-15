@@ -80,8 +80,8 @@ cdef class GrowthForm:
     @classmethod
     def calculate_inouts(cls, params):
         n_inputs = 4 # energy, gravity, curvature, extra-bias-bit.
-        n_inputs += params.n_signals * (params.signal_thresholds-1)
-        n_inputs += params.n_morphogens * (params.morphogen_thresholds-1)
+        n_inputs += params.n_signals * (params.signal_thresholds)
+        n_inputs += params.n_morphogens * (params.morphogen_thresholds)
         n_inputs += (4 * params.use_polar_direction)
         n_inputs += params.n_memory
 
@@ -167,13 +167,13 @@ cdef class GrowthForm:
         for vert_n in vert.neighbors():
             for i in range(self.n_memory):
                 self.node_memory[idx, i] += self.node_memory[vert_n.id, i]
-            # for i in range(self.n_signals):
-            #     self.node_signals[idx, i] += self.node_signals[vert_n.id, i]
+            for i in range(self.n_signals):
+                self.node_signals[idx, i] += self.node_signals[vert_n.id, i]
             n += 1
 
         # Signals are average of neighbors.
-        # for i in range(self.n_signals):
-        #     self.node_signals[idx, i] /= n
+        for i in range(self.n_signals):
+            self.node_signals[idx, i] /= n
 
         # Take Memory if majority of neighbours have it.
         for i in range(self.n_memory):
@@ -258,17 +258,15 @@ cdef class GrowthForm:
             for mi in range(self.n_morphogens):
                 mbin = <int>(floor(morphogensU[mi, i] * morphogen_thresholds))
                 mbin = min(morphogen_thresholds - 1, mbin)
-                if mbin > 0:
-                    self.node_inputs[i, input_idx + (mbin-1)] = 1
-                input_idx += (morphogen_thresholds-1)
+                self.node_inputs[i, input_idx + (mbin)] = 1
+                input_idx += morphogen_thresholds
 
             # Signals.
             for mi in range(self.n_signals):
                 mbin = <int>(floor(self.node_signals[i, mi] * signal_thresholds))
                 mbin = min(signal_thresholds - 1, mbin)
-                if mbin > 0:
-                    self.node_inputs[i, input_idx + (mbin-1)] = 1
-                input_idx += (signal_thresholds-1)
+                self.node_inputs[i, input_idx + mbin] = 1
+                input_idx += signal_thresholds
 
             # Memory.
             for mi in range(self.n_memory):

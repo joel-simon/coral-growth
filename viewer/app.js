@@ -83,7 +83,7 @@ app.get('/dir/:dir', (req, res) => {
 })
 
 app.get('/view/:path', (req, res) => {
-    const p = path.resolve(decodeURIComponent(req.params.path))
+    const p = path.resolve(path.join(root, decodeURIComponent(req.params.path)))
     if (p.endsWith('.obj')) {
         res.redirect('/viewer?obj='+req.params.path)
     } else {

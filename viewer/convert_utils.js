@@ -128,7 +128,7 @@ module.exports = {
                 rows.push('f '+face.map(i => i+1).join(' '))
             }
             obj_string = rows.join('\n')
-            fs.writeFileSync(path.join(out_dir, idx.toString().padStart(4))+'.obj', obj_string)
+            fs.writeFileSync(path.join(out_dir, idx.toString())+'.obj', obj_string)
         })
     },
     sort_coral_names(names) {

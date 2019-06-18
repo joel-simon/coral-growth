@@ -84,7 +84,7 @@ function init() {
     controls = new THREE.OrbitControls( camera, renderer.domElement );
     controls.autoRotate = false;
     controls.autoRotateSpeed = 0.5;
-    controls.enableKeys = true;
+    controls.enableKeys = false;
     controls.enablePan = true;
     controls.target.y = 2;
 
@@ -177,25 +177,34 @@ function animate() {
 }
 
 function onDocumentKeyDown(event) {
-    console.log(event.which);
-    const keyCode = event.which;
-    const r_key = 82;
-    const space_key = 32;
-    const enter_key = 13;
-
+    console.log(event.which)
+    const keyCode = event.which
+    const r_key = 82
+    const space_key = 32
+    const enter_key = 13
+    const left_key = 37
+    const right_key = 39
     switch(keyCode) {
+        case left_key:
+            corals[0].prevFrame()
+            break
+        case right_key:
+            corals[0].nextFrame()
+            break
         case r_key:
-            need_reset = true;
+            // need_reset = true;
+            corals[0].setFrame(0)
             break;
         case enter_key:
             corals[0].nextFrame(true)
             break;
         case space_key:
-            socket.emit('render-frame', {
-                out_dir: path,
-                frame: corals[0].frame,
-                file: document.querySelector('canvas').toDataURL()
-            });
+            do_animate = !do_animate
+            // socket.emit('render-frame', {
+            //     out_dir: path,
+            //     frame: corals[0].frame,
+            //     file: document.querySelector('canvas').toDataURL()
+            // });
             break;
     }
 };
@@ -251,17 +260,17 @@ function empty_frames() {
 
 function render() {
     renderer.render( scene, camera );
-    if (window.save && coral.frame < coral.num_frames && !finished) {
-        // console.log(coral.frame);
-        if (coral.frame == coral.num_frames-1) {
-            finished = true
-        }
-        socket.emit('render-frame', {
-            out_dir: path,
-            frame: coral.frame,
-            file: document.querySelector('canvas').toDataURL("image/jpeg")
-        });
-    }
+    // if (window.save && coral.frame < coral.num_frames && !finished) {
+    //     // console.log(coral.frame);
+    //     if (coral.frame == coral.num_frames-1) {
+    //         finished = true
+    //     }
+    //     socket.emit('render-frame', {
+    //         out_dir: path,
+    //         frame: coral.frame,
+    //         file: document.querySelector('canvas').toDataURL("image/jpeg")
+    //     });
+    // }
 }
 
 </script>

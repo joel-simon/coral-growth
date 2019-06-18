@@ -58,7 +58,34 @@ module.exports = {
         }
         return { data, verts, faces }
     },
-    data2buffers(data) {
+    read_and_color(files) {
+        const parsed_files = []
+        for (const file of files) {
+            const obj_data = this.parse_obj(file)
+            parsed_files.push(obj_data)
+        }
+
+        const pca = new PCA(concat(parsed_files.map(f => f.data)))
+        const variances = pca.getExplainedVariance()
+        console.log(variances, sum(variances.slice(0,3)))
+
+        for (const obj_data of parsed_files) {
+            const pca_data = pca.predict(obj_data.data, {nComponents: 3}).data
+            const mins = math.min(pca_data, 0)
+            const maxs = math.max(pca_data, 0)
+            const scales = math.subtract(maxs, mins)
+            obj_data.colors = []
+            pca_data.forEach((value, index) => {
+                obj_data.colors.push([
+                    (value[1] - mins[1]) / scales[1], // red
+                    (value[2] - mins[2]) / scales[2], // green
+                    (value[0] - mins[0]) / scales[0] // blue
+                ])
+            })
+        }
+        return parsed_files
+    },
+    data_to_buffers(data) {
         const vert_buffer = new Float32Array(sum(data.map(d => d.verts.length))*3)
         const color_buffer = new Float32Array(sum(data.map(d => d.verts.length))*3)
         const face_buffer = new Uint32Array(sum(data.map(d => d.faces.length))*3)
@@ -88,34 +115,6 @@ module.exports = {
         })
         return { vert_buffer, color_buffer, face_buffer, vert_indices, face_indices }
     },
-    read_and_color(files) {
-        const parsed_files = []
-        for (const file of files) {
-            const obj_data = this.parse_obj(file)
-            parsed_files.push(obj_data)
-        }
-
-        const pca = new PCA(concat(parsed_files.map(f => f.data)))
-        const variances = pca.getExplainedVariance()
-        console.log(variances, sum(variances.slice(0,3)))
-
-        for (const obj_data of parsed_files) {
-            // console.log(obj_data.data)
-            const pca_data = pca.predict(obj_data.data, {nComponents: 3}).data
-            const mins = math.min(pca_data, 0)
-            const maxs = math.max(pca_data, 0)
-            const scales = math.subtract(maxs, mins)
-            obj_data.colors = []
-            pca_data.forEach((value, index) => {
-                obj_data.colors.push([
-                    (value[1] - mins[1]) / scales[1], // red
-                    (value[2] - mins[2]) / scales[2], // green
-                    (value[0] - mins[0]) / scales[0] // blue
-                ])
-            })
-        }
-        return parsed_files
-    },
     write_objs(out_dir, data) {
         data.forEach(({ colors, verts, faces }, idx) => {
             const rows = []
@@ -130,6 +129,14 @@ module.exports = {
             obj_string = rows.join('\n')
             fs.writeFileSync(path.join(out_dir, idx.toString())+'.obj', obj_string)
         })
+    },
+    write_buffers(out_dir, data) {
+        const buffers = this.data_to_buffers(data)
+        this.save_array(path.join(out_dir,'vert_array'), buffers.vert_buffer)
+        this.save_array(path.join(out_dir,'color_array'), buffers.color_buffer)
+        this.save_array(path.join(out_dir,'face_array'), buffers.face_buffer)
+        this.save_array(path.join(out_dir,'vert_indices'), buffers.vert_indices)
+        this.save_array(path.join(out_dir,'face_indices'), buffers.face_indices)
     },
     sort_coral_names(names) {
         names.sort((a, b) => {

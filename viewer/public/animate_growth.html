@@ -17,43 +17,39 @@
 <body>
 <script src="/js/mesh.js"></script>
 <script src="/js/utils.js"></script>
+<script src="/js/coral.js"></script>
 <script src="/js/lib/three.js"></script>
 <script src="/js/lib/OrbitControls.js"></script>
 <script src="/js/lib/OBJLoader.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 
-
-var need_reset = false;
-var finished = false;
-var do_animate = true;
-var scale = false;
+let need_reset = false;
+let finished = false;
+let do_animate = true;
+let scale = true;
 window.save = false;
 
-var renderer, scene, camera;
-var mouse;
-var line;
-var MAX_POINTS = 20000;
-var drawCount;
-var click_objects = [];
+let mouse;
+let line;
+let MAX_POINTS = 20000;
+let drawCount;
+let click_objects = [];
+
+let container, stats;
+let camera, scene, renderer;
+let mesh;
+let animation;
+let particleSystem;
+let particles;
+let laoder;
+let corals = [];
+let path;
 
 init();
 
-var container, stats;
-var camera, scene, renderer;
-var mesh;
-var animation;
-var particleSystem;
-var particles;
-var laoder;
-var corals = [];
-var path;
-
-
 function init() {
     socket = io.connect('http://localhost:9001/')
-    container = document.createElement( 'div' )
-    document.body.appendChild( container )
 
     // CAMERA
     camera = new THREE.PerspectiveCamera( 27, window.innerWidth / window.innerHeight, 1, 3500 );
@@ -67,7 +63,7 @@ function init() {
     // SCENE
     scene = new THREE.Scene();
     // scene.background = new THREE.Color( 0x050505 );
-    // scene.fog = new THREE.Fog(  0x3f7b9d, 0, 200 );
+    scene.fog = new THREE.Fog(  0x3f7b9d, 0, 200 );
 
     // RENDERER
     renderer = new THREE.WebGLRenderer( { antialias: true } );
@@ -78,7 +74,7 @@ function init() {
     renderer.setClearColor( 0xffffff, 1);
     renderer.shadowMap.enabled = true;
     // renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.appendChild( renderer.domElement );
+    document.body.appendChild( renderer.domElement );
 
     // STATS
     // stats = new Stats();
@@ -152,17 +148,17 @@ function init() {
         alert('no path given "?coral="')
     } else {
         console.log(urlParams.get('data'))
-        load_coral('data/'+ encodeURIComponent(path), 0, 0).then(function(coral){
-            // coral.setFrame(coral.num_frames-1);
-            coral.setFrame(0);
-            coral.setRotation(0, Math.PI/4,0);
-            camera.lookAt(coral.dynamicMesh.geometry.boundingSphere.center);
-            corals.push(coral)
-            animate()
-        }).catch(console.log)
-
+        CoralAnimationViewer
+            .fromUrl('data/'+ encodeURIComponent(path), 0, 0)
+            .then(coral => {
+                // coral.setFrame(coral.num_frames-1);
+                coral.setFrame(0);
+                coral.setRotation(0, Math.PI/4,0);
+                camera.lookAt(coral.dynamicMesh.geometry.boundingSphere.center);
+                corals.push(coral)
+                animate()
+            }).catch(console.log)
     }
-
     window.addEventListener( 'resize', onWindowResize, false );
     document.addEventListener("keydown", onDocumentKeyDown, false);
 }
@@ -182,10 +178,10 @@ function animate() {
 
 function onDocumentKeyDown(event) {
     console.log(event.which);
-    var keyCode = event.which;
-    var r_key = 82;
-    var space_key = 32;
-    var enter_key = 13;
+    const keyCode = event.which;
+    const r_key = 82;
+    const space_key = 32;
+    const enter_key = 13;
 
     switch(keyCode) {
         case r_key:
@@ -244,6 +240,8 @@ function update() {
     }
     // controls.target = corals[0].dynamicMesh.geometry.boundingSphere.center
     // camera.lookAt(0,corals[0].dynamicMesh.geometry.boundingSphere.center.y,0);
+    // fitCameraToObject(camera, corals[0].dynamicMesh.mesh, 5, controls)
+
 }
 
 

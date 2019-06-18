@@ -1,76 +1,3 @@
-var MAX_POINTS = 20000;
-class CoralAnimationViewer {
-    constructor(verts, colors, faces, vert_indices, face_indices, polyp_geo) {
-        console.assert(vert_indices.length == face_indices.length)
-        console.assert(verts.length == colors.length)
-
-        this.verts = verts;
-        this.colors = colors;
-        this.faces = faces;
-        this.vert_indices = vert_indices;
-        this.face_indices = face_indices;
-        this.polyp_geo = polyp_geo;
-
-        this.frame = 0
-        this.num_frames = face_indices.length
-
-        this.dynamicMesh = new DynamicMesh(MAX_POINTS)
-        // this.instanceMesh = new DynamicInstancesMesh(MAX_POINTS, polyp_geo)
-
-        this.dynamicMesh.coral = this
-        // this.instanceMesh.coral = this
-
-        this.setFrame(0)
-    }
-
-    addToScene(scene) {
-        scene.add(this.dynamicMesh.mesh)
-        // scene.add(this.instanceMesh.mesh)
-    }
-
-    setPosition(x, y, z) {
-        this.dynamicMesh.mesh.position.set(x, y, z);
-        // this.instanceMesh.mesh.position.set(x, y, z);
-    }
-    getPosition() {
-        return this.dynamicMesh.mesh.position;
-    }
-    setRotation(x, y, z) {
-        this.dynamicMesh.mesh.rotation.set(x, y, z);
-        // this.instanceMesh.mesh.rotation.set(x, y, z);
-    }
-    setScale(scale) {
-        this.dynamicMesh.mesh.scale.set(scale, scale, scale);
-        // this.instanceMesh.mesh.scale.set(scale, scale, scale);
-    }
-
-    setFrame(frame) {
-        if (frame >= this.num_frames || frame < 0) {
-            throw('Invalid frame', frame)
-        }
-        this.frame = frame;
-        var vert_end = this.vert_indices[this.frame];
-        var face_end = this.face_indices[this.frame];
-        var vert_start = (this.frame > 0 ? this.vert_indices[this.frame-1] : 0);
-        var face_start = (this.frame > 0 ? this.face_indices[this.frame-1] : 0);
-        var verts = this.verts.subarray(vert_start, vert_end);
-        var colors = this.colors.subarray(vert_start, vert_end);
-        var faces = this.faces.subarray(face_start, face_end);
-
-        this.dynamicMesh.update(verts, colors, faces);
-        // var directions = this.dynamicMesh.geometry.attributes.normal.array;
-        // this.instanceMesh.update(verts, colors, directions);
-    }
-
-    nextFrame(reset) {
-        if (reset) {
-            this.setFrame((this.frame+1)%this.num_frames);
-        } else if (this.frame+1 < this.num_frames) {
-            this.setFrame(this.frame+1);
-        }
-    }
-}
-
 class DynamicInstancesMesh {
     constructor(instanceCount, geo) {
         // this.position.
@@ -171,7 +98,6 @@ class DynamicInstancesMesh {
 
 class DynamicMesh {
     constructor(max_verts) {
-        console.log(max_verts)
         this.max_verts = max_verts
         this.geometry = new THREE.BufferGeometry()
         var positions = new Float32Array( max_verts * 3 );
@@ -182,6 +108,8 @@ class DynamicMesh {
         this.geometry.setIndex(new THREE.BufferAttribute( indexes, 1 ));
 
         var material = new THREE.MeshPhongMaterial( {
+            shininess: 100,
+            // flatShading: true,
             vertexColors: THREE.VertexColors,
         } );
 
@@ -197,7 +125,6 @@ class DynamicMesh {
         this.geometry.attributes.position.array.fill(0);
         this.geometry.attributes.position.array.set(position);
         this.geometry.attributes.color.array.set(color);
-        // this.geometry.attributes.color.array.fill(0.2);
         this.geometry.index.array.set(indices);
         this.geometry.index.array.fill(0, indices.length);// Fill rest with 0.
         this.geometry.setDrawRange(0, position.length*3);

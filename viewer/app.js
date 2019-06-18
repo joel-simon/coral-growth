@@ -57,9 +57,16 @@ app.get('/dir/:dir', (req, res) => {
     if (directories.length == 0 && files.every(f => f.endsWith('.obj'))) {
         const parent = path.dirname(path_dir)
         const animation_dir = path.join(parent, path.basename(dir)+'_animation')
+        const rgbobj_dir = path.join(parent, path.basename(dir)+'_rgb')
 
-        if (!fs.existsSync(animation_dir)) {
-            objs2buffers(path_dir, animation_dir)
+        if (!fs.existsSync(animation_dir) || !fs.existsSync(rgbobj_dir)) {
+            if (!fs.existsSync(animation_dir)) { fs.mkdirSync(animation_dir) }
+            if (!fs.existsSync(rgbobj_dir)) { fs.mkdirSync(rgbobj_dir) }
+            console.log('Converting data.')
+            const obj_paths = utils.get_obj_paths(path_dir)
+            const data = utils.read_and_color(obj_paths)
+            utils.write_objs(rgbobj_dir, data)
+            utils.write_buffers(animation_dir, data)
         }
         return res.redirect('/animate?data='+ encodeURIComponent(path.join(parent, path.basename(dir)+'_animation')))
 

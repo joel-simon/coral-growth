@@ -10,7 +10,7 @@ class CoralAnimationViewer {
         this.polyp_geo = polyp_geo;
 
         this.frame = 0
-        this.num_frames = face_indices.length -1 //Drop last frame because it has weird results.
+        this.num_frames = face_indices.length - 1 //Drop last frame because it has weird results.
         this.dynamicMesh = new DynamicMesh(MAX_POINTS)
         // this.instanceMesh = new DynamicInstancesMesh(MAX_POINTS, polyp_geo)
         this.dynamicMesh.coral = this
@@ -58,6 +58,11 @@ class CoralAnimationViewer {
             this.setFrame((this.frame+1)%this.num_frames)
         } else if (this.frame+1 < this.num_frames) {
             this.setFrame(this.frame+1)
+        }
+    }
+    prevFrame() {
+        if (this.frame-1 >=0 ) {
+            this.setFrame(this.frame-1)
         }
     }
 
